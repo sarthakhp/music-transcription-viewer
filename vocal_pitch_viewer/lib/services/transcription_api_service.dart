@@ -1,4 +1,5 @@
-import 'dart:typed_data';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/api_response.dart';
@@ -118,14 +119,28 @@ class TranscriptionApiService {
 
   /// Get pitch detection data (10ms intervals)
   /// GET /api/v1/jobs/{job_id}/frames
+  /// Uses isolate-based parsing to avoid blocking the main thread with large JSON
   Future<ApiResponse<ProcessedFramesData>> getFrames(String jobId) async {
-    return ApiErrorHandler.executeApiCall(
-      () => _client.get(
+    try {
+      final response = await _client.get(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/frames')),
         headers: _commonHeaders,
-      ).timeout(ApiConfig.requestTimeout),
-      (json) => ProcessedFramesData.fromJson(json),
-    );
+      ).timeout(ApiConfig.requestTimeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // Parse entire JSON and create ProcessedFramesData in isolate
+        final data = await compute(_parseProcessedFramesData, response.body);
+        return ApiResponse.success(data, statusCode: response.statusCode);
+      }
+
+      // Handle error response
+      return ApiResponse.error(
+        'Failed to fetch frames: ${response.statusCode}',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiErrorHandler.handleException(e);
+    }
   }
 
   // ========== Endpoint 7: Get Chords ==========
@@ -350,3 +365,10 @@ class CompleteJobData {
       instrumentalAudio != null;
 }
 
+/// Top-level function for parsing ProcessedFramesData in isolate
+/// This MUST be a top-level function to work with compute()
+/// Parses JSON string and creates ProcessedFramesData object
+ProcessedFramesData _parseProcessedFramesData(String jsonString) {
+  final jsonData = json.decode(jsonString) as Map<String, dynamic>;
+  return ProcessedFramesData.fromJson(jsonData);
+}

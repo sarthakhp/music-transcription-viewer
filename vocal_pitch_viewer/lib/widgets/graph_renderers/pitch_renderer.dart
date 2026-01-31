@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../models/pitch_data.dart';
 import '../../utils/music_utils.dart';
@@ -28,8 +29,23 @@ class PitchRenderer {
     final minMidi = frequencyToMidi(range.$1, referenceFrequency: referenceFrequency).floor() - 2;
     final maxMidi = frequencyToMidi(range.$2, referenceFrequency: referenceFrequency).ceil() + 2;
 
-    for (final frame in data.processedFrames) {
-      if (frame.time < viewStartTime || frame.time > viewEndTime) continue;
+    // Find the visible frame range using binary search for better performance
+    final startIndex = _findStartIndex();
+    final endIndex = _findEndIndex();
+
+    if (startIndex == -1 || endIndex == -1 || startIndex > endIndex) {
+      return; // No visible frames
+    }
+
+    // Group points by their rendering properties for batching
+    // We'll use a map to group points by their alpha value (confidence)
+    final Map<double, List<Offset>> voicedPointsByAlpha = {};
+    final List<Offset> unvoicedPoints = [];
+
+    // Iterate only through visible frames
+    for (int i = startIndex; i <= endIndex; i++) {
+      final frame = data.processedFrames[i];
+
       if (!frame.isVoiced && !showUnvoiced) continue;
 
       final x = _timeToX(frame.time, rect);
@@ -42,18 +58,98 @@ class PitchRenderer {
 
       if (y < rect.top || y > rect.bottom) continue;
 
-      final paint = Paint()
-        ..color = frame.isVoiced
-            ? primaryColor.withValues(alpha: frame.confidence.clamp(0.3, 1.0))
-            : unvoicedColor
-        ..style = PaintingStyle.fill;
+      final offset = Offset(x, y);
 
-      canvas.drawCircle(
-        Offset(x, y),
-        frame.isVoiced ? GraphConstants.voicedPointRadius : GraphConstants.unvoicedPointRadius,
-        paint,
-      );
+      if (frame.isVoiced) {
+        // Group voiced points by alpha (confidence) for batching
+        final alpha = frame.confidence.clamp(0.3, 1.0);
+        voicedPointsByAlpha.putIfAbsent(alpha, () => []).add(offset);
+      } else {
+        unvoicedPoints.add(offset);
+      }
     }
+
+    // Draw all unvoiced points in one batch
+    if (unvoicedPoints.isNotEmpty) {
+      final paint = Paint()
+        ..color = unvoicedColor
+        ..strokeWidth = GraphConstants.unvoicedPointRadius * 2
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawPoints(ui.PointMode.points, unvoicedPoints, paint);
+    }
+
+    // Draw voiced points batched by alpha value
+    voicedPointsByAlpha.forEach((alpha, points) {
+      if (points.isNotEmpty) {
+        final paint = Paint()
+          ..color = primaryColor.withValues(alpha: alpha)
+          ..strokeWidth = GraphConstants.voicedPointRadius * 2
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke;
+
+        canvas.drawPoints(ui.PointMode.points, points, paint);
+      }
+    });
+  }
+
+  /// Binary search to find the first frame that might be visible
+  int _findStartIndex() {
+    final frames = data.processedFrames;
+    if (frames.isEmpty) return -1;
+
+    // If the first frame is already past our view, return -1
+    if (frames.first.time > viewEndTime) return -1;
+
+    // If the last frame is before our view, return -1
+    if (frames.last.time < viewStartTime) return -1;
+
+    // Binary search for the first frame >= viewStartTime
+    int left = 0;
+    int right = frames.length - 1;
+    int result = 0;
+
+    while (left <= right) {
+      final mid = (left + right) ~/ 2;
+      if (frames[mid].time < viewStartTime) {
+        left = mid + 1;
+      } else {
+        result = mid;
+        right = mid - 1;
+      }
+    }
+
+    return result;
+  }
+
+  /// Binary search to find the last frame that might be visible
+  int _findEndIndex() {
+    final frames = data.processedFrames;
+    if (frames.isEmpty) return -1;
+
+    // If the first frame is already past our view, return -1
+    if (frames.first.time > viewEndTime) return -1;
+
+    // If the last frame is before our view, return -1
+    if (frames.last.time < viewStartTime) return -1;
+
+    // Binary search for the last frame <= viewEndTime
+    int left = 0;
+    int right = frames.length - 1;
+    int result = frames.length - 1;
+
+    while (left <= right) {
+      final mid = (left + right) ~/ 2;
+      if (frames[mid].time <= viewEndTime) {
+        result = mid;
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+
+    return result;
   }
 
   double _timeToX(double time, Rect rect) {

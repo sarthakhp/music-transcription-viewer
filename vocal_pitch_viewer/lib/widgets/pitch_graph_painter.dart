@@ -5,41 +5,40 @@ import 'graph_constants.dart';
 import 'graph_renderers/grid_renderer.dart';
 import 'graph_renderers/axis_renderer.dart';
 import 'graph_renderers/pitch_renderer.dart';
-import 'graph_renderers/playhead_renderer.dart';
 import 'graph_renderers/chord_renderer.dart';
 
-/// Custom painter for the pitch visualization
+/// Custom painter for the pitch visualization (static layer)
+/// This painter only draws content that doesn't change frequently:
+/// - Grid and background
+/// - Axes
+/// - Pitch points
+/// - Chord blocks
+/// The playhead is drawn separately in PlayheadPainter for better performance
 class PitchGraphPainter extends CustomPainter {
   final ProcessedFramesData data;
   final ChordData? chordData;
-  final double currentTime;
   final double viewStartTime;
   final double viewEndTime;
   final Color primaryColor;
   final Color onSurfaceColor;
   final Color gridColor;
-  final Color playheadColor;
   final Color unvoicedColor;
   final Color chordColor;
   final Brightness brightness;
   final double referenceFrequency;
-  final double? hoverTime;
 
   PitchGraphPainter({
     required this.data,
     this.chordData,
-    required this.currentTime,
     required this.viewStartTime,
     required this.viewEndTime,
     required this.primaryColor,
     required this.onSurfaceColor,
     required this.gridColor,
-    required this.playheadColor,
     required this.unvoicedColor,
     required this.chordColor,
     required this.brightness,
     required this.referenceFrequency,
-    this.hoverTime,
   });
 
   @override
@@ -79,16 +78,6 @@ class PitchGraphPainter extends CustomPainter {
       referenceFrequency: referenceFrequency,
     );
 
-    final playheadRenderer = PlayheadRenderer(
-      currentTime: currentTime,
-      viewStartTime: viewStartTime,
-      viewEndTime: viewEndTime,
-      playheadColor: playheadColor,
-      onSurfaceColor: onSurfaceColor,
-      brightness: brightness,
-      hoverTime: hoverTime,
-    );
-
     final chordRenderer = ChordRenderer(
       chordData: chordData,
       viewStartTime: viewStartTime,
@@ -98,24 +87,23 @@ class PitchGraphPainter extends CustomPainter {
       brightness: brightness,
     );
 
-    // Draw in order
+    // Draw static content only (no playhead)
     gridRenderer.drawBackground(canvas, graphRect);
     gridRenderer.drawGrid(canvas, graphRect);
     axisRenderer.drawAxes(canvas, size, graphRect);
     chordRenderer.drawChords(canvas, graphRect); // Draw chords before pitch points
     pitchRenderer.drawPitchPoints(canvas, graphRect);
-    playheadRenderer.drawHoverIndicator(canvas, graphRect);
-    playheadRenderer.drawPlayhead(canvas, graphRect);
   }
 
   @override
   bool shouldRepaint(covariant PitchGraphPainter oldDelegate) {
-    return oldDelegate.currentTime != currentTime ||
-        oldDelegate.viewStartTime != viewStartTime ||
+    // Only repaint when view changes or data changes
+    // Do NOT repaint when only currentTime or hoverTime changes
+    return oldDelegate.viewStartTime != viewStartTime ||
         oldDelegate.viewEndTime != viewEndTime ||
         oldDelegate.chordData != chordData ||
         oldDelegate.referenceFrequency != referenceFrequency ||
-        oldDelegate.hoverTime != hoverTime;
+        oldDelegate.data != data;
   }
 }
 

@@ -36,6 +36,7 @@ class AppState extends ChangeNotifier {
   // Error and loading state
   String? _errorMessage;
   bool _isLoading = false;
+  bool _isPreparingAudio = false; // True while encoding audio files for playback
 
   // Getters - Data
   ProcessedFramesData? get pitchData => _pitchData;
@@ -68,12 +69,13 @@ class AppState extends ChangeNotifier {
   // Getters - Error and loading
   String? get errorMessage => _errorMessage;
   bool get isLoading => _isLoading;
+  bool get isPreparingAudio => _isPreparingAudio;
 
   // Computed getters
   bool get hasData => _pitchData != null;
   bool get hasAudio => _audioBytes != null;
   bool get hasChords => _chordData != null;
-  bool get isReady => hasData && hasAudio;
+  bool get isReady => hasData && hasAudio; // Ready when we have data and audio bytes
   bool get hasActiveJob => _currentJobId != null;
   bool get isJobComplete => _jobStatus == JobStatus.completed;
   bool get isJobFailed => _jobStatus == JobStatus.failed;
@@ -156,6 +158,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPreparingAudio(bool preparing) {
+    _isPreparingAudio = preparing;
+    notifyListeners();
+  }
+
   // Job management setters (NEW)
 
   void setCurrentJobId(String? jobId) {
@@ -219,6 +226,7 @@ class AppState extends ChangeNotifier {
     _jobStatus = JobStatus.queued;
     _isProcessing = true;
     _processingProgress = 0;
+    _processingMessage = null; // Clear any previous message
     notifyListeners();
   }
 

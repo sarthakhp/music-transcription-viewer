@@ -1,12 +1,37 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/api_response.dart';
 
 /// API error handler utility
 class ApiErrorHandler {
-  /// Handle HTTP response and convert to ApiResponse
+  /// Handle HTTP response and convert to ApiResponse (async version for isolate parsing)
+  static Future<ApiResponse<T>> handleResponseAsync<T>(
+    http.Response response,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    try {
+      // Success responses (2xx)
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // Parse JSON in isolate to avoid blocking main thread
+        final jsonData = await compute(_parseJson, response.body);
+        final data = fromJson(jsonData);
+        return ApiResponse.success(data, statusCode: response.statusCode);
+      }
+
+      // Error responses
+      return _handleErrorResponse(response);
+    } catch (e) {
+      return ApiResponse.error(
+        'Failed to parse response: ${e.toString()}',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
+  /// Handle HTTP response and convert to ApiResponse (synchronous - for small responses)
   static ApiResponse<T> handleResponse<T>(
     http.Response response,
     T Function(Map<String, dynamic>) fromJson,
@@ -126,7 +151,20 @@ class ApiErrorHandler {
     );
   }
 
-  /// Execute API call with error handling
+  /// Execute API call with error handling (async parsing in isolate for large responses)
+  static Future<ApiResponse<T>> executeApiCallAsync<T>(
+    Future<http.Response> Function() apiCall,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    try {
+      final response = await apiCall();
+      return await handleResponseAsync(response, fromJson);
+    } catch (e) {
+      return handleException(e);
+    }
+  }
+
+  /// Execute API call with error handling (synchronous parsing for small responses)
   static Future<ApiResponse<T>> executeApiCall<T>(
     Future<http.Response> Function() apiCall,
     T Function(Map<String, dynamic>) fromJson,
@@ -154,9 +192,14 @@ class ApiErrorHandler {
   /// Check if error is retryable
   static bool isRetryable(ApiResponse response) {
     if (response.statusCode == null) return true; // Network errors are retryable
-    
+
     // Retry on server errors and rate limiting
     return response.statusCode! >= 500 || response.statusCode == 429;
   }
 }
 
+/// Top-level function for JSON parsing in isolate
+/// This MUST be a top-level function to work with compute()
+Map<String, dynamic> _parseJson(String jsonString) {
+  return json.decode(jsonString) as Map<String, dynamic>;
+}

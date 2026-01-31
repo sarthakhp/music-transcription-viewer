@@ -27,7 +27,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final bool _isLoadingJson = false;
-  final bool _isLoadingAudio = false;
+  bool _isLoadingAudio = false; // Show loading indicator while audio files are being prepared
   String? _loadingAudioStatus; // Detailed loading status message
 
   // Audio service
@@ -36,6 +36,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   StreamSubscription<Duration?>? _durationSubscription;
   StreamSubscription<bool>? _playingSubscription;
   bool _audioLoaded = false;
+
+  // Smooth playhead animation (60fps)
+  Timer? _playheadAnimationTimer;
+  double _lastKnownPosition = 0.0;
+  DateTime? _lastPositionUpdateTime;
 
   // API services (NEW)
   late final TranscriptionApiService _apiService;
@@ -226,6 +231,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final appState = context.read<AppState>();
 
     try {
+      // Set preparing flag BEFORE downloading to show loading indicator immediately
+      appState.setPreparingAudio(true);
+
       // Download all three stems in parallel
       final results = await Future.wait([
         _apiService.downloadStem(jobId: jobId, stemName: 'original'),
@@ -250,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     } catch (e) {
       debugPrint('Error downloading audio stems: $e');
       appState.setError('Failed to download audio: ${e.toString()}');
+      appState.setPreparingAudio(false);
     }
   }
 
@@ -291,6 +300,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _stopPlayheadAnimation();
     _scrollAnimationController.removeListener(_onScrollAnimationUpdate);
     _scrollAnimationController.dispose();
     _focusNode.dispose();
@@ -485,61 +495,93 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _loadAudio(AppState appState) async {
-    if (appState.audioBytes == null || _audioLoaded) return;
+    if (appState.audioBytes == null || _audioLoaded) {
+      debugPrint('⏭️ Skipping _loadAudio: audioBytes=${appState.audioBytes != null}, _audioLoaded=$_audioLoaded');
+      return;
+    }
+
+    debugPrint('🎵 Starting _loadAudio');
+
+    // Show loading indicator while audio files are being prepared
+    setState(() => _isLoadingAudio = true);
+    appState.setPreparingAudio(true);
 
     final mimeType = _getMimeType(appState.audioFileName ?? '');
+    debugPrint('🎵 MIME type: $mimeType');
 
     // Load all available audio stems (NEW - Phase 3)
     bool success = false;
 
-    // Load additional stems if available from API
+    // Load all tracks sequentially - loading indicator will show progress
     // Priority: original > vocals > fallback to appState.audioBytes
+
     if (appState.originalAudio != null) {
-      await _audioService.loadTrack(
+      debugPrint('🎵 Loading original audio (${appState.originalAudio!.length} bytes)');
+      final result = await _audioService.loadTrack(
         AudioTrackType.original,
         appState.originalAudio!,
         'audio/mpeg',
         setActive: true, // Original is the preferred active track
       );
-      success = true;
+      debugPrint('🎵 Original audio load result: $result');
+      success = result;
     }
 
     if (appState.vocalsAudio != null) {
-      await _audioService.loadTrack(
+      debugPrint('🎵 Loading vocals audio (${appState.vocalsAudio!.length} bytes)');
+      final result = await _audioService.loadTrack(
         AudioTrackType.vocal,
         appState.vocalsAudio!,
         'audio/mpeg',
         setActive: !success, // Set as active only if original wasn't loaded
       );
+      debugPrint('🎵 Vocals audio load result: $result');
       if (!success) {
-        success = true;
+        success = result;
       }
     }
 
     if (appState.instrumentalAudio != null) {
-      await _audioService.loadTrack(
+      debugPrint('🎵 Loading instrumental audio (${appState.instrumentalAudio!.length} bytes)');
+      final result = await _audioService.loadTrack(
         AudioTrackType.instrumental,
         appState.instrumentalAudio!,
         'audio/mpeg',
         setActive: false, // Never set instrumental as default active
       );
+      debugPrint('🎵 Instrumental audio load result: $result');
     }
 
     // Fallback: if no API stems available, load from appState.audioBytes
     if (!success) {
+      debugPrint('🎵 Loading fallback audio from audioBytes (${appState.audioBytes!.length} bytes)');
       success = await _audioService.loadFromBytes(appState.audioBytes!, mimeType);
+      debugPrint('🎵 Fallback audio load result: $success');
     }
 
-    if (success && mounted) {
-      setState(() => _audioLoaded = true);
+    debugPrint('🎵 Audio loading complete. Success: $success');
 
-      // Listen to position updates
+    if (success && mounted) {
+      debugPrint('✅ Setting audio as loaded and clearing preparing flag');
+      setState(() {
+        _audioLoaded = true;
+        _isLoadingAudio = false;
+      });
+      appState.setPreparingAudio(false);
+
+      // Listen to position updates from audio stream (~5 times/sec)
+      // Store actual position and use interpolation for smooth 60fps playhead
       _positionSubscription = _audioService.positionStream.listen((position) {
-        if (mounted) {
-          final time = position.inMilliseconds / 1000.0;
-          appState.setCurrentTime(time);
-          _updateViewWindow(time, appState.pitchData?.maxTime ?? 120);
-        }
+        if (!mounted) return;
+        final time = position.inMilliseconds / 1000.0;
+
+        // Store actual position from stream
+        _lastKnownPosition = time;
+        _lastPositionUpdateTime = DateTime.now();
+
+        // Update immediately
+        appState.setCurrentTime(time);
+        _updateViewWindow(time, appState.pitchData?.maxTime ?? 120);
       });
 
       // Listen to duration updates
@@ -549,13 +591,49 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         }
       });
 
-      // Listen to playing state
+      // Listen to playing state and start/stop smooth animation
       _playingSubscription = _audioService.playingStream.listen((playing) {
         if (mounted) {
           appState.setPlaying(playing);
+          if (playing) {
+            _startPlayheadAnimation();
+          } else {
+            _stopPlayheadAnimation();
+          }
         }
       });
     }
+  }
+
+  /// Start smooth playhead animation at 60fps
+  /// Interpolates position between audio stream updates for smooth movement
+  void _startPlayheadAnimation() {
+    _playheadAnimationTimer?.cancel();
+
+    final appState = context.read<AppState>();
+
+    _playheadAnimationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!mounted || !appState.isPlaying) {
+        _stopPlayheadAnimation();
+        return;
+      }
+
+      if (_lastPositionUpdateTime != null) {
+        // Calculate elapsed time since last position update from audio stream
+        final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
+        final interpolatedPosition = _lastKnownPosition + elapsed.inMilliseconds / 1000.0;
+
+        // Update playhead position smoothly
+        appState.setCurrentTime(interpolatedPosition);
+        _updateViewWindow(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
+      }
+    });
+  }
+
+  /// Stop smooth playhead animation
+  void _stopPlayheadAnimation() {
+    _playheadAnimationTimer?.cancel();
+    _playheadAnimationTimer = null;
   }
 
   String _getMimeType(String fileName) {
@@ -658,8 +736,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ? _buildViewerLayout(context, appState)
                     : _buildUploadLayout(context, appState),
               ),
-              // Loading overlay when loading job data
-              LoadingOverlay(isVisible: appState.isLoading && !appState.isReady),
+              // Loading overlay when loading job data OR preparing audio
+              LoadingOverlay(
+                isVisible: (appState.isLoading && !appState.isReady) || appState.isPreparingAudio,
+                message: appState.isPreparingAudio ? 'Preparing audio files...' : null,
+              ),
             ],
           ),
         ),
@@ -691,8 +772,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final screenWidth = MediaQuery.of(context).size.width;
     final isNarrow = screenWidth < 800;
 
-    // Load audio when entering viewer
-    if (!_audioLoaded && appState.audioBytes != null) {
+    // Load audio when entering viewer (only once)
+    if (!_audioLoaded && !_isLoadingAudio && appState.audioBytes != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadAudio(appState);
       });
@@ -715,18 +796,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           child: ClipRect(
             child: Stack(
               children: [
-                // Pitch graph
-                PitchGraph(
-                  data: appState.pitchData!,
-                  chordData: appState.chordData,
-                  currentTime: appState.currentTime,
-                  viewStartTime: _viewStartTime,
-                  viewEndTime: _viewStartTime + _viewWindowSize,
-                  referenceFrequency: appState.referenceFrequency,
-                  autoScroll: _autoScroll,
-                  onSeek: _seekTo,
-                  onZoom: _handleZoom,
-                  onPan: _handlePan,
+                // Pitch graph with RepaintBoundary for performance isolation
+                RepaintBoundary(
+                  child: PitchGraph(
+                    data: appState.pitchData!,
+                    chordData: appState.chordData,
+                    currentTime: appState.currentTime,
+                    viewStartTime: _viewStartTime,
+                    viewEndTime: _viewStartTime + _viewWindowSize,
+                    referenceFrequency: appState.referenceFrequency,
+                    autoScroll: _autoScroll,
+                    onSeek: _seekTo,
+                    onZoom: _handleZoom,
+                    onPan: _handlePan,
+                  ),
                 ),
 
               // Auto-scroll indicator (bottom-right corner)

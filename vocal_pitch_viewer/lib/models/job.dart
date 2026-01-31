@@ -216,12 +216,12 @@ class JobListItem {
       status: JobStatus.fromString(json['status'] as String),
       stage: json['stage'] as String?,
       progress: json['progress'] as int,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: DateTime.parse('${json['created_at'] as String}Z').toLocal(),
       startedAt: json['started_at'] != null
-          ? DateTime.parse(json['started_at'] as String)
+          ? DateTime.parse('${json['started_at'] as String}Z').toLocal()
           : null,
       completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'] as String)
+          ? DateTime.parse('${json['completed_at'] as String}Z').toLocal()
           : null,
       errorMessage: json['error_message'] as String?,
       inputFilename: json['input_filename'] as String,

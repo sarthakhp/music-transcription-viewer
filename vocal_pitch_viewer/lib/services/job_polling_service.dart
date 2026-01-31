@@ -154,6 +154,9 @@ class JobPollingService {
   /// Download audio stems
   Future<void> _downloadAudioStems(String jobId, String? inputFilename) async {
     try {
+      // Set preparing flag BEFORE downloading to show loading indicator immediately
+      _appState.setPreparingAudio(true);
+
       // Download all three stems in parallel
       final results = await Future.wait([
         _apiService.downloadStem(jobId: jobId, stemName: 'original'),
@@ -174,6 +177,7 @@ class JobPollingService {
       }
     } catch (e) {
       debugPrint('Failed to download audio stems: $e');
+      _appState.setPreparingAudio(false);
     }
   }
 

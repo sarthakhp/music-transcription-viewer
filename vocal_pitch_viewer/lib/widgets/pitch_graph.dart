@@ -3,6 +3,7 @@ import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import 'graph_constants.dart';
 import 'pitch_graph_painter.dart';
+import 'playhead_painter.dart';
 
 /// Main pitch graph widget with axes and visualization
 class PitchGraph extends StatefulWidget {
@@ -171,20 +172,28 @@ class _PitchGraphState extends State<PitchGraph> {
                 color: colorScheme.surface,
                 child: CustomPaint(
                   size: Size(width, height),
+                  // Static layer: pitch points, grid, axes, chords
                   painter: PitchGraphPainter(
                     data: widget.data,
                     chordData: widget.chordData,
-                    currentTime: widget.currentTime,
                     viewStartTime: widget.viewStartTime,
                     viewEndTime: effectiveEndTime,
                     primaryColor: colorScheme.primary,
                     onSurfaceColor: colorScheme.onSurface,
                     gridColor: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                    playheadColor: Colors.red,
                     unvoicedColor: colorScheme.onSurface.withValues(alpha: 0.2),
                     chordColor: colorScheme.tertiary,
                     brightness: theme.brightness,
                     referenceFrequency: widget.referenceFrequency,
+                  ),
+                  // Dynamic layer: playhead only (repaints frequently)
+                  foregroundPainter: PlayheadPainter(
+                    currentTime: widget.currentTime,
+                    viewStartTime: widget.viewStartTime,
+                    viewEndTime: effectiveEndTime,
+                    playheadColor: Colors.red,
+                    onSurfaceColor: colorScheme.onSurface,
+                    brightness: theme.brightness,
                     hoverTime: _hoverTime,
                   ),
                 ),

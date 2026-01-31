@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert'; // For base64Encode on web
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -7,6 +8,37 @@ enum AudioTrackType {
   original,
   vocal,
   instrumental,
+}
+
+/// Custom audio source that streams bytes directly without base64 encoding
+/// This is much more efficient than using data URIs for large audio files
+class BytesAudioSource extends StreamAudioSource {
+  final Uint8List bytes;
+  final String mimeType;
+
+  BytesAudioSource(this.bytes, this.mimeType);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    try {
+      start ??= 0;
+      end ??= bytes.length;
+
+      debugPrint('🎵 BytesAudioSource.request: start=$start, end=$end, total=${bytes.length}');
+
+      return StreamAudioResponse(
+        sourceLength: bytes.length,
+        contentLength: end - start,
+        offset: start,
+        stream: Stream.value(bytes.sublist(start, end)),
+        contentType: mimeType,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in BytesAudioSource.request: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
 }
 
 /// Audio playback service using just_audio with multi-track support
@@ -58,30 +90,50 @@ class AudioService {
     void Function(String status)? onStatusUpdate,
   }) async {
     try {
+      debugPrint('🎵 Loading track $trackType (${bytes.length} bytes, $mimeType)');
+
       // Dispose existing player for this track if any
       await _players[trackType]?.dispose();
 
       final player = AudioPlayer();
       _players[trackType] = player;
 
-      // Create a data URI from bytes for web compatibility
-      onStatusUpdate?.call('Encoding audio data...');
-      final base64Data = _bytesToBase64(bytes);
-      final dataUri = 'data:$mimeType;base64,$base64Data';
+      // On web, StreamAudioSource converts to Data URI anyway, so we do it directly
+      // On mobile/desktop, use StreamAudioSource for better performance
+      if (kIsWeb) {
+        // Web: Use base64 Data URI (what StreamAudioSource does internally anyway)
+        onStatusUpdate?.call('Encoding audio data...');
+        debugPrint('🎵 Encoding to base64 for web platform');
+        final base64Data = await compute(_base64EncodeInIsolate, bytes);
+        final dataUri = 'data:$mimeType;base64,$base64Data';
 
-      // Load the audio into the player
-      onStatusUpdate?.call('Initializing player...');
-      await player.setUrl(dataUri);
+        onStatusUpdate?.call('Initializing player...');
+        debugPrint('🎵 Setting URL for $trackType');
+        await player.setUrl(dataUri);
+      } else {
+        // Mobile/Desktop: Use StreamAudioSource for efficient streaming
+        onStatusUpdate?.call('Preparing audio data...');
+        debugPrint('🎵 Creating BytesAudioSource for $trackType');
+        final audioSource = BytesAudioSource(bytes, mimeType);
+
+        onStatusUpdate?.call('Initializing player...');
+        debugPrint('🎵 Setting audio source for $trackType');
+        await player.setAudioSource(audioSource);
+      }
+
+      debugPrint('🎵 Successfully loaded track $trackType');
 
       // If this should be the active track, set up listeners
       if (setActive) {
         _activeTrack = trackType;
         _setupListeners(player);
+        debugPrint('🎵 Set $trackType as active track');
       }
 
       return true;
-    } catch (e) {
-      debugPrint('Error loading track $trackType: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading track $trackType: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }
@@ -182,17 +234,8 @@ class AudioService {
   }
 
   /// Switch to a new audio source while preserving position and playback state
-  /// Returns true if successful (legacy method - uses setUrl which is slow)
+  /// Returns true if successful (legacy method - use switchToTrack for instant switching)
   Future<bool> switchSource(Uint8List bytes, String mimeType) async {
-    // Create a data URI from bytes for web compatibility
-    final base64Data = _bytesToBase64(bytes);
-    final dataUri = 'data:$mimeType;base64,$base64Data';
-    return switchSourceFromUri(dataUri);
-  }
-
-  /// Switch to a new audio source from a pre-computed data URI
-  /// Legacy method - use switchToTrack for instant switching
-  Future<bool> switchSourceFromUri(String dataUri) async {
     if (_player == null) {
       debugPrint('Cannot switch source: player not initialized');
       return false;
@@ -206,8 +249,11 @@ class AudioService {
       // Stop current playback
       await _player!.pause();
 
+      // Create audio source from bytes (no base64 encoding needed!)
+      final audioSource = BytesAudioSource(bytes, mimeType);
+
       // Load new source
-      await _player!.setUrl(dataUri);
+      await _player!.setAudioSource(audioSource);
 
       // Restore position
       await _player!.seek(currentPosition);
@@ -299,24 +345,10 @@ class AudioService {
     }
     _players.clear();
   }
-  
-  /// Convert bytes to base64 string
-  String _bytesToBase64(Uint8List bytes) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    final buffer = StringBuffer();
-    
-    for (int i = 0; i < bytes.length; i += 3) {
-      int b1 = bytes[i];
-      int b2 = i + 1 < bytes.length ? bytes[i + 1] : 0;
-      int b3 = i + 2 < bytes.length ? bytes[i + 2] : 0;
-      
-      buffer.write(chars[(b1 >> 2) & 0x3F]);
-      buffer.write(chars[((b1 << 4) | (b2 >> 4)) & 0x3F]);
-      buffer.write(i + 1 < bytes.length ? chars[((b2 << 2) | (b3 >> 6)) & 0x3F] : '=');
-      buffer.write(i + 2 < bytes.length ? chars[b3 & 0x3F] : '=');
-    }
-    
-    return buffer.toString();
-  }
 }
 
+/// Top-level function for base64 encoding in isolate (web only)
+/// This MUST be a top-level function to work with compute()
+String _base64EncodeInIsolate(Uint8List bytes) {
+  return base64Encode(bytes);
+}

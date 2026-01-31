@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 /// Loading overlay widget that displays when loading job data
 class LoadingOverlay extends StatelessWidget {
   final bool isVisible;
+  final String? message;
+  final String? subtitle;
 
   const LoadingOverlay({
     super.key,
     required this.isVisible,
+    this.message,
+    this.subtitle,
   });
 
   @override
@@ -32,18 +36,28 @@ class LoadingOverlay extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'Loading job data...',
+              message ?? 'Loading job data...',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Fetching pitch data, chords, and audio files',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.7),
+            if (subtitle != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
               ),
-            ),
+            ] else ...[
+              const SizedBox(height: 8),
+              Text(
+                'Fetching pitch data, chords, and audio files',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
           ],
         ),
       ),
