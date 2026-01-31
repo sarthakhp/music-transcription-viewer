@@ -204,7 +204,13 @@ class ProcessingStatusCard extends StatelessWidget {
     if (appState.isUploading) {
       return 'Uploading your audio file to the server';
     }
-    
+
+    // Use message from API if available
+    if (appState.processingMessage != null && appState.processingMessage!.isNotEmpty) {
+      return appState.processingMessage!;
+    }
+
+    // Fallback to stage-based messages
     if (appState.processingStage != null) {
       switch (appState.processingStage!) {
         case ProcessingStage.separation:
@@ -215,7 +221,7 @@ class ProcessingStatusCard extends StatelessWidget {
           return 'Analyzing chord progression';
       }
     }
-    
+
     return 'Processing your audio file';
   }
 }

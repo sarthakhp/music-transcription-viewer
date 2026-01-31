@@ -89,6 +89,7 @@ class JobPollingService {
         status: status.status,
         stage: status.stage,
         progress: status.progress,
+        message: status.message,
       );
 
       // Check if job is complete or failed

@@ -5,7 +5,7 @@ import '../models/job.dart';
 class JobListCard extends StatelessWidget {
   final List<JobListItem> jobs;
   final Function(String jobId) onJobSelected;
-  final Function(String jobId)? onJobDeleted;
+  final Future<void> Function(String jobId)? onJobDeleted;
   final bool isLoading;
 
   const JobListCard({
@@ -137,7 +137,7 @@ class JobListCard extends StatelessWidget {
 class _JobListTile extends StatefulWidget {
   final JobListItem job;
   final VoidCallback onTap;
-  final VoidCallback? onDelete;
+  final Future<void> Function()? onDelete;
 
   const _JobListTile({
     required this.job,
@@ -182,7 +182,14 @@ class _JobListTileState extends State<_JobListTile> {
 
     if (confirmed == true && mounted) {
       setState(() => _isDeleting = true);
-      widget.onDelete!();
+      try {
+        await widget.onDelete!();
+      } finally {
+        // Reset deleting state if widget is still mounted
+        if (mounted) {
+          setState(() => _isDeleting = false);
+        }
+      }
     }
   }
 

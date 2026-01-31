@@ -85,6 +85,7 @@ class JobStatusResponse {
   final ProcessingStage? stage;
   final int progress;
   final String? errorMessage;
+  final String? message;
 
   const JobStatusResponse({
     required this.id,
@@ -92,6 +93,7 @@ class JobStatusResponse {
     this.stage,
     required this.progress,
     this.errorMessage,
+    this.message,
   });
 
   factory JobStatusResponse.fromJson(Map<String, dynamic> json) {
@@ -104,6 +106,7 @@ class JobStatusResponse {
             : null,
         progress: (json['progress'] as num?)?.toInt() ?? 0,
         errorMessage: json['error_message'] as String?,
+        message: json['message'] as String?,
       );
     } catch (e) {
       throw FormatException('Failed to parse JobStatusResponse: $e, JSON: $json');

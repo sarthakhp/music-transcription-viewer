@@ -29,6 +29,7 @@ class AppState extends ChangeNotifier {
   JobStatus? _jobStatus;
   ProcessingStage? _processingStage;
   int _processingProgress = 0;
+  String? _processingMessage;
   bool _isUploading = false;
   bool _isProcessing = false;
 
@@ -60,6 +61,7 @@ class AppState extends ChangeNotifier {
   JobStatus? get jobStatus => _jobStatus;
   ProcessingStage? get processingStage => _processingStage;
   int get processingProgress => _processingProgress;
+  String? get processingMessage => _processingMessage;
   bool get isUploading => _isUploading;
   bool get isProcessing => _isProcessing;
 
@@ -192,11 +194,13 @@ class AppState extends ChangeNotifier {
     required JobStatus status,
     ProcessingStage? stage,
     required int progress,
+    String? message,
   }) {
     _currentJobId = jobId;
     _jobStatus = status;
     _processingStage = stage;
     _processingProgress = progress.clamp(0, 100);
+    _processingMessage = message;
     _isProcessing = status == JobStatus.processing || status == JobStatus.queued;
     notifyListeners();
   }
@@ -241,6 +245,7 @@ class AppState extends ChangeNotifier {
     _jobStatus = null;
     _processingStage = null;
     _processingProgress = 0;
+    _processingMessage = null;
     _isUploading = false;
     _isProcessing = false;
     notifyListeners();
@@ -267,6 +272,7 @@ class AppState extends ChangeNotifier {
     _jobStatus = null;
     _processingStage = null;
     _processingProgress = 0;
+    _processingMessage = null;
     _isUploading = false;
     _isProcessing = false;
 
