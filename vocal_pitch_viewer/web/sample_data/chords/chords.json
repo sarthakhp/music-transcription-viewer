@@ -1,0 +1,409 @@
+{
+  "duration": 85.22401360544218,
+  "sample_rate": 44100,
+  "tempo_bpm": 120.0,
+  "key_info": {},
+  "num_chords": 40,
+  "chords": [
+    {
+      "start_time": 0.0,
+      "end_time": 0.4629629629629629,
+      "duration": 0.4629629629629629,
+      "chord_label": "N",
+      "confidence": 0.5083732008934021,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 0.4629629629629629,
+      "end_time": 15.185185185185185,
+      "duration": 14.722222222222221,
+      "chord_label": "C",
+      "confidence": 0.4990379214286804,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 15.185185185185185,
+      "end_time": 16.75925925925926,
+      "duration": 1.5740740740740744,
+      "chord_label": "G",
+      "confidence": 0.5212114453315735,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 16.75925925925926,
+      "end_time": 18.14814814814815,
+      "duration": 1.3888888888888893,
+      "chord_label": "C",
+      "confidence": 0.5475245714187622,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 18.14814814814815,
+      "end_time": 20.0,
+      "duration": 1.8518518518518512,
+      "chord_label": "G",
+      "confidence": 0.9176934361457825,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 20.0,
+      "end_time": 23.425925925925924,
+      "duration": 3.425925925925924,
+      "chord_label": "C",
+      "confidence": 0.42265433073043823,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 23.425925925925924,
+      "end_time": 26.944444444444443,
+      "duration": 3.518518518518519,
+      "chord_label": "A:min",
+      "confidence": 0.4133237898349762,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 26.944444444444443,
+      "end_time": 27.59259259259259,
+      "duration": 0.6481481481481488,
+      "chord_label": "G",
+      "confidence": 0.5065979957580566,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 27.59259259259259,
+      "end_time": 30.0,
+      "duration": 2.4074074074074083,
+      "chord_label": "C",
+      "confidence": 0.9620241522789001,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 30.0,
+      "end_time": 33.33333333333333,
+      "duration": 3.3333333333333286,
+      "chord_label": "A:min",
+      "confidence": 0.6057221293449402,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 33.33333333333333,
+      "end_time": 34.81481481481481,
+      "duration": 1.481481481481481,
+      "chord_label": "F",
+      "confidence": 0.696357011795044,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 34.81481481481481,
+      "end_time": 36.666666666666664,
+      "duration": 1.8518518518518547,
+      "chord_label": "E:min",
+      "confidence": 0.7455652356147766,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 36.666666666666664,
+      "end_time": 37.31481481481481,
+      "duration": 0.6481481481481453,
+      "chord_label": "F",
+      "confidence": 0.6425706148147583,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 37.31481481481481,
+      "end_time": 38.148148148148145,
+      "duration": 0.8333333333333357,
+      "chord_label": "G",
+      "confidence": 0.7027022242546082,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 38.148148148148145,
+      "end_time": 39.166666666666664,
+      "duration": 1.018518518518519,
+      "chord_label": "C",
+      "confidence": 0.48192134499549866,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 39.166666666666664,
+      "end_time": 39.53703703703704,
+      "duration": 0.3703703703703738,
+      "chord_label": "C:min",
+      "confidence": 0.4739517271518707,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 39.53703703703704,
+      "end_time": 40.648148148148145,
+      "duration": 1.1111111111111072,
+      "chord_label": "F",
+      "confidence": 0.49834883213043213,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 40.648148148148145,
+      "end_time": 41.388888888888886,
+      "duration": 0.7407407407407405,
+      "chord_label": "G",
+      "confidence": 0.7473124861717224,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 41.388888888888886,
+      "end_time": 46.388888888888886,
+      "duration": 5.0,
+      "chord_label": "C",
+      "confidence": 0.8613319396972656,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 46.388888888888886,
+      "end_time": 49.72222222222222,
+      "duration": 3.3333333333333357,
+      "chord_label": "F",
+      "confidence": 0.4153795838356018,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 50.0,
+      "end_time": 52.77777777777777,
+      "duration": 2.7777777777777715,
+      "chord_label": "C#",
+      "confidence": 0.4463856518268585,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 52.77777777777777,
+      "end_time": 55.83333333333333,
+      "duration": 3.055555555555557,
+      "chord_label": "G#",
+      "confidence": 0.4558219909667969,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 55.83333333333333,
+      "end_time": 57.31481481481481,
+      "duration": 1.481481481481481,
+      "chord_label": "C#",
+      "confidence": 0.48219940066337585,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 57.31481481481481,
+      "end_time": 58.148148148148145,
+      "duration": 0.8333333333333357,
+      "chord_label": "G#",
+      "confidence": 0.48612359166145325,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 58.148148148148145,
+      "end_time": 58.98148148148148,
+      "duration": 0.8333333333333357,
+      "chord_label": "C#",
+      "confidence": 0.4606553316116333,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 58.98148148148148,
+      "end_time": 60.0,
+      "duration": 1.018518518518519,
+      "chord_label": "G#",
+      "confidence": 0.5964378714561462,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 60.0,
+      "end_time": 62.68518518518518,
+      "duration": 2.6851851851851833,
+      "chord_label": "G",
+      "confidence": 0.5655146837234497,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 62.68518518518518,
+      "end_time": 64.25925925925925,
+      "duration": 1.574074074074069,
+      "chord_label": "F",
+      "confidence": 0.3912819027900696,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 64.25925925925925,
+      "end_time": 68.05555555555556,
+      "duration": 3.7962962962963047,
+      "chord_label": "G#",
+      "confidence": 0.39596790075302124,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 68.05555555555556,
+      "end_time": 68.79629629629629,
+      "duration": 0.7407407407407334,
+      "chord_label": "C#",
+      "confidence": 0.45198163390159607,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 68.79629629629629,
+      "end_time": 70.0,
+      "duration": 1.2037037037037095,
+      "chord_label": "C",
+      "confidence": 0.7333824634552002,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 70.0,
+      "end_time": 71.29629629629629,
+      "duration": 1.2962962962962905,
+      "chord_label": "G",
+      "confidence": 0.3726145923137665,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 71.29629629629629,
+      "end_time": 72.4074074074074,
+      "duration": 1.1111111111111143,
+      "chord_label": "C",
+      "confidence": 0.4542965292930603,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 72.4074074074074,
+      "end_time": 75.83333333333333,
+      "duration": 3.425925925925924,
+      "chord_label": "G",
+      "confidence": 0.7436892986297607,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 75.83333333333333,
+      "end_time": 77.5,
+      "duration": 1.6666666666666714,
+      "chord_label": "F",
+      "confidence": 0.6369791030883789,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 77.5,
+      "end_time": 78.05555555555556,
+      "duration": 0.5555555555555571,
+      "chord_label": "E",
+      "confidence": 0.42678600549697876,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 78.05555555555556,
+      "end_time": 79.16666666666666,
+      "duration": 1.1111111111111,
+      "chord_label": "G#",
+      "confidence": 0.5503137707710266,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 80.83333333333333,
+      "end_time": 81.75925925925925,
+      "duration": 0.9259259259259238,
+      "chord_label": "C:min",
+      "confidence": 0.41786515712738037,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 81.75925925925925,
+      "end_time": 84.35185185185185,
+      "duration": 2.5925925925925952,
+      "chord_label": "B:min",
+      "confidence": 0.39468446373939514,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    },
+    {
+      "start_time": 84.35185185185185,
+      "end_time": 84.81481481481481,
+      "duration": 0.4629629629629619,
+      "chord_label": "C:min",
+      "confidence": 0.3774931728839874,
+      "root": "",
+      "quality": "",
+      "bass": ""
+    }
+  ]
+}
