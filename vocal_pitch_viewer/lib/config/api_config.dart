@@ -1,7 +1,7 @@
 /// API configuration for the Music Transcription service
 class ApiConfig {
   // Base URL for the API - Switch between ngrok and localhost here
-  static const bool _useNgrok = true; // Change to false for localhost
+  static const bool _useNgrok = false; // Change to false for localhost
   static const String _ngrokUrl = 'https://hypocotylous-krysten-abominably.ngrok-free.dev';
   static const String _localhostUrl = 'http://localhost:8000';
   static String get baseUrl => _useNgrok ? _ngrokUrl : _localhostUrl;

@@ -10,6 +10,8 @@ class AxisRenderer {
   final double viewEndTime;
   final Color textColor;
   final double referenceFrequency;
+  final double minMidi;
+  final double maxMidi;
 
   AxisRenderer({
     required this.data,
@@ -17,6 +19,8 @@ class AxisRenderer {
     required this.viewEndTime,
     required this.textColor,
     required this.referenceFrequency,
+    required this.minMidi,
+    required this.maxMidi,
   });
 
   void drawAxes(Canvas canvas, Size size, Rect rect) {
@@ -43,13 +47,9 @@ class AxisRenderer {
   }
 
   void _drawPianoLabels(Canvas canvas, Rect rect, TextStyle style) {
-    final range = data.frequencyRange;
-    final minMidi = frequencyToMidi(range.$1, referenceFrequency: referenceFrequency).floor() - 2;
-    final maxMidi = frequencyToMidi(range.$2, referenceFrequency: referenceFrequency).ceil() + 2;
-
     // Draw label for each note
-    for (int midi = minMidi; midi <= maxMidi; midi++) {
-      final y = _midiToY(midi.toDouble(), rect, minMidi.toDouble(), maxMidi.toDouble());
+    for (int midi = minMidi.floor(); midi <= maxMidi.ceil(); midi++) {
+      final y = _midiToY(midi.toDouble(), rect, minMidi, maxMidi);
       final label = midiToNoteName(midi.toDouble());
       // Make C notes (octave markers) bold
       final labelStyle = midi % 12 == 0

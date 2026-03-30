@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
@@ -13,8 +14,12 @@ class PitchGraph extends StatefulWidget {
   final double viewStartTime;
   final double viewEndTime;
   final double referenceFrequency;
+  final double minMidi;
+  final double maxMidi;
   final Function(double time)? onSeek;
   final Function(double zoomDelta, double focalPointRatio)? onZoom;
+  final Function(double scaleFactor)? onYZoom;
+  final Function(double scrollDeltaY)? onYPan;
   final Function(double panDelta)? onPan;
   final bool autoScroll;
 
@@ -26,8 +31,12 @@ class PitchGraph extends StatefulWidget {
     this.viewStartTime = 0,
     this.viewEndTime = 0,
     this.referenceFrequency = 440.0,
+    required this.minMidi,
+    required this.maxMidi,
     this.onSeek,
     this.onZoom,
+    this.onYZoom,
+    this.onYPan,
     this.onPan,
     this.autoScroll = true,
   });
@@ -58,11 +67,6 @@ class _PitchGraphState extends State<PitchGraph> {
     return widget.viewStartTime + ratio * (effectiveEndTime - widget.viewStartTime);
   }
 
-  double _getFocalPointRatio(double x, double width) {
-    final graphWidth = width - _leftPadding - _rightPadding;
-    return ((x - _leftPadding) / graphWidth).clamp(0, 1);
-  }
-
   void _handleTap(TapUpDetails details, double width) {
     if (widget.onSeek == null) return;
 
@@ -87,26 +91,27 @@ class _PitchGraphState extends State<PitchGraph> {
 
   // Track if we're in a pinch gesture (2+ fingers)
   bool _isPinching = false;
+  // Track last scale to compute incremental factor each frame
+  double _lastScale = 1.0;
 
   void _handleScaleStart(ScaleStartDetails details) {
     _initialScale = 1.0;
+    _lastScale = 1.0;
     _isPinching = details.pointerCount >= 2;
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details, double width) {
     if (_initialScale == null) return;
 
-    // Update pinching state
     if (details.pointerCount >= 2) {
       _isPinching = true;
     }
 
-    final focalPointRatio = _getFocalPointRatio(details.localFocalPoint.dx, width);
-
-    // Handle zoom (pinch gesture only)
-    if (details.scale != 1.0 && widget.onZoom != null && _isPinching) {
-      final zoomDelta = (details.scale - 1.0) * 2; // Amplify for responsiveness
-      widget.onZoom!(zoomDelta, focalPointRatio);
+    // Handle Y-axis semantic zoom for touch screens (multi-touch pinch)
+    if (details.scale != 1.0 && _isPinching && widget.onYZoom != null) {
+      final scaleFactor = details.scale / _lastScale;
+      _lastScale = details.scale;
+      widget.onYZoom!(scaleFactor);
     }
 
     // Note: Pan is handled by Listener's onPointerMove for more responsive dragging
@@ -114,6 +119,7 @@ class _PitchGraphState extends State<PitchGraph> {
 
   void _handleScaleEnd(ScaleEndDetails details) {
     _initialScale = null;
+    _lastScale = 1.0;
     _isPinching = false;
   }
 
@@ -159,6 +165,30 @@ class _PitchGraphState extends State<PitchGraph> {
           onPointerDown: (event) => _handlePointerDown(event, width),
           onPointerMove: (event) => _handlePointerMove(event, width),
           onPointerUp: _handlePointerUp,
+          onPointerSignal: (event) {
+            if (event is PointerScaleEvent && widget.onYZoom != null) {
+              GestureBinding.instance.pointerSignalResolver.register(event, (event) {
+                widget.onYZoom!((event as PointerScaleEvent).scale);
+              });
+            } else if (event is PointerScrollEvent) {
+              final dx = event.scrollDelta.dx;
+              final dy = event.scrollDelta.dy;
+              if (dx != 0 || dy != 0) {
+                GestureBinding.instance.pointerSignalResolver.register(event, (event) {
+                  final scroll = event as PointerScrollEvent;
+                  if (scroll.scrollDelta.dy != 0) {
+                    widget.onYPan?.call(scroll.scrollDelta.dy);
+                  }
+                  if (scroll.scrollDelta.dx != 0 && widget.onPan != null) {
+                    final graphWidth = width - _leftPadding - _rightPadding;
+                    final viewDuration = widget.viewEndTime - widget.viewStartTime;
+                    final timeDelta = scroll.scrollDelta.dx * viewDuration / graphWidth;
+                    widget.onPan!(timeDelta);
+                  }
+                });
+              }
+            }
+          },
           child: MouseRegion(
             onHover: (event) => _handleHover(event, width),
             onExit: (_) => setState(() => _hoverTime = null),
@@ -185,6 +215,8 @@ class _PitchGraphState extends State<PitchGraph> {
                     chordColor: colorScheme.tertiary,
                     brightness: theme.brightness,
                     referenceFrequency: widget.referenceFrequency,
+                    minMidi: widget.minMidi,
+                    maxMidi: widget.maxMidi,
                   ),
                   // Dynamic layer: playhead only (repaints frequently)
                   foregroundPainter: PlayheadPainter(

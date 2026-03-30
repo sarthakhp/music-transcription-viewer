@@ -39,7 +39,7 @@ class PlayheadRenderer {
       fontWeight: FontWeight.bold,
     );
     final tp = TextPainter(
-      text: TextSpan(text: formatTime(currentTime), style: textStyle),
+      text: TextSpan(text: formatTimeWithMs(currentTime), style: textStyle),
       textDirection: TextDirection.ltr,
     )..layout();
 
@@ -77,7 +77,7 @@ class PlayheadRenderer {
       fontSize: 10,
     );
     final tp = TextPainter(
-      text: TextSpan(text: formatTime(hoverTime!), style: textStyle),
+      text: TextSpan(text: formatTimeWithMs(hoverTime!), style: textStyle),
       textDirection: TextDirection.ltr,
     )..layout();
 

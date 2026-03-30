@@ -261,7 +261,7 @@ class _ReferenceFrequencyControlState extends State<_ReferenceFrequencyControl> 
         ),
         // Text input
         SizedBox(
-          width: 50,
+          width: 62,
           child: TextField(
             controller: _controller,
             focusNode: _focusNode,

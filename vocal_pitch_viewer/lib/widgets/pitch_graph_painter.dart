@@ -26,6 +26,8 @@ class PitchGraphPainter extends CustomPainter {
   final Color chordColor;
   final Brightness brightness;
   final double referenceFrequency;
+  final double minMidi;
+  final double maxMidi;
 
   PitchGraphPainter({
     required this.data,
@@ -39,6 +41,8 @@ class PitchGraphPainter extends CustomPainter {
     required this.chordColor,
     required this.brightness,
     required this.referenceFrequency,
+    required this.minMidi,
+    required this.maxMidi,
   });
 
   @override
@@ -58,6 +62,8 @@ class PitchGraphPainter extends CustomPainter {
       gridColor: gridColor,
       brightness: brightness,
       referenceFrequency: referenceFrequency,
+      minMidi: minMidi,
+      maxMidi: maxMidi,
     );
 
     final axisRenderer = AxisRenderer(
@@ -66,6 +72,8 @@ class PitchGraphPainter extends CustomPainter {
       viewEndTime: viewEndTime,
       textColor: onSurfaceColor,
       referenceFrequency: referenceFrequency,
+      minMidi: minMidi,
+      maxMidi: maxMidi,
     );
 
     final pitchRenderer = PitchRenderer(
@@ -76,6 +84,8 @@ class PitchGraphPainter extends CustomPainter {
       primaryColor: primaryColor,
       unvoicedColor: unvoicedColor,
       referenceFrequency: referenceFrequency,
+      minMidi: minMidi,
+      maxMidi: maxMidi,
     );
 
     final chordRenderer = ChordRenderer(
@@ -103,7 +113,9 @@ class PitchGraphPainter extends CustomPainter {
         oldDelegate.viewEndTime != viewEndTime ||
         oldDelegate.chordData != chordData ||
         oldDelegate.referenceFrequency != referenceFrequency ||
-        oldDelegate.data != data;
+        oldDelegate.data != data ||
+        oldDelegate.minMidi != minMidi ||
+        oldDelegate.maxMidi != maxMidi;
   }
 }
 

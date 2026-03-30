@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import 'package:just_audio/just_audio.dart' show ProcessingState;
 import '../services/audio_service.dart';
 import '../services/transcription_api_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
 import '../utils/file_service.dart';
+import '../utils/music_utils.dart';
 import '../widgets/pitch_graph.dart';
 import '../widgets/audio_controls.dart';
 import '../models/job.dart';
@@ -16,6 +18,10 @@ import 'widgets/loading_overlay.dart';
 import 'widgets/keyboard_shortcuts_dialog.dart';
 import 'widgets/upload_layout.dart';
 import 'widgets/viewer_toolbar.dart';
+
+part 'home_screen_audio.dart';
+part 'home_screen_jobs.dart';
+part 'home_screen_view_controls.dart';
 
 /// Main home screen of the Vocal Pitch Viewer app
 class HomeScreen extends StatefulWidget {
@@ -35,14 +41,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
   StreamSubscription<bool>? _playingSubscription;
+  StreamSubscription<ProcessingState>? _processingStateSubscription;
   bool _audioLoaded = false;
+  bool _waitingForBuffer = false; // true when play was pressed but audio is still buffering
 
   // Smooth playhead animation (60fps)
   Timer? _playheadAnimationTimer;
   double _lastKnownPosition = 0.0;
   DateTime? _lastPositionUpdateTime;
+  bool _awaitingFirstStreamSync = false; // true until first positionStream event after play
+  double _lastStreamPosition = 0.0;     // last value reported by positionStream (debug)
+  int _timerTickCount = 0;              // counts timer ticks for periodic debug logging
 
-  // API services (NEW)
+  // API services
   late final TranscriptionApiService _apiService;
   late final UploadService _uploadService;
   late final JobPollingService _pollingService;
@@ -51,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<JobListItem> _completedJobs = [];
   bool _isLoadingJobs = false;
 
-  // Audio track switching - store pre-computed data URIs for instant switching
+  // Audio track switching
   AudioTrackType _currentTrack = AudioTrackType.original;
   bool _isSwitchingTrack = false;
 
@@ -59,6 +70,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   double _viewStartTime = 0;
   double _viewWindowSize = 30; // Show 30 seconds at a time (adjustable via zoom)
   bool _autoScroll = true;
+
+  // Y-axis (MIDI range) zoom — scale relative to data's natural range
+  // > 1.0 = zoomed in (fewer notes visible), < 1.0 = zoomed out
+  double _yZoomScale = 1.0;
+  static const double _minYZoomScale = 0.5;
+  static const double _maxYZoomScale = 6.0;
+
+  // Y-axis pan offset in MIDI notes (0 = centered on data's natural range)
+  double _yPanOffset = 0.0;
 
   // Smooth scrolling animation
   late AnimationController _scrollAnimationController;
@@ -83,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
     _scrollAnimationController.addListener(_onScrollAnimationUpdate);
 
-    // Initialize API services (NEW)
+    // Initialize API services
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final appState = context.read<AppState>();
       _apiService = TranscriptionApiService();
@@ -98,204 +118,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
       // Load completed jobs
       _loadCompletedJobs();
-
-      // Auto-load sample data on startup (DISABLED - Phase 3)
-      // Users should upload their own audio files via the API
-      // _loadSampleData();
     });
-  }
-
-  /// Load completed jobs from API
-  Future<void> _loadCompletedJobs() async {
-    setState(() {
-      _isLoadingJobs = true;
-    });
-
-    try {
-      final response = await _apiService.listJobs(status: 'completed');
-
-      if (response.isSuccess && response.data != null) {
-        setState(() {
-          _completedJobs = response.data!.jobs;
-          _isLoadingJobs = false;
-        });
-      } else {
-        setState(() {
-          _isLoadingJobs = false;
-        });
-        // Don't show error for failed job list fetch - it's not critical
-        debugPrint('Failed to load completed jobs: ${response.error}');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoadingJobs = false;
-      });
-      debugPrint('Error loading completed jobs: $e');
-    }
-  }
-
-  /// Handle job selection - load job data and display
-  Future<void> _onJobSelected(String jobId) async {
-    final appState = context.read<AppState>();
-
-    try {
-      appState.setLoading(true);
-      appState.setError(null);
-
-      // Fetch job results summary to get input filename
-      final resultsResponse = await _apiService.getJobResults(jobId);
-      String? inputFilename;
-      if (resultsResponse.isSuccess && resultsResponse.data != null) {
-        inputFilename = resultsResponse.data!.inputFilename;
-      }
-
-      // Fetch frames and chords in parallel
-      final results = await _apiService.getAllProcessedData(jobId);
-
-      // Update app state with data
-      if (results.frames.isSuccess && results.frames.data != null) {
-        appState.setPitchData(results.frames.data!);
-      } else {
-        appState.setError('Failed to fetch pitch data: ${results.frames.error ?? "No data available"}');
-        appState.setLoading(false);
-        return;
-      }
-
-      if (results.chords.isSuccess && results.chords.data != null) {
-        appState.setChordData(results.chords.data!);
-      } else {
-        appState.setError('Failed to fetch chord data: ${results.chords.error ?? "No data available"}');
-        appState.setLoading(false);
-        return;
-      }
-
-      // Download audio stems (original, vocals, instrumental)
-      await _downloadAudioStems(jobId, inputFilename);
-
-      appState.setLoading(false);
-    } catch (e) {
-      appState.setError('Failed to load job data: ${e.toString()}');
-      appState.setLoading(false);
-    }
-  }
-
-  /// Handle job deletion
-  Future<void> _onJobDeleted(String jobId) async {
-    try {
-      final response = await _apiService.deleteJob(jobId);
-
-      if (response.isSuccess) {
-        // Remove job from local list
-        setState(() {
-          _completedJobs.removeWhere((job) => job.id == jobId);
-        });
-
-        // Show success message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Job deleted successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      } else {
-        // Show error message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete job: ${response.error}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting job: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  /// Download audio stems for a job
-  Future<void> _downloadAudioStems(String jobId, String? inputFilename) async {
-    final appState = context.read<AppState>();
-
-    try {
-      // Set preparing flag BEFORE downloading to show loading indicator immediately
-      appState.setPreparingAudio(true);
-
-      // Download all three stems in parallel
-      final results = await Future.wait([
-        _apiService.downloadStem(jobId: jobId, stemName: 'original'),
-        _apiService.downloadStem(jobId: jobId, stemName: 'vocals'),
-        _apiService.downloadStem(jobId: jobId, stemName: 'instrumental'),
-      ]);
-
-      // Store in AppState
-      appState.setAllAudioStems(
-        original: results[0].isSuccess ? results[0].data : null,
-        vocals: results[1].isSuccess ? results[1].data : null,
-        instrumental: results[2].isSuccess ? results[2].data : null,
-      );
-
-      // Also set the vocals as the default audio with the original filename
-      if (results[1].isSuccess && results[1].data != null) {
-        appState.setAudioData(results[1].data!, inputFilename ?? 'vocals.mp3');
-      } else if (results[0].isSuccess && results[0].data != null) {
-        // Fallback to original if vocals not available
-        appState.setAudioData(results[0].data!, inputFilename ?? 'original.mp3');
-      }
-    } catch (e) {
-      debugPrint('Error downloading audio stems: $e');
-      appState.setError('Failed to download audio: ${e.toString()}');
-      appState.setPreparingAudio(false);
-    }
-  }
-
-  void _onScrollAnimationUpdate() {
-    if (_scrollAnimation != null) {
-      setState(() {
-        _viewStartTime = _scrollAnimation!.value;
-      });
-    }
-  }
-
-  /// Switch to a different audio track instantly using pre-loaded players
-  Future<void> _switchTrack(AudioTrackType newTrack) async {
-    if (newTrack == _currentTrack) return;
-    if (!_audioService.isTrackLoaded(newTrack)) return;
-    if (_isSwitchingTrack) return; // Prevent double-switching
-
-    setState(() => _isSwitchingTrack = true);
-
-    try {
-      // Use instant track switching (switches between pre-loaded players)
-      final success = await _audioService.switchToTrack(newTrack);
-
-      if (mounted) {
-        setState(() {
-          if (success) {
-            _currentTrack = newTrack;
-          }
-          _isSwitchingTrack = false;
-        });
-      }
-    } catch (e) {
-      // Ensure loading state is reset even on error
-      if (mounted) {
-        setState(() => _isSwitchingTrack = false);
-      }
-    }
   }
 
   @override
@@ -307,377 +130,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
+    _processingStateSubscription?.cancel();
     _audioService.dispose();
 
-    // Dispose API services (NEW)
     _pollingService.dispose();
     _apiService.dispose();
 
     super.dispose();
-  }
-
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    final appState = context.read<AppState>();
-    if (!appState.isReady) return KeyEventResult.ignored;
-
-    final currentTime = appState.currentTime;
-    final maxTime = appState.pitchData?.maxTime ?? 120;
-
-    // Space - Play/Pause
-    if (event.logicalKey == LogicalKeyboardKey.space) {
-      _audioService.togglePlayPause();
-      return KeyEventResult.handled;
-    }
-
-    // Left arrow - Seek back 5s
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      _seekTo((currentTime - 5).clamp(0, maxTime));
-      return KeyEventResult.handled;
-    }
-
-    // Right arrow - Seek forward 5s
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      _seekTo((currentTime + 5).clamp(0, maxTime));
-      return KeyEventResult.handled;
-    }
-
-    // + or = - Zoom in
-    if (event.logicalKey == LogicalKeyboardKey.equal ||
-        event.logicalKey == LogicalKeyboardKey.add) {
-      _zoomIn();
-      return KeyEventResult.handled;
-    }
-
-    // - - Zoom out
-    if (event.logicalKey == LogicalKeyboardKey.minus) {
-      _zoomOut();
-      return KeyEventResult.handled;
-    }
-
-    // 0 - Reset zoom
-    if (event.logicalKey == LogicalKeyboardKey.digit0) {
-      _resetZoom();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
-  }
-
-  void _updateViewWindow(double currentTime, double maxTime) {
-    if (!_autoScroll) return;
-
-    final viewEndTime = _viewStartTime + _viewWindowSize;
-
-    // If playhead is near the end of the view window (within 10%), scroll
-    if (currentTime > viewEndTime - _viewWindowSize * 0.1) {
-      final newStartTime = (currentTime - _viewWindowSize * 0.1).clamp(0.0, max(0.0, maxTime - _viewWindowSize).toDouble());
-      _animateScrollTo(newStartTime);
-    }
-    // If playhead is before the view window, scroll back
-    else if (currentTime < _viewStartTime) {
-      final newStartTime = currentTime.clamp(0.0, max(0.0, maxTime - _viewWindowSize).toDouble());
-      _animateScrollTo(newStartTime);
-    }
-  }
-
-  void _zoomIn() {
-    final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
-    final centerTime = _viewStartTime + _viewWindowSize / 2;
-    setState(() {
-      _viewWindowSize = (_viewWindowSize / _zoomFactor).clamp(_minWindowSize, _maxWindowSize);
-      _viewStartTime = (centerTime - _viewWindowSize / 2).clamp(0, max(0, maxTime - _viewWindowSize));
-      _autoScroll = false;
-    });
-    _reEnableAutoScrollAfterDelay();
-  }
-
-  void _zoomOut() {
-    final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
-    final centerTime = _viewStartTime + _viewWindowSize / 2;
-    setState(() {
-      _viewWindowSize = (_viewWindowSize * _zoomFactor).clamp(_minWindowSize, _maxWindowSize);
-      _viewStartTime = (centerTime - _viewWindowSize / 2).clamp(0, max(0, maxTime - _viewWindowSize));
-      _autoScroll = false;
-    });
-    _reEnableAutoScrollAfterDelay();
-  }
-
-  void _resetZoom() {
-    setState(() {
-      _viewWindowSize = 30;
-      _viewStartTime = 0;
-      _autoScroll = true;
-    });
-  }
-
-  void _handleZoom(double zoomDelta, double focalPointRatio) {
-    // zoomDelta > 0 means zoom in, < 0 means zoom out
-    final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120.0;
-
-    // Calculate the time at the focal point
-    final focalTime = _viewStartTime + _viewWindowSize * focalPointRatio;
-
-    // Apply zoom
-    final newWindowSize = (zoomDelta > 0
-        ? _viewWindowSize / (1 + zoomDelta.abs() * 0.1)
-        : _viewWindowSize * (1 + zoomDelta.abs() * 0.1)
-    ).clamp(_minWindowSize, _maxWindowSize);
-
-    // Adjust start time to keep focal point stationary
-    final newStartTime = (focalTime - newWindowSize * focalPointRatio).clamp(0.0, max(0.0, maxTime - newWindowSize).toDouble());
-
-    setState(() {
-      _viewWindowSize = newWindowSize;
-      _viewStartTime = newStartTime;
-      _autoScroll = false;
-    });
-    _reEnableAutoScrollAfterDelay();
-  }
-
-  void _handlePan(double panDelta) {
-    final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
-
-    // Update immediately for direct mouse tracking (no animation)
-    setState(() {
-      _viewStartTime = (_viewStartTime + panDelta).clamp(0.0, max(0.0, maxTime - _viewWindowSize));
-      _autoScroll = false;
-    });
-    _reEnableAutoScrollAfterDelay();
-  }
-
-  void _animateScrollTo(double targetTime) {
-    _scrollAnimation = Tween<double>(
-      begin: _viewStartTime,
-      end: targetTime,
-    ).animate(CurvedAnimation(
-      parent: _scrollAnimationController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _scrollAnimationController.forward(from: 0);
-  }
-
-  void _reEnableAutoScrollAfterDelay() {
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() => _autoScroll = true);
-      }
-    });
-  }
-
-  void _seekTo(double time) {
-    _audioService.seekToSeconds(time);
-
-    final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
-    final viewEndTime = _viewStartTime + _viewWindowSize;
-
-    // Only adjust view if seek position is outside current view
-    final isOutsideView = time < _viewStartTime || time > viewEndTime;
-
-    setState(() {
-      _autoScroll = false;
-    });
-
-    if (isOutsideView) {
-      // Smoothly scroll to center the view on the seek position
-      final newStartTime = (time - _viewWindowSize / 2).clamp(0.0, max(0.0, maxTime - _viewWindowSize).toDouble());
-      _animateScrollTo(newStartTime);
-    }
-
-    // Re-enable auto-scroll after a short delay
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() => _autoScroll = true);
-      }
-    });
-  }
-
-  Future<void> _loadAudio(AppState appState) async {
-    if (appState.audioBytes == null || _audioLoaded) {
-      debugPrint('⏭️ Skipping _loadAudio: audioBytes=${appState.audioBytes != null}, _audioLoaded=$_audioLoaded');
-      return;
-    }
-
-    debugPrint('🎵 Starting _loadAudio');
-
-    // Show loading indicator while audio files are being prepared
-    setState(() => _isLoadingAudio = true);
-    appState.setPreparingAudio(true);
-
-    final mimeType = _getMimeType(appState.audioFileName ?? '');
-    debugPrint('🎵 MIME type: $mimeType');
-
-    // Load all available audio stems (NEW - Phase 3)
-    bool success = false;
-
-    // Load all tracks sequentially - loading indicator will show progress
-    // Priority: original > vocals > fallback to appState.audioBytes
-
-    if (appState.originalAudio != null) {
-      debugPrint('🎵 Loading original audio (${appState.originalAudio!.length} bytes)');
-      final result = await _audioService.loadTrack(
-        AudioTrackType.original,
-        appState.originalAudio!,
-        'audio/mpeg',
-        setActive: true, // Original is the preferred active track
-      );
-      debugPrint('🎵 Original audio load result: $result');
-      success = result;
-    }
-
-    if (appState.vocalsAudio != null) {
-      debugPrint('🎵 Loading vocals audio (${appState.vocalsAudio!.length} bytes)');
-      final result = await _audioService.loadTrack(
-        AudioTrackType.vocal,
-        appState.vocalsAudio!,
-        'audio/mpeg',
-        setActive: !success, // Set as active only if original wasn't loaded
-      );
-      debugPrint('🎵 Vocals audio load result: $result');
-      if (!success) {
-        success = result;
-      }
-    }
-
-    if (appState.instrumentalAudio != null) {
-      debugPrint('🎵 Loading instrumental audio (${appState.instrumentalAudio!.length} bytes)');
-      final result = await _audioService.loadTrack(
-        AudioTrackType.instrumental,
-        appState.instrumentalAudio!,
-        'audio/mpeg',
-        setActive: false, // Never set instrumental as default active
-      );
-      debugPrint('🎵 Instrumental audio load result: $result');
-    }
-
-    // Fallback: if no API stems available, load from appState.audioBytes
-    if (!success) {
-      debugPrint('🎵 Loading fallback audio from audioBytes (${appState.audioBytes!.length} bytes)');
-      success = await _audioService.loadFromBytes(appState.audioBytes!, mimeType);
-      debugPrint('🎵 Fallback audio load result: $success');
-    }
-
-    debugPrint('🎵 Audio loading complete. Success: $success');
-
-    if (success && mounted) {
-      debugPrint('✅ Setting audio as loaded and clearing preparing flag');
-      setState(() {
-        _audioLoaded = true;
-        _isLoadingAudio = false;
-      });
-      appState.setPreparingAudio(false);
-
-      // Listen to position updates from audio stream (~5 times/sec)
-      // Store actual position and use interpolation for smooth 60fps playhead
-      _positionSubscription = _audioService.positionStream.listen((position) {
-        if (!mounted) return;
-        final time = position.inMilliseconds / 1000.0;
-
-        // Store actual position from stream
-        _lastKnownPosition = time;
-        _lastPositionUpdateTime = DateTime.now();
-
-        // Update immediately
-        appState.setCurrentTime(time);
-        _updateViewWindow(time, appState.pitchData?.maxTime ?? 120);
-      });
-
-      // Listen to duration updates
-      _durationSubscription = _audioService.durationStream.listen((duration) {
-        if (mounted && duration != null) {
-          appState.setDuration(duration.inMilliseconds / 1000.0);
-        }
-      });
-
-      // Listen to playing state and start/stop smooth animation
-      _playingSubscription = _audioService.playingStream.listen((playing) {
-        if (mounted) {
-          appState.setPlaying(playing);
-          if (playing) {
-            _startPlayheadAnimation();
-          } else {
-            _stopPlayheadAnimation();
-          }
-        }
-      });
-    }
-  }
-
-  /// Start smooth playhead animation at 60fps
-  /// Interpolates position between audio stream updates for smooth movement
-  void _startPlayheadAnimation() {
-    _playheadAnimationTimer?.cancel();
-
-    final appState = context.read<AppState>();
-
-    _playheadAnimationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
-      if (!mounted || !appState.isPlaying) {
-        _stopPlayheadAnimation();
-        return;
-      }
-
-      if (_lastPositionUpdateTime != null) {
-        // Calculate elapsed time since last position update from audio stream
-        final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
-        final interpolatedPosition = _lastKnownPosition + elapsed.inMilliseconds / 1000.0;
-
-        // Update playhead position smoothly
-        appState.setCurrentTime(interpolatedPosition);
-        _updateViewWindow(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
-      }
-    });
-  }
-
-  /// Stop smooth playhead animation
-  void _stopPlayheadAnimation() {
-    _playheadAnimationTimer?.cancel();
-    _playheadAnimationTimer = null;
-  }
-
-  String _getMimeType(String fileName) {
-    final ext = fileName.toLowerCase().split('.').last;
-    switch (ext) {
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'wav':
-        return 'audio/wav';
-      case 'ogg':
-        return 'audio/ogg';
-      case 'm4a':
-        return 'audio/mp4';
-      case 'flac':
-        return 'audio/flac';
-      case 'webm':
-        return 'audio/webm';
-      default:
-        return 'audio/mpeg';
-    }
-  }
-
-  /// Upload audio file to API for processing (NEW)
-  Future<void> _uploadAudioFileToAPI() async {
-    final result = await FileService.pickAudioFile();
-
-    if (!mounted) return;
-
-    final appState = context.read<AppState>();
-
-    if (result.isSuccess) {
-      // Upload file
-      final jobId = await _uploadService.uploadAudioFile(
-        fileBytes: result.data!,
-        fileName: result.fileName!,
-      );
-
-      if (jobId != null && mounted) {
-        // Start polling for job status
-        _pollingService.startPolling(jobId);
-      }
-    } else if (result.error != null) {
-      appState.setError(result.error);
-    }
   }
 
   @override
@@ -748,8 +207,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-
-
   Widget _buildUploadLayout(BuildContext context, AppState appState) {
     return UploadLayout(
       appState: appState,
@@ -763,8 +220,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       loadingAudioStatus: _loadingAudioStatus,
     );
   }
-
-
 
   Widget _buildViewerLayout(BuildContext context, AppState appState) {
     final theme = Theme.of(context);
@@ -798,46 +253,62 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 // Pitch graph with RepaintBoundary for performance isolation
                 RepaintBoundary(
-                  child: PitchGraph(
-                    data: appState.pitchData!,
-                    chordData: appState.chordData,
-                    currentTime: appState.currentTime,
-                    viewStartTime: _viewStartTime,
-                    viewEndTime: _viewStartTime + _viewWindowSize,
-                    referenceFrequency: appState.referenceFrequency,
-                    autoScroll: _autoScroll,
-                    onSeek: _seekTo,
-                    onZoom: _handleZoom,
-                    onPan: _handlePan,
-                  ),
+                  child: Builder(builder: (context) {
+                    // Compute MIDI range from data, then apply Y-zoom and Y-pan
+                    final pitchData = appState.pitchData!;
+                    final range = pitchData.frequencyRange;
+                    final baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2.0;
+                    final baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2.0;
+                    final center = (baseMin + baseMax) / 2.0 + _yPanOffset;
+                    final halfSpan = (baseMax - baseMin) / 2.0 / _yZoomScale;
+                    final effectiveMinMidi = center - halfSpan;
+                    final effectiveMaxMidi = center + halfSpan;
+
+                    return PitchGraph(
+                      data: pitchData,
+                      chordData: appState.chordData,
+                      currentTime: appState.currentTime,
+                      viewStartTime: _viewStartTime,
+                      viewEndTime: _viewStartTime + _viewWindowSize,
+                      referenceFrequency: appState.referenceFrequency,
+                      autoScroll: _autoScroll,
+                      minMidi: effectiveMinMidi,
+                      maxMidi: effectiveMaxMidi,
+                      onSeek: _seekTo,
+                      onZoom: _handleZoom,
+                      onYZoom: _handleYZoom,
+                      onYPan: _handleYPan,
+                      onPan: _handlePan,
+                    );
+                  }),
                 ),
 
-              // Auto-scroll indicator (bottom-right corner)
-              if (_autoScroll)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Chip(
-                    avatar: Icon(
-                      Icons.play_arrow_rounded,
-                      size: 16,
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                    label: Text(
-                      'Auto-scroll',
-                      style: TextStyle(
-                        fontSize: 11,
+                // Auto-scroll indicator (bottom-right corner)
+                if (_autoScroll)
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Chip(
+                      avatar: Icon(
+                        Icons.play_arrow_rounded,
+                        size: 16,
                         color: colorScheme.onSecondaryContainer,
                       ),
+                      label: Text(
+                        'Auto-scroll',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                      backgroundColor: colorScheme.secondaryContainer.withValues(alpha: 0.8),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
                     ),
-                    backgroundColor: colorScheme.secondaryContainer.withValues(alpha: 0.8),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
         ),
 
         // Audio controls bar
@@ -857,6 +328,4 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ],
     );
   }
-
 }
-

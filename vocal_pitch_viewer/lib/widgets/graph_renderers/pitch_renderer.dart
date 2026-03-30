@@ -13,6 +13,8 @@ class PitchRenderer {
   final Color primaryColor;
   final Color unvoicedColor;
   final double referenceFrequency;
+  final double minMidi;
+  final double maxMidi;
 
   PitchRenderer({
     required this.data,
@@ -22,12 +24,11 @@ class PitchRenderer {
     required this.primaryColor,
     required this.unvoicedColor,
     required this.referenceFrequency,
+    required this.minMidi,
+    required this.maxMidi,
   });
 
   void drawPitchPoints(Canvas canvas, Rect rect) {
-    final range = data.frequencyRange;
-    final minMidi = frequencyToMidi(range.$1, referenceFrequency: referenceFrequency).floor() - 2;
-    final maxMidi = frequencyToMidi(range.$2, referenceFrequency: referenceFrequency).ceil() + 2;
 
     // Find the visible frame range using binary search for better performance
     final startIndex = _findStartIndex();
@@ -44,7 +45,7 @@ class PitchRenderer {
 
     // Iterate only through visible frames
     for (int i = startIndex; i <= endIndex; i++) {
-      final frame = data.processedFrames[i];
+      final frame = data.displayFrames[i];
 
       if (!frame.isVoiced && !showUnvoiced) continue;
 
@@ -54,7 +55,7 @@ class PitchRenderer {
       // Recalculate MIDI pitch from frequency using current reference frequency
       if (frame.frequency <= 0) continue;
       final midiPitch = frequencyToMidi(frame.frequency, referenceFrequency: referenceFrequency);
-      final y = _midiToY(midiPitch, rect, minMidi.toDouble(), maxMidi.toDouble());
+      final y = _midiToY(midiPitch, rect, minMidi, maxMidi);
 
       if (y < rect.top || y > rect.bottom) continue;
 
@@ -96,7 +97,7 @@ class PitchRenderer {
 
   /// Binary search to find the first frame that might be visible
   int _findStartIndex() {
-    final frames = data.processedFrames;
+    final frames = data.displayFrames;
     if (frames.isEmpty) return -1;
 
     // If the first frame is already past our view, return -1
@@ -125,7 +126,7 @@ class PitchRenderer {
 
   /// Binary search to find the last frame that might be visible
   int _findEndIndex() {
-    final frames = data.processedFrames;
+    final frames = data.displayFrames;
     if (frames.isEmpty) return -1;
 
     // If the first frame is already past our view, return -1

@@ -1,3 +1,5 @@
+import '../utils/pitch_sampler.dart';
+
 /// Represents a single pitch frame from the analysis
 class PitchFrame {
   final double time;
@@ -52,7 +54,10 @@ class ProcessedFramesData {
   final List<PitchFrame> processedFrames;
   final int frameCount;
 
-  const ProcessedFramesData({
+  // Lazy cache for downsampled display frames
+  List<PitchFrame>? _displayFramesCache;
+
+  ProcessedFramesData({
     required this.metadata,
     required this.processedFrames,
     required this.frameCount,
@@ -92,16 +97,21 @@ class ProcessedFramesData {
   (double min, double max) get frequencyRange {
     final voiced = voicedFrames;
     if (voiced.isEmpty) return (0, 2000);
-    
+
     double minFreq = double.infinity;
     double maxFreq = 0;
-    
+
     for (final frame in voiced) {
       if (frame.frequency < minFreq) minFreq = frame.frequency;
       if (frame.frequency > maxFreq) maxFreq = frame.frequency;
     }
-    
+
     return (minFreq, maxFreq);
   }
-}
 
+  /// Downsampled frames for rendering. Computed once and cached.
+  /// See [sampleDisplayFrames] in pitch_sampler.dart for the algorithm.
+  List<PitchFrame> get displayFrames {
+    return _displayFramesCache ??= sampleDisplayFrames(processedFrames, maxTime);
+  }
+}

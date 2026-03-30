@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:convert'; // For base64Encode on web
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import '../utils/blob_url_helper.dart'
+    if (dart.library.io) '../utils/blob_url_helper_stub.dart';
 
 /// Audio track type enum
 enum AudioTrackType {
@@ -12,6 +13,7 @@ enum AudioTrackType {
 
 /// Custom audio source that streams bytes directly without base64 encoding
 /// This is much more efficient than using data URIs for large audio files
+// ignore: experimental_member_use
 class BytesAudioSource extends StreamAudioSource {
   final Uint8List bytes;
   final String mimeType;
@@ -19,6 +21,7 @@ class BytesAudioSource extends StreamAudioSource {
   BytesAudioSource(this.bytes, this.mimeType);
 
   @override
+  // ignore: experimental_member_use
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     try {
       start ??= 0;
@@ -26,6 +29,7 @@ class BytesAudioSource extends StreamAudioSource {
 
       debugPrint('🎵 BytesAudioSource.request: start=$start, end=$end, total=${bytes.length}');
 
+      // ignore: experimental_member_use
       return StreamAudioResponse(
         sourceLength: bytes.length,
         contentLength: end - start,
@@ -47,10 +51,20 @@ class AudioService {
   final Map<AudioTrackType, AudioPlayer> _players = {};
   AudioTrackType _activeTrack = AudioTrackType.original;
 
+  // Blob URLs created for web playback — must be revoked to free browser memory
+  final Map<AudioTrackType, String> _blobUrls = {};
+
+  // On web, seeking while paused causes Chrome to report synthetic wall-clock-based
+  // currentTime on next play (instead of real decode position), creating a ~1s A/V gap.
+  // Fix: when play() is called after a paused-seek, we play THEN immediately re-seek
+  // while playing. Chrome's decode engine is then active and currentTime is accurate.
+  Duration? _pendingWebSeekTarget;
+
   // Stream controllers for state updates
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _playingController = StreamController<bool>.broadcast();
+  final _processingStateController = StreamController<ProcessingState>.broadcast();
 
   // Subscriptions for the active player
   StreamSubscription<Duration>? _positionSubscription;
@@ -62,6 +76,7 @@ class AudioService {
   Stream<Duration> get positionStream => _positionController.stream;
   Stream<Duration?> get durationStream => _durationController.stream;
   Stream<bool> get playingStream => _playingController.stream;
+  Stream<ProcessingState> get processingStateStream => _processingStateController.stream;
 
   // Current state - from active player
   AudioPlayer? get _player => _players[_activeTrack];
@@ -74,6 +89,7 @@ class AudioService {
   }
   Duration get position => _player?.position ?? Duration.zero;
   Duration? get duration => _player?.duration;
+  ProcessingState get processingState => _player?.processingState ?? ProcessingState.idle;
 
   /// Initialize the audio player with bytes data (default track)
   Future<bool> loadFromBytes(Uint8List bytes, String mimeType) async {
@@ -98,18 +114,20 @@ class AudioService {
       final player = AudioPlayer();
       _players[trackType] = player;
 
-      // On web, StreamAudioSource converts to Data URI anyway, so we do it directly
-      // On mobile/desktop, use StreamAudioSource for better performance
       if (kIsWeb) {
-        // Web: Use base64 Data URI (what StreamAudioSource does internally anyway)
-        onStatusUpdate?.call('Encoding audio data...');
-        debugPrint('🎵 Encoding to base64 for web platform');
-        final base64Data = await compute(_base64EncodeInIsolate, bytes);
-        final dataUri = 'data:$mimeType;base64,$base64Data';
+        // Web: Create a Blob URL — instant, no encoding, no giant string to parse.
+        // Revoke old URL for this track to free browser memory before replacing it.
+        final oldUrl = _blobUrls[trackType];
+        if (oldUrl != null) revokeBlobUrl(oldUrl);
+
+        onStatusUpdate?.call('Preparing audio...');
+        debugPrint('🎵 Creating Blob URL for $trackType');
+        final blobUrl = createBlobUrl(bytes, mimeType);
+        _blobUrls[trackType] = blobUrl;
 
         onStatusUpdate?.call('Initializing player...');
         debugPrint('🎵 Setting URL for $trackType');
-        await player.setUrl(dataUri);
+        await player.setUrl(blobUrl);
       } else {
         // Mobile/Desktop: Use StreamAudioSource for efficient streaming
         onStatusUpdate?.call('Preparing audio data...');
@@ -158,9 +176,9 @@ class AudioService {
       _playingController.add(playing);
     });
 
-    // Listen to processing state to handle completion
+    // Listen to processing state to handle completion and expose to UI
     _processingStateSubscription = player.processingStateStream.listen((state) {
-      // When audio completes, pause it so the UI reflects the correct state
+      _processingStateController.add(state);
       if (state == ProcessingState.completed) {
         player.pause();
       }
@@ -169,7 +187,18 @@ class AudioService {
 
   /// Play audio
   Future<void> play() async {
-    await _player?.play();
+    if (kIsWeb && _pendingWebSeekTarget != null) {
+      // Corrective play-then-seek: start playback first (activates Chrome's decode
+      // pipeline), then immediately seek while playing. This ensures currentTime
+      // reflects real decode position instead of wall-clock time.
+      final target = _pendingWebSeekTarget!;
+      _pendingWebSeekTarget = null;
+      debugPrint('[AudioService] play-then-seek corrective: seeking to $target while playing');
+      await _player?.play();
+      await _player?.seek(target);
+    } else {
+      await _player?.play();
+    }
   }
   
   /// Pause audio
@@ -203,6 +232,7 @@ class AudioService {
   
   /// Stop audio and reset position
   Future<void> stop() async {
+    _pendingWebSeekTarget = null;
     await _player?.stop();
     await _player?.seek(Duration.zero);
   }
@@ -213,6 +243,14 @@ class AudioService {
 
     // Check if we're seeking from a completed state
     final wasCompleted = _player!.processingState == ProcessingState.completed;
+
+    if (kIsWeb && !isPlaying) {
+      // Save seek target so play() can do a corrective play-then-seek
+      _pendingWebSeekTarget = position;
+    } else {
+      // Seeking while playing: no correction needed, clear any pending target
+      _pendingWebSeekTarget = null;
+    }
 
     await _player!.seek(position);
 
@@ -333,22 +371,26 @@ class AudioService {
 
   /// Dispose resources
   Future<void> dispose() async {
-    // Cancel subscriptions
+    // Cancel subscriptions and close controllers
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
     _processingStateSubscription?.cancel();
+    _processingStateController.close();
 
     // Dispose all players
     for (final player in _players.values) {
       await player.dispose();
     }
     _players.clear();
+
+    // Revoke all Blob URLs to free browser memory
+    if (kIsWeb) {
+      for (final url in _blobUrls.values) {
+        revokeBlobUrl(url);
+      }
+      _blobUrls.clear();
+    }
   }
 }
 
-/// Top-level function for base64 encoding in isolate (web only)
-/// This MUST be a top-level function to work with compute()
-String _base64EncodeInIsolate(Uint8List bytes) {
-  return base64Encode(bytes);
-}

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/pitch_data.dart';
-import '../../utils/music_utils.dart';
 import '../graph_constants.dart';
 
 /// Renders grid lines and background for the pitch graph
@@ -11,6 +10,8 @@ class GridRenderer {
   final Color gridColor;
   final Brightness brightness;
   final double referenceFrequency;
+  final double minMidi;
+  final double maxMidi;
 
   GridRenderer({
     required this.data,
@@ -19,6 +20,8 @@ class GridRenderer {
     required this.gridColor,
     required this.brightness,
     required this.referenceFrequency,
+    required this.minMidi,
+    required this.maxMidi,
   });
 
   void drawBackground(Canvas canvas, Rect rect) {
@@ -50,14 +53,10 @@ class GridRenderer {
   }
 
   void _drawPianoGrid(Canvas canvas, Rect rect, Paint paint) {
-    final range = data.frequencyRange;
-    final minMidi = frequencyToMidi(range.$1, referenceFrequency: referenceFrequency).floor() - 2;
-    final maxMidi = frequencyToMidi(range.$2, referenceFrequency: referenceFrequency).ceil() + 2;
-
     // First, draw alternating light/dark bands for each note
-    for (int midi = minMidi; midi <= maxMidi; midi++) {
-      final topY = _midiToY(midi + 0.5, rect, minMidi.toDouble(), maxMidi.toDouble());
-      final bottomY = _midiToY(midi - 0.5, rect, minMidi.toDouble(), maxMidi.toDouble());
+    for (int midi = minMidi.floor(); midi <= maxMidi.ceil(); midi++) {
+      final topY = _midiToY(midi + 0.5, rect, minMidi, maxMidi);
+      final bottomY = _midiToY(midi - 0.5, rect, minMidi, maxMidi);
 
       // Alternate bands: even midi = light, odd midi = dark
       if (midi % 2 == 1) {
@@ -72,9 +71,9 @@ class GridRenderer {
     }
 
     // Then draw grid lines at note BOUNDARIES (between notes, at midi + 0.5)
-    for (int midi = minMidi; midi <= maxMidi; midi++) {
+    for (int midi = minMidi.floor(); midi <= maxMidi.ceil(); midi++) {
       final boundaryMidi = midi + 0.5;
-      final y = _midiToY(boundaryMidi, rect, minMidi.toDouble(), maxMidi.toDouble());
+      final y = _midiToY(boundaryMidi, rect, minMidi, maxMidi);
 
       // Make lines between B and C (octave boundaries) more prominent
       if (midi % 12 == 11) {

@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "original_song_path": "/Users/psarthak/personal/projects/music-transcription/storage/jobs/841689fc-2c53-4102-b6dc-d73e59282cbc/input/Phir Se (Audio)  Dhurandhar The Revenge  Ranveer Singh Shashwat Sachdev,Arijit Singh,Irshad Kamil.mp3",
+    "vocal_file_path": "/Users/psarthak/personal/projects/music-transcription/storage/jobs/841689fc-2c53-4102-b6dc-d73e59282cbc/separated/841689fc-2c53-4102-b6dc-d73e59282cbc_Phir Se (Audio)  Dhurandhar The Revenge  Ranveer Singh Shashwat Sachdev,Arijit Singh,Irshad Kamil_vocals.mp3",
+    "bpm": 151.99908088235293
+  },
+  "processed_frames": [
+    {
+      "time": 0.0,
+      "frequency": 0.0,
+      "confidence": 0.0057966760359704494,
+      "midi_pitch": 0.0,
+      "is_voiced": false
+    },
+    {
+      "time": 0.01,
+      "frequency": 0.0,
+      "confidence": 0.0057966760359704494,
+      "midi_pitch": 0.0,
+      "is_voiced": false
+    }
+  ],
+  "frame_count": 2
+}
