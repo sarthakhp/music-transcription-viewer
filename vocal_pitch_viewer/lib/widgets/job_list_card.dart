@@ -162,7 +162,7 @@ class _JobListTileState extends State<_JobListTile> {
       builder: (context) => AlertDialog(
         title: const Text('Delete Job'),
         content: Text(
-          'Are you sure you want to delete "${widget.job.inputFilename}"?\n\nThis will permanently delete all associated data including audio stems and processing results.',
+          'Are you sure you want to delete "${widget.job.displayName}"?\n\nThis will permanently delete all associated data including audio stems and processing results.',
         ),
         actions: [
           TextButton(
@@ -234,7 +234,9 @@ class _JobListTileState extends State<_JobListTile> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
-                          Icons.music_note_rounded,
+                          widget.job.isUrlSource
+                              ? Icons.link_rounded
+                              : Icons.music_note_rounded,
                           color: colorScheme.primary,
                           size: 20,
                         ),
@@ -247,7 +249,7 @@ class _JobListTileState extends State<_JobListTile> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.job.inputFilename,
+                              widget.job.displayName,
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),

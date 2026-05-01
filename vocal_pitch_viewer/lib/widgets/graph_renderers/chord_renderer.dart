@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/chord_data.dart';
+import '../../utils/music_utils.dart';
 
 /// Renders chord blocks on the graph
 class ChordRenderer {
@@ -9,6 +10,7 @@ class ChordRenderer {
   final Color chordColor;
   final Color textColor;
   final Brightness brightness;
+  final int transposeAmount;
 
   ChordRenderer({
     required this.chordData,
@@ -17,6 +19,7 @@ class ChordRenderer {
     required this.chordColor,
     required this.textColor,
     required this.brightness,
+    this.transposeAmount = 0,
   });
 
   void drawChords(Canvas canvas, Rect rect) {
@@ -83,7 +86,7 @@ class ChordRenderer {
       );
 
       final tp = TextPainter(
-        text: TextSpan(text: chord.displayLabel, style: textStyle),
+        text: TextSpan(text: transposeChordLabel(chord.displayLabel, transposeAmount), style: textStyle),
         textDirection: TextDirection.ltr,
         maxLines: 1,
         ellipsis: '...',

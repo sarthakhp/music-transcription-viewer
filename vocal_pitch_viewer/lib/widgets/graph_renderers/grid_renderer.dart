@@ -12,6 +12,8 @@ class GridRenderer {
   final double referenceFrequency;
   final double minMidi;
   final double maxMidi;
+  final bool sargamEnabled;
+  final int scaleRoot;
 
   GridRenderer({
     required this.data,
@@ -22,6 +24,8 @@ class GridRenderer {
     required this.referenceFrequency,
     required this.minMidi,
     required this.maxMidi,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
   });
 
   void drawBackground(Canvas canvas, Rect rect) {
@@ -53,30 +57,44 @@ class GridRenderer {
   }
 
   void _drawPianoGrid(Canvas canvas, Rect rect, Paint paint) {
-    // First, draw alternating light/dark bands for each note
+    // The tonic note for octave reference tint (C in Western, Sa in Sargam).
+    final tonicSemitone = sargamEnabled ? scaleRoot : 0; // 0 = C
+
+    // Draw alternating light/dark bands + tonic tint
     for (int midi = minMidi.floor(); midi <= maxMidi.ceil(); midi++) {
       final topY = _midiToY(midi + 0.5, rect, minMidi, maxMidi);
       final bottomY = _midiToY(midi - 0.5, rect, minMidi, maxMidi);
+      final bandRect = Rect.fromLTRB(rect.left, topY, rect.right, bottomY);
 
       // Alternate bands: even midi = light, odd midi = dark
       if (midi % 2 == 1) {
         final bandPaint = Paint()
           ..color = paint.color.withValues(alpha: 0.15)
           ..style = PaintingStyle.fill;
-        canvas.drawRect(
-          Rect.fromLTRB(rect.left, topY, rect.right, bottomY),
-          bandPaint,
-        );
+        canvas.drawRect(bandRect, bandPaint);
+      }
+
+      // Subtle tonic row tint for octave reference
+      if (midi % 12 == tonicSemitone) {
+        final tonicPaint = Paint()
+          ..color = (brightness == Brightness.dark
+                  ? const Color(0xFF6699CC)
+                  : const Color(0xFF336699))
+              .withValues(alpha: 0.06)
+          ..style = PaintingStyle.fill;
+        canvas.drawRect(bandRect, tonicPaint);
       }
     }
 
-    // Then draw grid lines at note BOUNDARIES (between notes, at midi + 0.5)
+    // Grid lines at note boundaries
+    // Octave boundary = between the note below tonic and tonic itself.
+    final octaveBoundary = ((tonicSemitone - 1) % 12 + 12) % 12;
     for (int midi = minMidi.floor(); midi <= maxMidi.ceil(); midi++) {
       final boundaryMidi = midi + 0.5;
       final y = _midiToY(boundaryMidi, rect, minMidi, maxMidi);
 
-      // Make lines between B and C (octave boundaries) more prominent
-      if (midi % 12 == 11) {
+      if (midi % 12 == octaveBoundary) {
+        // Stronger line at octave boundary
         final strongPaint = Paint()
           ..color = paint.color.withValues(alpha: 0.5)
           ..strokeWidth = 1.0;

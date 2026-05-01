@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
-import 'package:just_audio/just_audio.dart' show ProcessingState;
 import '../services/audio_service.dart';
 import '../services/transcription_api_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
 import '../utils/file_service.dart';
 import '../utils/music_utils.dart';
+import '../utils/performance_monitor.dart';
 import '../widgets/pitch_graph.dart';
 import '../widgets/audio_controls.dart';
 import '../models/job.dart';
@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
   StreamSubscription<bool>? _playingSubscription;
-  StreamSubscription<ProcessingState>? _processingStateSubscription;
+  StreamSubscription<AudioPlayerState>? _processingStateSubscription;
   bool _audioLoaded = false;
   bool _waitingForBuffer = false; // true when play was pressed but audio is still buffering
 
@@ -65,6 +65,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Audio track switching
   AudioTrackType _currentTrack = AudioTrackType.original;
   bool _isSwitchingTrack = false;
+
+  // Layer visibility toggles for the pitch graph
+  bool _showVocals = true;
+  bool _showBass = true;
+  bool _showOther = true;
+
+  // Minimum confidence thresholds for each layer (0.0 = show all)
+  double _vocalsMinConfidence = 0.0;
+  double _bassMinConfidence = 0.0;
+  double _otherMinConfidence = 0.0;
+
+  // Playback speed (preset steps: 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)
+  double _playbackSpeed = 1.0;
+
+  // Transpose: semitones offset applied to visual display AND audio pitch shift
+  int _transposeAmount = 0;
+
+  // Sargam notation display
+  bool _sargamEnabled = false;
+  int _scaleRoot = 0; // 0=C, 1=C#, 2=D, ... 11=B
 
   // View window for zoom/pan (in seconds)
   double _viewStartTime = 0;
@@ -96,6 +116,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
 
+    PerformanceMonitor.instance.start();
+
     // Initialize smooth scroll animation controller
     _scrollAnimationController = AnimationController(
       vsync: this,
@@ -104,19 +126,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _scrollAnimationController.addListener(_onScrollAnimationUpdate);
 
     // Initialize API services
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final appState = context.read<AppState>();
-      _apiService = TranscriptionApiService();
-      _uploadService = UploadService(
-        apiService: _apiService,
-        appState: appState,
-      );
-      _pollingService = JobPollingService(
-        apiService: _apiService,
-        appState: appState,
-      );
+    final appState = context.read<AppState>();
+    _apiService = TranscriptionApiService();
+    _uploadService = UploadService(
+      apiService: _apiService,
+      appState: appState,
+    );
+    _pollingService = JobPollingService(
+      apiService: _apiService,
+      appState: appState,
+    );
 
-      // Load completed jobs
+    // Load completed jobs after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCompletedJobs();
     });
   }
@@ -133,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _processingStateSubscription?.cancel();
     _audioService.dispose();
 
+    PerformanceMonitor.instance.stop();
     _pollingService.dispose();
     _apiService.dispose();
 
@@ -210,11 +233,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildUploadLayout(BuildContext context, AppState appState) {
     return UploadLayout(
       appState: appState,
+      apiService: _apiService,
       completedJobs: _completedJobs,
       isLoadingJobs: _isLoadingJobs,
       onJobSelected: _onJobSelected,
       onJobDeleted: _onJobDeleted,
       onUploadPressed: _uploadAudioFileToAPI,
+      onUrlSubmitted: _submitUrlForTranscription,
+      onCancel: _cancelCurrentJob,
       isLoadingJson: _isLoadingJson,
       isLoadingAudio: _isLoadingAudio,
       loadingAudioStatus: _loadingAudioStatus,
@@ -244,6 +270,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           isSwitchingTrack: _isSwitchingTrack,
           onTrackChanged: _switchTrack,
           isNarrow: isNarrow,
+          showVocals: _showVocals,
+          showBass: _showBass,
+          showOther: _showOther,
+          onVocalsToggled: (v) => setState(() => _showVocals = v),
+          onBassToggled: (v) => setState(() => _showBass = v),
+          onOtherToggled: (v) => setState(() => _showOther = v),
+          vocalsMinConfidence: _vocalsMinConfidence,
+          bassMinConfidence: _bassMinConfidence,
+          otherMinConfidence: _otherMinConfidence,
+          onVocalsConfidenceChanged: (v) => setState(() => _vocalsMinConfidence = v),
+          onBassConfidenceChanged: (v) => setState(() => _bassMinConfidence = v),
+          onOtherConfidenceChanged: (v) => setState(() => _otherMinConfidence = v),
         ),
 
         // Main content area - pitch graph with zoom controls
@@ -254,11 +292,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 // Pitch graph with RepaintBoundary for performance isolation
                 RepaintBoundary(
                   child: Builder(builder: (context) {
-                    // Compute MIDI range from data, then apply Y-zoom and Y-pan
+                    // Compute MIDI range from vocal pitch data, then extend to include instrument notes
                     final pitchData = appState.pitchData!;
                     final range = pitchData.frequencyRange;
-                    final baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2.0;
-                    final baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2.0;
+                    double baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2.0;
+                    double baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2.0;
+                    final instrData = appState.instrumentData;
+                    if (instrData != null) {
+                      final (instrMin, instrMax) = instrData.midiRange;
+                      if (instrMin - 1.0 < baseMin) baseMin = instrMin - 1.0;
+                      if (instrMax + 1.0 > baseMax) baseMax = instrMax + 1.0;
+                    }
+                    // Shift Y-axis by transpose so note-name labels reflect transposed view
+                    baseMin += _transposeAmount;
+                    baseMax += _transposeAmount;
                     final center = (baseMin + baseMax) / 2.0 + _yPanOffset;
                     final halfSpan = (baseMax - baseMin) / 2.0 / _yZoomScale;
                     final effectiveMinMidi = center - halfSpan;
@@ -267,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     return PitchGraph(
                       data: pitchData,
                       chordData: appState.chordData,
+                      instrumentData: appState.instrumentData,
                       currentTime: appState.currentTime,
                       viewStartTime: _viewStartTime,
                       viewEndTime: _viewStartTime + _viewWindowSize,
@@ -274,6 +322,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       autoScroll: _autoScroll,
                       minMidi: effectiveMinMidi,
                       maxMidi: effectiveMaxMidi,
+                      showVocals: _showVocals,
+                      showBass: _showBass,
+                      showOther: _showOther,
+                      vocalsMinConfidence: _vocalsMinConfidence,
+                      bassMinConfidence: _bassMinConfidence,
+                      otherMinConfidence: _otherMinConfidence,
+                      transposeAmount: _transposeAmount,
+                      sargamEnabled: _sargamEnabled,
+                      scaleRoot: _scaleRoot,
                       onSeek: _seekTo,
                       onZoom: _handleZoom,
                       onYZoom: _handleYZoom,
@@ -283,29 +340,37 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   }),
                 ),
 
-                // Auto-scroll indicator (bottom-right corner)
-                if (_autoScroll)
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
+                // Auto-scroll toggle (bottom-right corner)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _autoScroll = !_autoScroll),
                     child: Chip(
                       avatar: Icon(
-                        Icons.play_arrow_rounded,
+                        _autoScroll ? Icons.play_arrow_rounded : Icons.play_arrow_outlined,
                         size: 16,
-                        color: colorScheme.onSecondaryContainer,
+                        color: _autoScroll
+                            ? colorScheme.onSecondaryContainer
+                            : colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                       label: Text(
                         'Auto-scroll',
                         style: TextStyle(
                           fontSize: 11,
-                          color: colorScheme.onSecondaryContainer,
+                          color: _autoScroll
+                              ? colorScheme.onSecondaryContainer
+                              : colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
-                      backgroundColor: colorScheme.secondaryContainer.withValues(alpha: 0.8),
+                      backgroundColor: _autoScroll
+                          ? colorScheme.secondaryContainer.withValues(alpha: 0.8)
+                          : colorScheme.surface.withValues(alpha: 0.6),
                       padding: EdgeInsets.zero,
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -324,6 +389,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onZoomIn: _zoomIn,
           onZoomOut: _zoomOut,
           viewWindowSize: _viewWindowSize,
+          playbackSpeed: _playbackSpeed,
+          onSpeedChanged: (speed) {
+            setState(() => _playbackSpeed = speed);
+            _audioService.setSpeed(speed);
+          },
+          transposeAmount: _transposeAmount,
+          onTransposeChanged: (n) {
+            setState(() => _transposeAmount = n);
+            _audioService.setPitchSemitones(n);
+          },
+          sargamEnabled: _sargamEnabled,
+          onSargamToggled: (v) => setState(() => _sargamEnabled = v),
+          scaleRoot: _scaleRoot,
+          onScaleRootChanged: (v) => setState(() => _scaleRoot = v),
         ),
       ],
     );

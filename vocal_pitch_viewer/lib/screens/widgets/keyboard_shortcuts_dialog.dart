@@ -21,12 +21,16 @@ class KeyboardShortcutsDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildShortcutRow(context, 'Space', 'Play / Pause'),
-          _buildShortcutRow(context, '←', 'Seek back 5s'),
-          _buildShortcutRow(context, '→', 'Seek forward 5s'),
+          _buildShortcutRow(context, '←', 'Seek back 1s'),
+          _buildShortcutRow(context, '→', 'Seek forward 1s'),
           _buildShortcutRow(context, '+', 'Zoom in'),
           _buildShortcutRow(context, '-', 'Zoom out'),
           _buildShortcutRow(context, '0', 'Reset zoom'),
-          _buildShortcutRow(context, 'M', 'Mute / Unmute'),
+          _buildShortcutRow(context, '[', 'Slow down'),
+          _buildShortcutRow(context, ']', 'Speed up'),
+          _buildShortcutRow(context, '\\', 'Reset speed to 1×'),
+          _buildShortcutRow(context, '⌘⇧↑', 'Pitch up 1 semitone'),
+          _buildShortcutRow(context, '⌘⇧↓', 'Pitch down 1 semitone'),
         ],
       ),
       actions: [
@@ -76,4 +80,3 @@ class KeyboardShortcutsDialog extends StatelessWidget {
     );
   }
 }
-

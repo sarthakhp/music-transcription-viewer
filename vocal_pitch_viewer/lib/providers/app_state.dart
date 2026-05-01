@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
+import '../models/instrument_data.dart';
 import '../models/job_status.dart';
 
 /// Main application state provider
@@ -15,6 +16,9 @@ class AppState extends ChangeNotifier {
   Uint8List? _originalAudio;
   Uint8List? _vocalsAudio;
   Uint8List? _instrumentalAudio;
+
+  // Instrument transcription data
+  InstrumentData? _instrumentData;
 
   // Playback state
   bool _isPlaying = false;
@@ -48,6 +52,9 @@ class AppState extends ChangeNotifier {
   Uint8List? get originalAudio => _originalAudio;
   Uint8List? get vocalsAudio => _vocalsAudio;
   Uint8List? get instrumentalAudio => _instrumentalAudio;
+
+  // Getters - Instrument transcription
+  InstrumentData? get instrumentData => _instrumentData;
 
   // Getters - Playback
   bool get isPlaying => _isPlaying;
@@ -109,6 +116,11 @@ class AppState extends ChangeNotifier {
 
   void setInstrumentalAudio(Uint8List? audio) {
     _instrumentalAudio = audio;
+    notifyListeners();
+  }
+
+  void setInstrumentData(InstrumentData? data) {
+    _instrumentData = data;
     notifyListeners();
   }
 
@@ -247,6 +259,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Cancel job processing
+  void cancelJob() {
+    _isProcessing = false;
+    _isUploading = false;
+    _jobStatus = JobStatus.cancelled;
+    _processingStage = null;
+    _processingProgress = 0;
+    _processingMessage = null;
+    notifyListeners();
+  }
+
   /// Clear job state
   void clearJobState() {
     _currentJobId = null;
@@ -274,6 +297,7 @@ class AppState extends ChangeNotifier {
     _originalAudio = null;
     _vocalsAudio = null;
     _instrumentalAudio = null;
+    _instrumentData = null;
 
     // Clear job state
     _currentJobId = null;

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
+import '../models/instrument_data.dart';
 import 'graph_constants.dart';
 import 'pitch_graph_painter.dart';
 import 'playhead_painter.dart';
@@ -10,12 +11,22 @@ import 'playhead_painter.dart';
 class PitchGraph extends StatefulWidget {
   final ProcessedFramesData data;
   final ChordData? chordData;
+  final InstrumentData? instrumentData;
   final double currentTime;
   final double viewStartTime;
   final double viewEndTime;
   final double referenceFrequency;
   final double minMidi;
   final double maxMidi;
+  final bool showVocals;
+  final bool showBass;
+  final bool showOther;
+  final double vocalsMinConfidence;
+  final double bassMinConfidence;
+  final double otherMinConfidence;
+  final int transposeAmount;
+  final bool sargamEnabled;
+  final int scaleRoot;
   final Function(double time)? onSeek;
   final Function(double zoomDelta, double focalPointRatio)? onZoom;
   final Function(double scaleFactor)? onYZoom;
@@ -27,12 +38,22 @@ class PitchGraph extends StatefulWidget {
     super.key,
     required this.data,
     this.chordData,
+    this.instrumentData,
     this.currentTime = 0,
     this.viewStartTime = 0,
     this.viewEndTime = 0,
     this.referenceFrequency = 440.0,
     required this.minMidi,
     required this.maxMidi,
+    this.showVocals = true,
+    this.showBass = true,
+    this.showOther = true,
+    this.vocalsMinConfidence = 0.0,
+    this.bassMinConfidence = 0.0,
+    this.otherMinConfidence = 0.0,
+    this.transposeAmount = 0,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
     this.onSeek,
     this.onZoom,
     this.onYZoom,
@@ -50,8 +71,9 @@ class _PitchGraphState extends State<PitchGraph> {
   static const double _leftPadding = GraphConstants.leftPadding;
   static const double _rightPadding = GraphConstants.rightPadding;
 
-  // For click-to-seek
+  // For click-to-seek and note row highlight
   double? _hoverTime;
+  double? _hoverY; // local Y position of cursor
 
   // For pinch-to-zoom
   double? _initialScale;
@@ -82,11 +104,17 @@ class _PitchGraphState extends State<PitchGraph> {
     final x = event.localPosition.dx;
     if (x < _leftPadding || x > width - _rightPadding) {
       if (_hoverTime != null) {
-        setState(() => _hoverTime = null);
+        setState(() {
+          _hoverTime = null;
+          _hoverY = null;
+        });
       }
       return;
     }
-    setState(() => _hoverTime = _xToTime(x, width));
+    setState(() {
+      _hoverTime = _xToTime(x, width);
+      _hoverY = event.localPosition.dy;
+    });
   }
 
   // Track if we're in a pinch gesture (2+ fingers)
@@ -191,7 +219,10 @@ class _PitchGraphState extends State<PitchGraph> {
           },
           child: MouseRegion(
             onHover: (event) => _handleHover(event, width),
-            onExit: (_) => setState(() => _hoverTime = null),
+            onExit: (_) => setState(() {
+              _hoverTime = null;
+              _hoverY = null;
+            }),
             cursor: widget.onSeek != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
             child: GestureDetector(
               onTapUp: (details) => _handleTap(details, width),
@@ -206,6 +237,7 @@ class _PitchGraphState extends State<PitchGraph> {
                   painter: PitchGraphPainter(
                     data: widget.data,
                     chordData: widget.chordData,
+                    instrumentData: widget.instrumentData,
                     viewStartTime: widget.viewStartTime,
                     viewEndTime: effectiveEndTime,
                     primaryColor: colorScheme.primary,
@@ -217,6 +249,15 @@ class _PitchGraphState extends State<PitchGraph> {
                     referenceFrequency: widget.referenceFrequency,
                     minMidi: widget.minMidi,
                     maxMidi: widget.maxMidi,
+                    showVocals: widget.showVocals,
+                    showBass: widget.showBass,
+                    showOther: widget.showOther,
+                    vocalsMinConfidence: widget.vocalsMinConfidence,
+                    bassMinConfidence: widget.bassMinConfidence,
+                    otherMinConfidence: widget.otherMinConfidence,
+                    transposeAmount: widget.transposeAmount,
+                    sargamEnabled: widget.sargamEnabled,
+                    scaleRoot: widget.scaleRoot,
                   ),
                   // Dynamic layer: playhead only (repaints frequently)
                   foregroundPainter: PlayheadPainter(
@@ -227,6 +268,11 @@ class _PitchGraphState extends State<PitchGraph> {
                     onSurfaceColor: colorScheme.onSurface,
                     brightness: theme.brightness,
                     hoverTime: _hoverTime,
+                    hoverY: _hoverY,
+                    minMidi: widget.minMidi,
+                    maxMidi: widget.maxMidi,
+                    sargamEnabled: widget.sargamEnabled,
+                    scaleRoot: widget.scaleRoot,
                   ),
                 ),
               ),

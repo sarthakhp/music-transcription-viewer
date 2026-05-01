@@ -12,6 +12,8 @@ class AxisRenderer {
   final double referenceFrequency;
   final double minMidi;
   final double maxMidi;
+  final bool sargamEnabled;
+  final int scaleRoot;
 
   AxisRenderer({
     required this.data,
@@ -21,6 +23,8 @@ class AxisRenderer {
     required this.referenceFrequency,
     required this.minMidi,
     required this.maxMidi,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
   });
 
   void drawAxes(Canvas canvas, Size size, Rect rect) {
@@ -47,19 +51,81 @@ class AxisRenderer {
   }
 
   void _drawPianoLabels(Canvas canvas, Rect rect, TextStyle style) {
-    // Draw label for each note
+    final midiRange = maxMidi - minMidi;
+    if (midiRange <= 0) return;
+
+    // Row height in pixels — determines font size and skip interval.
+    final rowHeight = rect.height / midiRange;
+
+    // Adaptive font size: scale with row height, clamped to 8–14px.
+    final fontSize = rowHeight.clamp(8.0, 14.0);
+
+    // Skip labels when rows are too small to fit text.
+    // At minimum font (8px), we need ~12px row height to avoid overlap.
+    int skipInterval = 1;
+    if (rowHeight < 12) skipInterval = 2;
+    if (rowHeight < 7) skipInterval = 3;
+    if (rowHeight < 5) skipInterval = 6;
+
+    final tonicSemitone = sargamEnabled ? scaleRoot : 0;
+
     for (int midi = minMidi.floor(); midi <= maxMidi.ceil(); midi++) {
+      final semitone = ((midi - tonicSemitone) % 12 + 12) % 12;
+      final isTonic = semitone == 0;
+      final isDominant = semitone == 7;
+
+      if (skipInterval > 1 && !isTonic && !isDominant) {
+        if (semitone % skipInterval != 0) continue;
+      }
+
       final y = _midiToY(midi.toDouble(), rect, minMidi, maxMidi);
-      final label = midiToNoteName(midi.toDouble());
-      // Make C notes (octave markers) bold
-      final labelStyle = midi % 12 == 0
-          ? style.copyWith(fontWeight: FontWeight.bold)
-          : style;
+
+      final String label;
+      if (sargamEnabled) {
+        label = midiToSargam(midi.toDouble(), scaleRoot: scaleRoot);
+      } else {
+        label = midiToNoteName(midi.toDouble());
+      }
+
+      final TextStyle labelStyle;
+      if (sargamEnabled) {
+        final sargamStyle = SargamTheme.forType(getSargamNoteType(semitone));
+        labelStyle = style.copyWith(
+          fontSize: fontSize,
+          fontWeight: sargamStyle.fontWeight,
+          color: sargamStyle.color,
+        );
+      } else {
+        labelStyle = style.copyWith(
+          fontSize: fontSize,
+          fontWeight: isTonic ? FontWeight.bold : FontWeight.normal,
+        );
+      }
+
       final tp = TextPainter(
         text: TextSpan(text: label, style: labelStyle),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(rect.left - tp.width - 8, y - tp.height / 2));
+
+      final labelX = rect.left - tp.width - 8;
+      final labelY = y - tp.height / 2;
+
+      if (sargamEnabled) {
+        final bg = SargamTheme.forType(getSargamNoteType(semitone)).backgroundColor;
+        if (bg != null) {
+          const hPad = 4.0;
+          const vPad = 2.0;
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(labelX - hPad, labelY - vPad, tp.width + hPad * 2, tp.height + vPad * 2),
+              const Radius.circular(3),
+            ),
+            Paint()..color = bg,
+          );
+        }
+      }
+
+      tp.paint(canvas, Offset(labelX, labelY));
     }
   }
 

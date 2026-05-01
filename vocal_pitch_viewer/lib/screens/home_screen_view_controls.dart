@@ -62,6 +62,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   }
 
   void _handleZoom(double zoomDelta, double focalPointRatio) {
+    PerformanceMonitor.instance.reportAction(UserAction.zoomX);
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120.0;
     final focalTime = _viewStartTime + _viewWindowSize * focalPointRatio;
 
@@ -82,6 +83,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   }
 
   void _handleYZoom(double scaleFactor) {
+    PerformanceMonitor.instance.reportAction(UserAction.zoomY);
     setState(() {
       _yZoomScale = (_yZoomScale * scaleFactor)
           .clamp(_HomeScreenState._minYZoomScale, _HomeScreenState._maxYZoomScale);
@@ -89,6 +91,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   }
 
   void _handleYPan(double scrollDeltaY) {
+    PerformanceMonitor.instance.reportAction(UserAction.panY);
     final pitchData = context.read<AppState>().pitchData;
     if (pitchData == null) return;
     final appState = context.read<AppState>();
@@ -104,6 +107,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   }
 
   void _handlePan(double panDelta) {
+    PerformanceMonitor.instance.reportAction(UserAction.panX);
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
     setState(() {
       _viewStartTime =
@@ -125,12 +129,11 @@ extension _HomeScreenViewControls on _HomeScreenState {
   }
 
   void _reEnableAutoScrollAfterDelay() {
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _autoScroll = true);
-    });
+    // Auto-scroll is now only re-enabled via the Auto-scroll button.
   }
 
   void _seekTo(double time) {
+    PerformanceMonitor.instance.reportAction(UserAction.seek);
     final playerPosBefore = _audioService.position.inMilliseconds / 1000.0;
     debugPrint('[Seek] target=$time  playerPosBefore=$playerPosBefore  _lastKnownPosition=$_lastKnownPosition  display=${context.read<AppState>().currentTime}');
     _audioService.seekToSeconds(time);
@@ -152,6 +155,20 @@ extension _HomeScreenViewControls on _HomeScreenState {
     });
   }
 
+  static const _speedPresets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+  void _stepSpeed(int direction) {
+    final currentIndex = _speedPresets.indexOf(_playbackSpeed);
+    if (currentIndex < 0) return;
+    final newIndex = (currentIndex + direction).clamp(0, _speedPresets.length - 1);
+    _setSpeed(_speedPresets[newIndex]);
+  }
+
+  void _setSpeed(double speed) {
+    setState(() => _playbackSpeed = speed);
+    _audioService.setSpeed(speed);
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
@@ -166,13 +183,32 @@ extension _HomeScreenViewControls on _HomeScreenState {
       return KeyEventResult.handled;
     }
 
+    // Cmd+Shift+Up/Down: transpose pitch (check before plain arrow keys)
+    if (HardwareKeyboard.instance.isMetaPressed &&
+        HardwareKeyboard.instance.isShiftPressed) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        if (_transposeAmount < 12) {
+          setState(() => _transposeAmount = _transposeAmount + 1);
+          _audioService.setPitchSemitones(_transposeAmount);
+        }
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        if (_transposeAmount > -12) {
+          setState(() => _transposeAmount = _transposeAmount - 1);
+          _audioService.setPitchSemitones(_transposeAmount);
+        }
+        return KeyEventResult.handled;
+      }
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      _seekTo((currentTime - 5).clamp(0, maxTime));
+      _seekTo((currentTime - AudioControls.seekStepSeconds).clamp(0, maxTime));
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      _seekTo((currentTime + 5).clamp(0, maxTime));
+      _seekTo((currentTime + AudioControls.seekStepSeconds).clamp(0, maxTime));
       return KeyEventResult.handled;
     }
 
@@ -189,6 +225,20 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
     if (event.logicalKey == LogicalKeyboardKey.digit0) {
       _resetZoom();
+      return KeyEventResult.handled;
+    }
+
+    // Speed controls: [ slower, ] faster, \ reset
+    if (event.logicalKey == LogicalKeyboardKey.bracketLeft) {
+      _stepSpeed(-1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.bracketRight) {
+      _stepSpeed(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.backslash) {
+      _setSpeed(1.0);
       return KeyEventResult.handled;
     }
 

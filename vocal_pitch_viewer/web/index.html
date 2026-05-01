@@ -34,6 +34,11 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Expose SoundTouchNode globally for Dart js_interop bindings -->
+  <script type="module">
+    import { SoundTouchNode } from './SoundTouchNode.js';
+    window.SoundTouchNode = SoundTouchNode;
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

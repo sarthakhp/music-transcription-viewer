@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
+import '../models/instrument_data.dart';
 import 'graph_constants.dart';
 import 'graph_renderers/grid_renderer.dart';
 import 'graph_renderers/axis_renderer.dart';
 import 'graph_renderers/pitch_renderer.dart';
 import 'graph_renderers/chord_renderer.dart';
+import 'graph_renderers/instrument_renderer.dart';
 
 /// Custom painter for the pitch visualization (static layer)
 /// This painter only draws content that doesn't change frequently:
 /// - Grid and background
 /// - Axes
-/// - Pitch points
+/// - Instrument note bars (bass, other)
+/// - Pitch points (vocals)
 /// - Chord blocks
 /// The playhead is drawn separately in PlayheadPainter for better performance
 class PitchGraphPainter extends CustomPainter {
   final ProcessedFramesData data;
   final ChordData? chordData;
+  final InstrumentData? instrumentData;
   final double viewStartTime;
   final double viewEndTime;
   final Color primaryColor;
@@ -28,10 +32,20 @@ class PitchGraphPainter extends CustomPainter {
   final double referenceFrequency;
   final double minMidi;
   final double maxMidi;
+  final bool showVocals;
+  final bool showBass;
+  final bool showOther;
+  final double vocalsMinConfidence;
+  final double bassMinConfidence;
+  final double otherMinConfidence;
+  final int transposeAmount;
+  final bool sargamEnabled;
+  final int scaleRoot;
 
   PitchGraphPainter({
     required this.data,
     this.chordData,
+    this.instrumentData,
     required this.viewStartTime,
     required this.viewEndTime,
     required this.primaryColor,
@@ -43,6 +57,15 @@ class PitchGraphPainter extends CustomPainter {
     required this.referenceFrequency,
     required this.minMidi,
     required this.maxMidi,
+    this.showVocals = true,
+    this.showBass = true,
+    this.showOther = true,
+    this.vocalsMinConfidence = 0.0,
+    this.bassMinConfidence = 0.0,
+    this.otherMinConfidence = 0.0,
+    this.transposeAmount = 0,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
   });
 
   @override
@@ -54,7 +77,6 @@ class PitchGraphPainter extends CustomPainter {
       size.height - GraphConstants.bottomPadding,
     );
 
-    // Create renderers
     final gridRenderer = GridRenderer(
       data: data,
       viewStartTime: viewStartTime,
@@ -64,6 +86,8 @@ class PitchGraphPainter extends CustomPainter {
       referenceFrequency: referenceFrequency,
       minMidi: minMidi,
       maxMidi: maxMidi,
+      sargamEnabled: sargamEnabled,
+      scaleRoot: scaleRoot,
     );
 
     final axisRenderer = AxisRenderer(
@@ -74,6 +98,8 @@ class PitchGraphPainter extends CustomPainter {
       referenceFrequency: referenceFrequency,
       minMidi: minMidi,
       maxMidi: maxMidi,
+      sargamEnabled: sargamEnabled,
+      scaleRoot: scaleRoot,
     );
 
     final pitchRenderer = PitchRenderer(
@@ -86,6 +112,8 @@ class PitchGraphPainter extends CustomPainter {
       referenceFrequency: referenceFrequency,
       minMidi: minMidi,
       maxMidi: maxMidi,
+      minConfidence: vocalsMinConfidence,
+      transposeAmount: transposeAmount,
     );
 
     final chordRenderer = ChordRenderer(
@@ -95,27 +123,53 @@ class PitchGraphPainter extends CustomPainter {
       chordColor: chordColor,
       textColor: onSurfaceColor,
       brightness: brightness,
+      transposeAmount: transposeAmount,
     );
 
-    // Draw static content only (no playhead)
     gridRenderer.drawBackground(canvas, graphRect);
     gridRenderer.drawGrid(canvas, graphRect);
     axisRenderer.drawAxes(canvas, size, graphRect);
-    chordRenderer.drawChords(canvas, graphRect); // Draw chords before pitch points
-    pitchRenderer.drawPitchPoints(canvas, graphRect);
+    chordRenderer.drawChords(canvas, graphRect);
+
+    // Instrument bars sit below vocal pitch dots so vocals remain readable
+    if (instrumentData != null) {
+      InstrumentRenderer(
+        instrumentData: instrumentData!,
+        viewStartTime: viewStartTime,
+        viewEndTime: viewEndTime,
+        minMidi: minMidi,
+        maxMidi: maxMidi,
+        showBass: showBass,
+        showOther: showOther,
+        bassMinConfidence: bassMinConfidence,
+        otherMinConfidence: otherMinConfidence,
+        transposeAmount: transposeAmount,
+      ).drawNotes(canvas, graphRect);
+    }
+
+    if (showVocals) {
+      pitchRenderer.drawPitchPoints(canvas, graphRect);
+    }
   }
 
   @override
   bool shouldRepaint(covariant PitchGraphPainter oldDelegate) {
-    // Only repaint when view changes or data changes
-    // Do NOT repaint when only currentTime or hoverTime changes
     return oldDelegate.viewStartTime != viewStartTime ||
         oldDelegate.viewEndTime != viewEndTime ||
         oldDelegate.chordData != chordData ||
+        oldDelegate.instrumentData != instrumentData ||
         oldDelegate.referenceFrequency != referenceFrequency ||
         oldDelegate.data != data ||
         oldDelegate.minMidi != minMidi ||
-        oldDelegate.maxMidi != maxMidi;
+        oldDelegate.maxMidi != maxMidi ||
+        oldDelegate.showVocals != showVocals ||
+        oldDelegate.showBass != showBass ||
+        oldDelegate.showOther != showOther ||
+        oldDelegate.vocalsMinConfidence != vocalsMinConfidence ||
+        oldDelegate.bassMinConfidence != bassMinConfidence ||
+        oldDelegate.otherMinConfidence != otherMinConfidence ||
+        oldDelegate.transposeAmount != transposeAmount ||
+        oldDelegate.sargamEnabled != sargamEnabled ||
+        oldDelegate.scaleRoot != scaleRoot;
   }
 }
-

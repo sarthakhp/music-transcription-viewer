@@ -3,7 +3,8 @@ enum JobStatus {
   queued,
   processing,
   completed,
-  failed;
+  failed,
+  cancelled;
 
   /// Parse status from string
   static JobStatus fromString(String status) {
@@ -16,6 +17,8 @@ enum JobStatus {
         return JobStatus.completed;
       case 'failed':
         return JobStatus.failed;
+      case 'cancelled':
+        return JobStatus.cancelled;
       default:
         throw ArgumentError('Unknown job status: $status');
     }
@@ -27,7 +30,10 @@ enum JobStatus {
   }
 
   /// Check if job is in a terminal state
-  bool get isTerminal => this == JobStatus.completed || this == JobStatus.failed;
+  bool get isTerminal =>
+      this == JobStatus.completed ||
+      this == JobStatus.failed ||
+      this == JobStatus.cancelled;
 
   /// Check if job is still processing
   bool get isActive => this == JobStatus.queued || this == JobStatus.processing;
@@ -35,17 +41,23 @@ enum JobStatus {
 
 /// Processing stage enumeration
 enum ProcessingStage {
+  download,
   separation,
   transcription,
+  instruments,
   chords;
 
   /// Parse stage from string
   static ProcessingStage fromString(String stage) {
     switch (stage.toLowerCase()) {
+      case 'download':
+        return ProcessingStage.download;
       case 'separation':
         return ProcessingStage.separation;
       case 'transcription':
         return ProcessingStage.transcription;
+      case 'instruments':
+        return ProcessingStage.instruments;
       case 'chords':
         return ProcessingStage.chords;
       default:
@@ -56,10 +68,14 @@ enum ProcessingStage {
   /// Get display name for the stage
   String get displayName {
     switch (this) {
+      case ProcessingStage.download:
+        return 'Downloading';
       case ProcessingStage.separation:
         return 'Source Separation';
       case ProcessingStage.transcription:
         return 'Vocal Transcription';
+      case ProcessingStage.instruments:
+        return 'Instrument Transcription';
       case ProcessingStage.chords:
         return 'Chord Detection';
     }
@@ -68,12 +84,16 @@ enum ProcessingStage {
   /// Get progress range for this stage (0-100)
   (int start, int end) get progressRange {
     switch (this) {
+      case ProcessingStage.download:
+        return (0, 15);
       case ProcessingStage.separation:
-        return (0, 33);
+        return (15, 45);
       case ProcessingStage.transcription:
-        return (33, 66);
+        return (45, 65);
+      case ProcessingStage.instruments:
+        return (65, 80);
       case ProcessingStage.chords:
-        return (66, 100);
+        return (80, 100);
     }
   }
 }
@@ -126,6 +146,9 @@ class JobStatusResponse {
 
   /// Check if job has failed
   bool get hasFailed => status == JobStatus.failed;
+
+  /// Check if job was cancelled
+  bool get isCancelled => status == JobStatus.cancelled;
 
   /// Check if job is still processing
   bool get isProcessing => status.isActive;

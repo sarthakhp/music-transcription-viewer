@@ -4,8 +4,17 @@ import '../providers/app_state.dart';
 import '../models/job_status.dart';
 
 /// Widget to display job processing status with progress
-class ProcessingStatusCard extends StatelessWidget {
-  const ProcessingStatusCard({super.key});
+class ProcessingStatusCard extends StatefulWidget {
+  final Future<void> Function()? onCancel;
+
+  const ProcessingStatusCard({super.key, this.onCancel});
+
+  @override
+  State<ProcessingStatusCard> createState() => _ProcessingStatusCardState();
+}
+
+class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
+  bool _isCancelling = false;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +91,43 @@ class ProcessingStatusCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   _buildStageIndicator(context, appState),
                 ],
+
+                // Cancel button
+                if (widget.onCancel != null && !appState.isUploading) ...[
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _isCancelling
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Cancelling...',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
+                          )
+                        : TextButton(
+                            onPressed: _handleCancel,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(context).colorScheme.error,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -90,12 +136,60 @@ class ProcessingStatusCard extends StatelessWidget {
     );
   }
 
+  Future<void> _handleCancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel processing?'),
+        content: const Text(
+          'All progress will be lost. The audio file will need to be re-uploaded to try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep Processing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Confirm Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isCancelling = true);
+      try {
+        await widget.onCancel!();
+      } finally {
+        if (mounted) {
+          setState(() => _isCancelling = false);
+        }
+      }
+    }
+  }
+
   /// Build stage indicator showing all 3 stages
   Widget _buildStageIndicator(BuildContext context, AppState appState) {
     final currentStage = appState.processingStage;
-    
+    // Show the download stage only when it's active or has been passed.
+    final showDownload = currentStage == ProcessingStage.download ||
+        (currentStage != null && currentStage.index > ProcessingStage.download.index);
+
     return Row(
       children: [
+        if (showDownload) ...[
+          _buildStageChip(
+            context,
+            'Download',
+            ProcessingStage.download,
+            currentStage,
+          ),
+          const SizedBox(width: 8),
+        ],
         _buildStageChip(
           context,
           'Separation',
@@ -107,6 +201,13 @@ class ProcessingStatusCard extends StatelessWidget {
           context,
           'Transcription',
           ProcessingStage.transcription,
+          currentStage,
+        ),
+        const SizedBox(width: 8),
+        _buildStageChip(
+          context,
+          'Instruments',
+          ProcessingStage.instruments,
           currentStage,
         ),
         const SizedBox(width: 8),
@@ -213,10 +314,14 @@ class ProcessingStatusCard extends StatelessWidget {
     // Fallback to stage-based messages
     if (appState.processingStage != null) {
       switch (appState.processingStage!) {
+        case ProcessingStage.download:
+          return 'Downloading audio from URL';
         case ProcessingStage.separation:
           return 'Separating audio into stems (vocals, instruments)';
         case ProcessingStage.transcription:
           return 'Detecting pitch and transcribing vocals';
+        case ProcessingStage.instruments:
+          return 'Transcribing instrument notes (bass, melodic)';
         case ProcessingStage.chords:
           return 'Analyzing chord progression';
       }

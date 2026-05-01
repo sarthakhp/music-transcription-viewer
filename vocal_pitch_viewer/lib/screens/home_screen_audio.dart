@@ -105,8 +105,6 @@ extension _HomeScreenAudio on _HomeScreenState {
           final interpolated = _lastKnownPosition + elapsed.inMilliseconds / 1000.0;
           final diff = time - interpolated;
 
-          debugPrint('[PositionStream] PLAYING stream=$time, interpolated=$interpolated, diff=$diff, firstSync=$_awaitingFirstStreamSync');
-
           if (_awaitingFirstStreamSync) {
             // First stream event after pressing play: always snap to stream.
             // On web, the audio engine may start from a keyframe slightly before the
@@ -117,7 +115,6 @@ extension _HomeScreenAudio on _HomeScreenState {
             _lastKnownPosition = time;
           } else if (diff.abs() > 1.0) {
             // Large jump = seek; snap directly to stream position
-            debugPrint('[PositionStream] Seek detected, snapping to $time');
             _lastKnownPosition = time;
           } else {
             // Normal playback: advance baseline to max(stream, interpolated) to prevent
@@ -128,7 +125,6 @@ extension _HomeScreenAudio on _HomeScreenState {
         } else {
           // Paused — stream is authoritative
           _lastStreamPosition = time;
-          debugPrint('[PositionStream] PAUSED stream=$time, was _lastKnownPosition=$_lastKnownPosition');
           _lastKnownPosition = time;
           _lastPositionUpdateTime = DateTime.now();
           appState.setCurrentTime(time);
@@ -153,10 +149,10 @@ extension _HomeScreenAudio on _HomeScreenState {
         }
       });
 
-      _processingStateSubscription = _audioService.processingStateStream.listen((state) {
+      _processingStateSubscription = _audioService.stateStream.listen((state) {
         if (!mounted) return;
-        debugPrint('[ProcessingState] $state  waitingForBuffer=$_waitingForBuffer');
-        if (state == ProcessingState.ready && _waitingForBuffer) {
+        debugPrint('[AudioPlayerState] $state  waitingForBuffer=$_waitingForBuffer');
+        if (state == AudioPlayerState.ready && _waitingForBuffer) {
           _waitingForBuffer = false;
           final actualPos = _audioService.position.inMilliseconds / 1000.0;
           debugPrint('[BufferReady] Reseeding from actual pos=$actualPos');
@@ -218,8 +214,8 @@ extension _HomeScreenAudio on _HomeScreenState {
     // either before or after this point (race with the audio engine). The listener will
     // clear it when ready fires.
     _waitingForBuffer = true;
-    final currentProcessingState = _audioService.processingState;
-    debugPrint('[StartAnim] seed=$audioPos  firstSync=ARMED  processingState=$currentProcessingState  waitingForBuffer=$_waitingForBuffer');
+    final currentState = _audioService.playerState;
+    debugPrint('[StartAnim] seed=$audioPos  firstSync=ARMED  playerState=$currentState  waitingForBuffer=$_waitingForBuffer');
 
     _playheadAnimationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       if (!mounted || !appState.isPlaying) {

@@ -12,6 +12,11 @@ class PlayheadPainter extends CustomPainter {
   final Color onSurfaceColor;
   final Brightness brightness;
   final double? hoverTime;
+  final double? hoverY;
+  final double minMidi;
+  final double maxMidi;
+  final bool sargamEnabled;
+  final int scaleRoot;
 
   PlayheadPainter({
     required this.currentTime,
@@ -21,6 +26,11 @@ class PlayheadPainter extends CustomPainter {
     required this.onSurfaceColor,
     required this.brightness,
     this.hoverTime,
+    this.hoverY,
+    required this.minMidi,
+    required this.maxMidi,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
   });
 
   @override
@@ -40,9 +50,14 @@ class PlayheadPainter extends CustomPainter {
       onSurfaceColor: onSurfaceColor,
       brightness: brightness,
       hoverTime: hoverTime,
+      hoverY: hoverY,
+      minMidi: minMidi,
+      maxMidi: maxMidi,
+      sargamEnabled: sargamEnabled,
+      scaleRoot: scaleRoot,
     );
 
-    // Only draw the playhead and hover indicator
+    playheadRenderer.drawNoteRowHighlight(canvas, graphRect);
     playheadRenderer.drawHoverIndicator(canvas, graphRect);
     playheadRenderer.drawPlayhead(canvas, graphRect);
   }
@@ -52,7 +67,8 @@ class PlayheadPainter extends CustomPainter {
     // Only repaint when currentTime or hoverTime changes
     // This is much more efficient than repainting the entire graph
     return oldDelegate.currentTime != currentTime ||
-        oldDelegate.hoverTime != hoverTime;
+        oldDelegate.hoverTime != hoverTime ||
+        oldDelegate.hoverY != hoverY;
   }
 }
 

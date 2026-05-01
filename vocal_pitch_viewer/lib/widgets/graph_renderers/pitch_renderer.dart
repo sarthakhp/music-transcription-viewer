@@ -15,6 +15,8 @@ class PitchRenderer {
   final double referenceFrequency;
   final double minMidi;
   final double maxMidi;
+  final double minConfidence;
+  final int transposeAmount;
 
   PitchRenderer({
     required this.data,
@@ -26,6 +28,8 @@ class PitchRenderer {
     required this.referenceFrequency,
     required this.minMidi,
     required this.maxMidi,
+    this.minConfidence = 0.0,
+    this.transposeAmount = 0,
   });
 
   void drawPitchPoints(Canvas canvas, Rect rect) {
@@ -48,13 +52,14 @@ class PitchRenderer {
       final frame = data.displayFrames[i];
 
       if (!frame.isVoiced && !showUnvoiced) continue;
+      if (frame.confidence < minConfidence) continue;
 
       final x = _timeToX(frame.time, rect);
 
       // Always use MIDI/piano mode
       // Recalculate MIDI pitch from frequency using current reference frequency
       if (frame.frequency <= 0) continue;
-      final midiPitch = frequencyToMidi(frame.frequency, referenceFrequency: referenceFrequency);
+      final midiPitch = frequencyToMidi(frame.frequency, referenceFrequency: referenceFrequency) + transposeAmount;
       final y = _midiToY(midiPitch, rect, minMidi, maxMidi);
 
       if (y < rect.top || y > rect.bottom) continue;

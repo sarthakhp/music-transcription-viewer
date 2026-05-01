@@ -7,6 +7,7 @@ import '../models/job.dart';
 import '../models/job_status.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
+import '../models/instrument_data.dart';
 import '../utils/api_error_handler.dart';
 
 /// Main API service for Music Transcription backend
@@ -54,6 +55,54 @@ class TranscriptionApiService {
     } catch (e) {
       return ApiErrorHandler.handleException(e);
     }
+  }
+
+  // ========== Endpoint 1b: Transcribe from URL ==========
+
+  /// Submit a URL (YouTube, etc.) for transcription
+  /// POST /api/v1/transcribe/url
+  Future<ApiResponse<JobCreationResponse>> transcribeUrl({
+    required String url,
+    double? startTime,
+    double? endTime,
+  }) async {
+    try {
+      final body = <String, dynamic>{'url': url};
+      if (startTime != null) body['start_time'] = startTime;
+      if (endTime != null) body['end_time'] = endTime;
+
+      final response = await _client.post(
+        Uri.parse(ApiConfig.getUrl('${ApiConfig.transcribeEndpoint}/url')),
+        headers: {
+          ..._commonHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(body),
+      ).timeout(ApiConfig.requestTimeout);
+
+      return ApiErrorHandler.handleResponse(
+        response,
+        (json) => JobCreationResponse.fromJson(json),
+      );
+    } catch (e) {
+      return ApiErrorHandler.handleException(e);
+    }
+  }
+
+  // ========== Endpoint 1c: URL Metadata ==========
+
+  /// Fetch metadata for a URL (title, duration, thumbnail, etc.)
+  /// GET /api/v1/url/metadata?url={encoded_url}
+  Future<ApiResponse<UrlMetadata>> getUrlMetadata(String url) async {
+    return ApiErrorHandler.executeApiCall(
+      () => _client.get(
+        Uri.parse(ApiConfig.getUrl('/url/metadata')).replace(
+          queryParameters: {'url': url},
+        ),
+        headers: _commonHeaders,
+      ).timeout(ApiConfig.requestTimeout),
+      (json) => UrlMetadata.fromJson(json),
+    );
   }
 
   // ========== Endpoint 2: Get Job Status ==========
@@ -157,7 +206,36 @@ class TranscriptionApiService {
     );
   }
 
-  // ========== Endpoint 8: Delete Job ==========
+  // ========== Endpoint 8: Get Instrument Transcription ==========
+
+  /// Get instrument (bass + other stems) note transcription
+  /// GET /api/v1/jobs/{job_id}/instruments
+  /// Returns 404 for older jobs that don't have instrument data
+  Future<ApiResponse<InstrumentData>> getInstruments(String jobId) async {
+    return ApiErrorHandler.executeApiCallAsync(
+      () => _client.get(
+        Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/instruments')),
+        headers: _commonHeaders,
+      ).timeout(ApiConfig.requestTimeout),
+      (json) => InstrumentData.fromJson(json),
+    );
+  }
+
+  // ========== Endpoint: Cancel Job ==========
+
+  /// Cancel an in-progress or queued job
+  /// POST /api/v1/jobs/{job_id}/cancel
+  Future<ApiResponse<JobCancelResponse>> cancelJob(String jobId) async {
+    return ApiErrorHandler.executeApiCall(
+      () => _client.post(
+        Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/cancel')),
+        headers: _commonHeaders,
+      ).timeout(ApiConfig.requestTimeout),
+      (json) => JobCancelResponse.fromJson(json),
+    );
+  }
+
+  // ========== Endpoint 9: Delete Job ==========
 
   /// Delete job and all associated files
   /// DELETE /api/v1/jobs/{job_id}

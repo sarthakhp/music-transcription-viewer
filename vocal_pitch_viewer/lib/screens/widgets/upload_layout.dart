@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../providers/app_state.dart';
 import '../../models/job.dart';
+import '../../services/transcription_api_service.dart';
 import '../../widgets/job_list_card.dart';
 import 'upload_section.dart';
 
 /// Upload layout widget with responsive design
 class UploadLayout extends StatelessWidget {
   final AppState appState;
+  final TranscriptionApiService apiService;
   final List<JobListItem> completedJobs;
   final bool isLoadingJobs;
   final Future<void> Function(String) onJobSelected;
   final Future<void> Function(String) onJobDeleted;
   final VoidCallback onUploadPressed;
+  final Future<void> Function(String url, {double? startTime, double? endTime})? onUrlSubmitted;
+  final Future<void> Function()? onCancel;
   final bool isLoadingJson;
   final bool isLoadingAudio;
   final String? loadingAudioStatus;
@@ -19,11 +23,14 @@ class UploadLayout extends StatelessWidget {
   const UploadLayout({
     super.key,
     required this.appState,
+    required this.apiService,
     required this.completedJobs,
     required this.isLoadingJobs,
     required this.onJobSelected,
     required this.onJobDeleted,
     required this.onUploadPressed,
+    this.onUrlSubmitted,
+    this.onCancel,
     this.isLoadingJson = false,
     this.isLoadingAudio = false,
     this.loadingAudioStatus,
@@ -71,7 +78,10 @@ class UploadLayout extends StatelessWidget {
                             constraints: const BoxConstraints(maxWidth: 500),
                             child: UploadSection(
                               appState: appState,
+                              apiService: apiService,
                               onUploadPressed: onUploadPressed,
+                              onUrlSubmitted: onUrlSubmitted,
+                              onCancel: onCancel,
                               isLoadingJson: isLoadingJson,
                               isLoadingAudio: isLoadingAudio,
                               loadingAudioStatus: loadingAudioStatus,
@@ -101,7 +111,10 @@ class UploadLayout extends StatelessWidget {
                         constraints: const BoxConstraints(maxWidth: 500),
                         child: UploadSection(
                           appState: appState,
+                          apiService: apiService,
                           onUploadPressed: onUploadPressed,
+                          onUrlSubmitted: onUrlSubmitted,
+                          onCancel: onCancel,
                           isLoadingJson: isLoadingJson,
                           isLoadingAudio: isLoadingAudio,
                           loadingAudioStatus: loadingAudioStatus,

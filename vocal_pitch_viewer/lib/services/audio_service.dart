@@ -1,103 +1,61 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:just_audio/just_audio.dart';
-import '../utils/blob_url_helper.dart'
-    if (dart.library.io) '../utils/blob_url_helper_stub.dart';
+import 'platform_audio_player.dart';
+import 'platform_audio_player.dart'
+    if (dart.library.io) 'platform_audio_player_native.dart'
+    if (dart.library.js_interop) 'platform_audio_player_web.dart'
+    as platform;
 
-/// Audio track type enum
+export 'platform_audio_player.dart' show AudioPlayerState;
+
 enum AudioTrackType {
   original,
   vocal,
   instrumental,
 }
 
-/// Custom audio source that streams bytes directly without base64 encoding
-/// This is much more efficient than using data URIs for large audio files
-// ignore: experimental_member_use
-class BytesAudioSource extends StreamAudioSource {
-  final Uint8List bytes;
-  final String mimeType;
-
-  BytesAudioSource(this.bytes, this.mimeType);
-
-  @override
-  // ignore: experimental_member_use
-  Future<StreamAudioResponse> request([int? start, int? end]) async {
-    try {
-      start ??= 0;
-      end ??= bytes.length;
-
-      debugPrint('🎵 BytesAudioSource.request: start=$start, end=$end, total=${bytes.length}');
-
-      // ignore: experimental_member_use
-      return StreamAudioResponse(
-        sourceLength: bytes.length,
-        contentLength: end - start,
-        offset: start,
-        stream: Stream.value(bytes.sublist(start, end)),
-        contentType: mimeType,
-      );
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error in BytesAudioSource.request: $e');
-      debugPrint('Stack trace: $stackTrace');
-      rethrow;
-    }
-  }
-}
-
-/// Audio playback service using just_audio with multi-track support
+/// Audio playback service with multi-track support.
+///
+/// On native (mobile/desktop): uses just_audio via [NativeAudioPlayer].
+/// On web: uses HTMLAudioElement + SoundTouchNode via [WebAudioPlayer].
 class AudioService {
-  // Multiple players for instant track switching
-  final Map<AudioTrackType, AudioPlayer> _players = {};
+  final Map<AudioTrackType, PlatformAudioPlayer> _players = {};
   AudioTrackType _activeTrack = AudioTrackType.original;
 
-  // Blob URLs created for web playback — must be revoked to free browser memory
-  final Map<AudioTrackType, String> _blobUrls = {};
-
-  // On web, seeking while paused causes Chrome to report synthetic wall-clock-based
-  // currentTime on next play (instead of real decode position), creating a ~1s A/V gap.
-  // Fix: when play() is called after a paused-seek, we play THEN immediately re-seek
-  // while playing. Chrome's decode engine is then active and currentTime is accurate.
-  Duration? _pendingWebSeekTarget;
-
-  // Stream controllers for state updates
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _playingController = StreamController<bool>.broadcast();
-  final _processingStateController = StreamController<ProcessingState>.broadcast();
+  final _stateController = StreamController<AudioPlayerState>.broadcast();
 
-  // Subscriptions for the active player
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
   StreamSubscription<bool>? _playingSubscription;
-  StreamSubscription<ProcessingState>? _processingStateSubscription;
+  StreamSubscription<AudioPlayerState>? _stateSubscription;
 
-  // Streams
   Stream<Duration> get positionStream => _positionController.stream;
   Stream<Duration?> get durationStream => _durationController.stream;
   Stream<bool> get playingStream => _playingController.stream;
-  Stream<ProcessingState> get processingStateStream => _processingStateController.stream;
+  Stream<AudioPlayerState> get stateStream => _stateController.stream;
 
-  // Current state - from active player
-  AudioPlayer? get _player => _players[_activeTrack];
+  PlatformAudioPlayer? get _player => _players[_activeTrack];
+
   bool get isPlaying {
     final player = _player;
     if (player == null) return false;
-    // When audio completes, just_audio keeps playing=true but processingState=completed
-    // We should treat completed state as not playing
-    return player.playing && player.processingState != ProcessingState.completed;
+    return player.playing && player.state != AudioPlayerState.completed;
   }
+
   Duration get position => _player?.position ?? Duration.zero;
   Duration? get duration => _player?.duration;
-  ProcessingState get processingState => _player?.processingState ?? ProcessingState.idle;
+  AudioPlayerState get playerState =>
+      _player?.state ?? AudioPlayerState.idle;
+  AudioTrackType get activeTrack => _activeTrack;
 
-  /// Initialize the audio player with bytes data (default track)
-  Future<bool> loadFromBytes(Uint8List bytes, String mimeType) async {
-    return loadTrack(AudioTrackType.original, bytes, mimeType, setActive: true);
-  }
+  // ─── Loading ──────────────────────────────────────────────────────────────
 
-  /// Load a specific track into its own player
-  /// [onStatusUpdate] is called with status messages during loading
+  Future<bool> loadFromBytes(Uint8List bytes, String mimeType) =>
+      loadTrack(AudioTrackType.original, bytes, mimeType, setActive: true);
+
   Future<bool> loadTrack(
     AudioTrackType trackType,
     Uint8List bytes,
@@ -106,291 +64,147 @@ class AudioService {
     void Function(String status)? onStatusUpdate,
   }) async {
     try {
-      debugPrint('🎵 Loading track $trackType (${bytes.length} bytes, $mimeType)');
+      debugPrint('Loading track $trackType (${bytes.length} bytes, $mimeType)');
 
-      // Dispose existing player for this track if any
+      // Dispose old player for this track.
       await _players[trackType]?.dispose();
 
-      final player = AudioPlayer();
+      // Create platform-appropriate player.
+      final player = platform.createPlatformAudioPlayer();
       _players[trackType] = player;
 
-      if (kIsWeb) {
-        // Web: Create a Blob URL — instant, no encoding, no giant string to parse.
-        // Revoke old URL for this track to free browser memory before replacing it.
-        final oldUrl = _blobUrls[trackType];
-        if (oldUrl != null) revokeBlobUrl(oldUrl);
+      onStatusUpdate?.call('Preparing audio...');
+      await player.load(bytes, mimeType);
 
-        onStatusUpdate?.call('Preparing audio...');
-        debugPrint('🎵 Creating Blob URL for $trackType');
-        final blobUrl = createBlobUrl(bytes, mimeType);
-        _blobUrls[trackType] = blobUrl;
+      debugPrint('Loaded $trackType');
 
-        onStatusUpdate?.call('Initializing player...');
-        debugPrint('🎵 Setting URL for $trackType');
-        await player.setUrl(blobUrl);
-      } else {
-        // Mobile/Desktop: Use StreamAudioSource for efficient streaming
-        onStatusUpdate?.call('Preparing audio data...');
-        debugPrint('🎵 Creating BytesAudioSource for $trackType');
-        final audioSource = BytesAudioSource(bytes, mimeType);
-
-        onStatusUpdate?.call('Initializing player...');
-        debugPrint('🎵 Setting audio source for $trackType');
-        await player.setAudioSource(audioSource);
-      }
-
-      debugPrint('🎵 Successfully loaded track $trackType');
-
-      // If this should be the active track, set up listeners
       if (setActive) {
         _activeTrack = trackType;
         _setupListeners(player);
-        debugPrint('🎵 Set $trackType as active track');
+        debugPrint('Active track -> $trackType');
       }
-
       return true;
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error loading track $trackType: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e, st) {
+      debugPrint('Error loading $trackType: $e\n$st');
       return false;
     }
   }
 
-  /// Set up stream listeners for a player
-  void _setupListeners(AudioPlayer player) {
-    // Cancel existing subscriptions
+  // ─── Listeners ────────────────────────────────────────────────────────────
+
+  void _setupListeners(PlatformAudioPlayer player) {
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
-    _processingStateSubscription?.cancel();
+    _stateSubscription?.cancel();
 
-    _positionSubscription = player.positionStream.listen((position) {
-      _positionController.add(position);
-    });
-
-    _durationSubscription = player.durationStream.listen((duration) {
-      _durationController.add(duration);
-    });
-
-    _playingSubscription = player.playingStream.listen((playing) {
-      _playingController.add(playing);
-    });
-
-    // Listen to processing state to handle completion and expose to UI
-    _processingStateSubscription = player.processingStateStream.listen((state) {
-      _processingStateController.add(state);
-      if (state == ProcessingState.completed) {
-        player.pause();
-      }
-    });
+    _positionSubscription =
+        player.positionStream.listen(_positionController.add);
+    _durationSubscription =
+        player.durationStream.listen(_durationController.add);
+    _playingSubscription =
+        player.playingStream.listen(_playingController.add);
+    _stateSubscription = player.stateStream.listen(_stateController.add);
   }
 
-  /// Play audio
+  // ─── Playback ─────────────────────────────────────────────────────────────
+
   Future<void> play() async {
-    if (kIsWeb && _pendingWebSeekTarget != null) {
-      // Corrective play-then-seek: start playback first (activates Chrome's decode
-      // pipeline), then immediately seek while playing. This ensures currentTime
-      // reflects real decode position instead of wall-clock time.
-      final target = _pendingWebSeekTarget!;
-      _pendingWebSeekTarget = null;
-      debugPrint('[AudioService] play-then-seek corrective: seeking to $target while playing');
-      await _player?.play();
-      await _player?.seek(target);
-    } else {
-      await _player?.play();
-    }
+    await _player?.play();
   }
-  
-  /// Pause audio
+
   Future<void> pause() async {
     await _player?.pause();
   }
-  
-  /// Toggle play/pause
+
   Future<void> togglePlayPause() async {
     if (_player == null) return;
-
-    // Check if audio has completed (at the end)
-    final isCompleted = _player!.processingState == ProcessingState.completed;
-
+    final isCompleted = _player!.state == AudioPlayerState.completed;
     if (_player!.playing && !isCompleted) {
-      // Currently playing and not completed - pause it
       await pause();
     } else {
-      // Not playing or completed - play it
-      // If completed and at the end, seek to beginning first
       if (isCompleted) {
         final dur = _player!.duration;
-        final pos = _player!.position;
-        if (dur != null && pos >= dur) {
+        if (dur != null && _player!.position >= dur) {
           await _player!.seek(Duration.zero);
         }
       }
       await play();
     }
   }
-  
-  /// Stop audio and reset position
+
   Future<void> stop() async {
-    _pendingWebSeekTarget = null;
     await _player?.stop();
-    await _player?.seek(Duration.zero);
   }
-  
-  /// Seek to position
+
   Future<void> seek(Duration position) async {
-    if (_player == null) return;
-
-    // Check if we're seeking from a completed state
-    final wasCompleted = _player!.processingState == ProcessingState.completed;
-
-    if (kIsWeb && !isPlaying) {
-      // Save seek target so play() can do a corrective play-then-seek
-      _pendingWebSeekTarget = position;
-    } else {
-      // Seeking while playing: no correction needed, clear any pending target
-      _pendingWebSeekTarget = null;
-    }
-
-    await _player!.seek(position);
-
-    // If we were in completed state and paused, resume playback
-    // This handles the case where audio finished and user seeks to middle
-    if (wasCompleted && !_player!.playing) {
-      await _player!.play();
-    }
+    await _player?.seek(position);
   }
 
-  /// Seek to time in seconds
-  Future<void> seekToSeconds(double seconds) async {
-    await seek(Duration(milliseconds: (seconds * 1000).round()));
-  }
+  Future<void> seekToSeconds(double seconds) =>
+      seek(Duration(milliseconds: (seconds * 1000).round()));
 
-  /// Set playback speed
+  double _currentSpeed = 1.0;
+  double get speed => _currentSpeed;
+
   Future<void> setSpeed(double speed) async {
-    await _player?.setSpeed(speed.clamp(0.5, 2.0));
+    _currentSpeed = speed.clamp(0.5, 2.0);
+    await _player?.setSpeed(_currentSpeed);
   }
 
-  /// Switch to a new audio source while preserving position and playback state
-  /// Returns true if successful (legacy method - use switchToTrack for instant switching)
-  Future<bool> switchSource(Uint8List bytes, String mimeType) async {
-    if (_player == null) {
-      debugPrint('Cannot switch source: player not initialized');
-      return false;
-    }
-
-    // Save current state
-    final wasPlaying = isPlaying;
-    final currentPosition = position;
-
-    try {
-      // Stop current playback
-      await _player!.pause();
-
-      // Create audio source from bytes (no base64 encoding needed!)
-      final audioSource = BytesAudioSource(bytes, mimeType);
-
-      // Load new source
-      await _player!.setAudioSource(audioSource);
-
-      // Restore position
-      await _player!.seek(currentPosition);
-
-      // Resume playback if it was playing (don't await - let it play async)
-      if (wasPlaying) {
-        _player!.play();
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error switching audio source: $e');
-      return false;
+  /// Sets pitch shift in semitones (-12 to +12). Speed is preserved.
+  /// On web, this drives the SoundTouchNode. On native, currently a no-op.
+  void setPitchSemitones(int semitones) {
+    for (final player in _players.values) {
+      player.setPitchSemitones(semitones);
     }
   }
 
-  /// Switch to a pre-loaded track instantly
-  /// This is the fastest method - switches between already-loaded players
+  // ─── Track switching ──────────────────────────────────────────────────────
+
   Future<bool> switchToTrack(AudioTrackType trackType) async {
-    if (!_players.containsKey(trackType)) {
-      debugPrint('Track $trackType not loaded');
-      return false;
-    }
-
-    if (_activeTrack == trackType) {
-      return true; // Already on this track
-    }
+    if (!_players.containsKey(trackType)) return false;
+    if (_activeTrack == trackType) return true;
 
     final currentPlayer = _players[_activeTrack];
     final targetPlayer = _players[trackType];
+    if (targetPlayer == null) return false;
 
-    if (targetPlayer == null) {
-      return false;
-    }
-
-    // Save current state
     final wasPlaying = currentPlayer?.playing ?? false;
     final currentPosition = currentPlayer?.position ?? Duration.zero;
 
     try {
-      // Pause current player
       await currentPlayer?.pause();
-
-      // Seek target player to same position
       await targetPlayer.seek(currentPosition);
-
-      // Switch active track
+      await targetPlayer.setSpeed(_currentSpeed);
       _activeTrack = trackType;
-
-      // Set up listeners for new active player
       _setupListeners(targetPlayer);
-
-      // Resume playback if it was playing
-      if (wasPlaying) {
-        targetPlayer.play();
-      }
-
-      // Emit current state from new player
+      if (wasPlaying) targetPlayer.play();
       _durationController.add(targetPlayer.duration);
       _positionController.add(currentPosition);
       _playingController.add(wasPlaying);
-
       return true;
     } catch (e) {
-      debugPrint('Error switching to track $trackType: $e');
+      debugPrint('Error switching to $trackType: $e');
       return false;
     }
   }
 
-  /// Check if a track is loaded
-  bool isTrackLoaded(AudioTrackType trackType) {
-    return _players.containsKey(trackType);
-  }
+  bool isTrackLoaded(AudioTrackType trackType) =>
+      _players.containsKey(trackType);
 
-  /// Get the active track type
-  AudioTrackType get activeTrack => _activeTrack;
+  // ─── Dispose ──────────────────────────────────────────────────────────────
 
-  /// Dispose resources
   Future<void> dispose() async {
-    // Cancel subscriptions and close controllers
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
-    _processingStateSubscription?.cancel();
-    _processingStateController.close();
+    _stateSubscription?.cancel();
+    _stateController.close();
 
-    // Dispose all players
     for (final player in _players.values) {
       await player.dispose();
     }
     _players.clear();
-
-    // Revoke all Blob URLs to free browser memory
-    if (kIsWeb) {
-      for (final url in _blobUrls.values) {
-        revokeBlobUrl(url);
-      }
-      _blobUrls.clear();
-    }
   }
 }
-

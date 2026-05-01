@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
+import '../models/job_status.dart';
 import '../providers/app_state.dart';
 import 'transcription_api_service.dart';
 
@@ -92,7 +93,7 @@ class JobPollingService {
         message: status.message,
       );
 
-      // Check if job is complete or failed
+      // Check if job is complete, failed, or cancelled
       if (status.isComplete) {
         _appState.completeJob();
 
@@ -102,6 +103,9 @@ class JobPollingService {
 
         // Trigger data fetch
         _onJobComplete(completedJobId);
+      } else if (status.status == JobStatus.cancelled) {
+        _appState.cancelJob();
+        stopPolling();
       } else if (status.hasFailed) {
         _appState.failJob(status.errorMessage ?? 'Job processing failed');
         stopPolling();
@@ -141,8 +145,11 @@ class JobPollingService {
         _appState.setError('Failed to fetch chord data: ${results.chords.error ?? "No data available"}');
       }
 
-      // Download audio stems (original, vocals, instrumental)
-      await _downloadAudioStems(jobId, inputFilename);
+      // Download audio stems + instrument data in parallel
+      await Future.wait([
+        _downloadAudioStems(jobId, inputFilename),
+        _fetchInstrumentData(jobId),
+      ]);
 
       _appState.setLoading(false);
     } catch (e) {
@@ -178,6 +185,18 @@ class JobPollingService {
     } catch (e) {
       debugPrint('Failed to download audio stems: $e');
       _appState.setPreparingAudio(false);
+    }
+  }
+
+  /// Fetch instrument transcription data — silently ignored if unavailable (404 / older jobs)
+  Future<void> _fetchInstrumentData(String jobId) async {
+    try {
+      final response = await _apiService.getInstruments(jobId);
+      if (response.isSuccess && response.data != null) {
+        _appState.setInstrumentData(response.data);
+      }
+    } catch (e) {
+      debugPrint('Instrument data not available for job $jobId: $e');
     }
   }
 

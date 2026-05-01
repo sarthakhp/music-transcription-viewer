@@ -35,6 +35,9 @@ class JobResultsSummary {
   final int numFrames;
   final int numChords;
   final double processingTime;
+  final String? sourceType;
+  final String? sourceUrl;
+  final String? videoTitle;
 
   const JobResultsSummary({
     required this.jobId,
@@ -49,7 +52,16 @@ class JobResultsSummary {
     required this.numFrames,
     required this.numChords,
     required this.processingTime,
+    this.sourceType,
+    this.sourceUrl,
+    this.videoTitle,
   });
+
+  /// Display name: video title for URL jobs, input filename for file uploads.
+  String get displayName => videoTitle ?? inputFilename;
+
+  /// Whether this job was created from a URL.
+  bool get isUrlSource => sourceType == 'url';
 
   factory JobResultsSummary.fromJson(Map<String, dynamic> json) {
     return JobResultsSummary(
@@ -65,6 +77,9 @@ class JobResultsSummary {
       numFrames: json['num_frames'] as int,
       numChords: json['num_chords'] as int,
       processingTime: (json['processing_time'] as num).toDouble(),
+      sourceType: json['source_type'] as String?,
+      sourceUrl: json['source_url'] as String?,
+      videoTitle: json['video_title'] as String?,
     );
   }
 
@@ -192,6 +207,9 @@ class JobListItem {
   final double tempoBpm;
   final int numFrames;
   final int numChords;
+  final String? sourceType;
+  final String? sourceUrl;
+  final String? videoTitle;
 
   const JobListItem({
     required this.id,
@@ -208,7 +226,16 @@ class JobListItem {
     required this.tempoBpm,
     required this.numFrames,
     required this.numChords,
+    this.sourceType,
+    this.sourceUrl,
+    this.videoTitle,
   });
+
+  /// Display name: video title for URL jobs, input filename for file uploads.
+  String get displayName => videoTitle ?? inputFilename;
+
+  /// Whether this job was created from a URL.
+  bool get isUrlSource => sourceType == 'url';
 
   factory JobListItem.fromJson(Map<String, dynamic> json) {
     return JobListItem(
@@ -230,6 +257,9 @@ class JobListItem {
       tempoBpm: (json['tempo_bpm'] as num).toDouble(),
       numFrames: json['num_frames'] as int,
       numChords: json['num_chords'] as int,
+      sourceType: json['source_type'] as String?,
+      sourceUrl: json['source_url'] as String?,
+      videoTitle: json['video_title'] as String?,
     );
   }
 
@@ -265,6 +295,64 @@ class JobListItem {
     } else {
       return 'Just now';
     }
+  }
+}
+
+/// Job cancellation response model
+class JobCancelResponse {
+  final String jobId;
+  final bool cancelled;
+  final String message;
+
+  const JobCancelResponse({
+    required this.jobId,
+    required this.cancelled,
+    required this.message,
+  });
+
+  factory JobCancelResponse.fromJson(Map<String, dynamic> json) {
+    return JobCancelResponse(
+      jobId: json['job_id'] as String,
+      cancelled: json['cancelled'] as bool,
+      message: json['message'] as String,
+    );
+  }
+}
+
+/// URL metadata response model
+class UrlMetadata {
+  final String title;
+  final double duration;
+  final String? uploader;
+  final String? thumbnail;
+  final String url;
+  final int maxDurationSeconds;
+
+  const UrlMetadata({
+    required this.title,
+    required this.duration,
+    this.uploader,
+    this.thumbnail,
+    required this.url,
+    required this.maxDurationSeconds,
+  });
+
+  factory UrlMetadata.fromJson(Map<String, dynamic> json) {
+    return UrlMetadata(
+      title: json['title'] as String,
+      duration: (json['duration'] as num).toDouble(),
+      uploader: json['uploader'] as String?,
+      thumbnail: json['thumbnail'] as String?,
+      url: json['url'] as String,
+      maxDurationSeconds: json['max_duration_seconds'] as int? ?? 600,
+    );
+  }
+
+  String get durationFormatted {
+    final totalSeconds = duration.round();
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 }
 
