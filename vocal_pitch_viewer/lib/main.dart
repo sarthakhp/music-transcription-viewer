@@ -21,7 +21,9 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: _buildLightTheme(),
         darkTheme: _buildDarkTheme(),
-        themeMode: ThemeMode.dark,
+        themeMode: appPalette.brightness == Brightness.dark
+            ? ThemeMode.dark
+            : ThemeMode.light,
         home: const HomeScreen(),
       ),
     );
@@ -37,15 +39,17 @@ class MyApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: GoogleFonts.interTextTheme(),
+      scaffoldBackgroundColor: appPalette.scaffoldBg,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: colorScheme.surface,
+        backgroundColor: appPalette.scaffoldBg,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
+        color: appPalette.cardBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: colorScheme.outlineVariant),
@@ -72,17 +76,17 @@ class MyApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      scaffoldBackgroundColor: appPalette.darkScaffoldBg,
+      scaffoldBackgroundColor: appPalette.scaffoldBg,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: appPalette.darkScaffoldBg,
+        backgroundColor: appPalette.scaffoldBg,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: appPalette.darkCardBg,
+        color: appPalette.cardBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),

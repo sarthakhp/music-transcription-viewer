@@ -31,9 +31,7 @@ class GridRenderer {
 
   void drawBackground(Canvas canvas, Rect rect) {
     final paint = Paint()
-      ..color = brightness == Brightness.dark
-          ? appPalette.darkGraphBg
-          : appPalette.lightGraphBg;
+      ..color = appPalette.graphBg;
     canvas.drawRect(rect, paint);
   }
 
@@ -78,9 +76,7 @@ class GridRenderer {
       // Subtle tonic row tint for octave reference
       if (midi % 12 == tonicSemitone) {
         final tonicPaint = Paint()
-          ..color = (brightness == Brightness.dark
-                  ? appPalette.darkTonicTint
-                  : appPalette.lightTonicTint)
+          ..color = (appPalette.tonicTint)
               .withValues(alpha: 0.06)
           ..style = PaintingStyle.fill;
         canvas.drawRect(bandRect, tonicPaint);

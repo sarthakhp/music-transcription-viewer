@@ -94,9 +94,7 @@ class PlayheadRenderer {
 
     // Background for tooltip
     final bgPaint = Paint()
-      ..color = brightness == Brightness.dark
-          ? appPalette.darkTooltipBg
-          : appPalette.lightTooltipBg;
+      ..color = appPalette.tooltipBg;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(
@@ -169,9 +167,7 @@ class PlayheadRenderer {
     final labelX = (cursorX + 14).clamp(rect.left, rect.right - labelW);
     final labelY = (rowCenterY - labelH / 2).clamp(rect.top, rect.bottom - labelH);
 
-    final bgColor = brightness == Brightness.dark
-        ? appPalette.darkTooltipBg
-        : appPalette.lightTooltipBg;
+    final bgColor = appPalette.tooltipBg;
     final bgPaint = Paint()..color = bgColor;
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(labelX, labelY, labelW, labelH),

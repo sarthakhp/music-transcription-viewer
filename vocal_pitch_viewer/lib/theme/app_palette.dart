@@ -5,51 +5,30 @@ import 'package:flutter/material.dart';
 /// To try a different color scheme, edit the values below or create
 /// an alternative [AppPalette] instance and assign it to [appPalette].
 class AppPalette {
-  // ─── Material theme seed ─────────────────────────────────────────────
+  final Brightness brightness;
   final Color seedColor;
-
-  // ─── Dark theme surface overrides ────────────────────────────────────
-  final Color darkScaffoldBg;
-  final Color darkCardBg;
-
-  // ─── Graph background ────────────────────────────────────────────────
-  final Color darkGraphBg;
-  final Color lightGraphBg;
-
-  // ─── Tonic row highlight ─────────────────────────────────────────────
-  final Color darkTonicTint;
-  final Color lightTonicTint;
-
-  // ─── Tooltip background ──────────────────────────────────────────────
-  final Color darkTooltipBg;
-  final Color lightTooltipBg;
-
-  // ─── Playhead ────────────────────────────────────────────────────────
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color graphBg;
+  final Color tonicTint;
+  final Color tooltipBg;
   final Color playheadColor;
-
-  // ─── Instrument track colors ─────────────────────────────────────────
   final Color bassColor;
   final Color otherColor;
-
-  // ─── Sargam note colors ──────────────────────────────────────────────
   final Color sargamShuddhColor;
   final Color sargamShuddhBg;
   final Color sargamKomalColor;
   final Color sargamTivraColor;
-
-  // ─── Trim slider ─────────────────────────────────────────────────────
   final Color trimHandleColor;
 
   const AppPalette({
+    required this.brightness,
     required this.seedColor,
-    required this.darkScaffoldBg,
-    required this.darkCardBg,
-    required this.darkGraphBg,
-    required this.lightGraphBg,
-    required this.darkTonicTint,
-    required this.lightTonicTint,
-    required this.darkTooltipBg,
-    required this.lightTooltipBg,
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.graphBg,
+    required this.tonicTint,
+    required this.tooltipBg,
     required this.playheadColor,
     required this.bassColor,
     required this.otherColor,
@@ -61,31 +40,43 @@ class AppPalette {
   });
 }
 
-/// Active palette — change this single reference to swap the entire color scheme.
-const appPalette = AppPalette(
-  seedColor:        Color(0xFF6366F1),  // indigo
+// ─── Available palettes ────────────────────────────────────────────────
 
-  darkScaffoldBg:   Color(0xFF0F0F14),
-  darkCardBg:       Color(0xFF1A1A24),
-
-  darkGraphBg:      Color(0xFF12121A),
-  lightGraphBg:     Color(0xFFF8F9FA),
-
-  darkTonicTint:    Color(0xFF6699CC),
-  lightTonicTint:   Color(0xFF336699),
-
-  darkTooltipBg:    Color(0xFF2A2A3A),
-  lightTooltipBg:   Color(0xFFE8E8EC),
-
-  playheadColor:    Color(0xFFEF4444),  // red
-
-  bassColor:        Color(0xFFFF6B35),  // orange
-  otherColor:       Color(0xFF48BFE3),  // cyan
-
+const indigoPalette = AppPalette(
+  brightness:       Brightness.dark,
+  seedColor:        Color(0xFF6366F1),
+  scaffoldBg:       Color(0xFF0F0F14),
+  cardBg:           Color(0xFF1A1A24),
+  graphBg:          Color(0xFF12121A),
+  tonicTint:        Color(0xFF6699CC),
+  tooltipBg:        Color(0xFF2A2A3A),
+  playheadColor:    Color(0xFFEF4444),
+  bassColor:        Color(0xFFFF6B35),
+  otherColor:       Color(0xFF48BFE3),
   sargamShuddhColor: Color(0xFFE0E0E0),
   sargamShuddhBg:    Color(0x22FFFFFF),
   sargamKomalColor:  Color(0xFF90CAF9),
   sargamTivraColor:  Color(0xFFEF9A9A),
-
   trimHandleColor:  Color(0xFFFFFFFF),
 );
+
+const minimalistPalette = AppPalette(
+  brightness:       Brightness.light,
+  seedColor:        Color(0xFF64748B),
+  scaffoldBg:       Color(0xFFF8FAFC),
+  cardBg:           Color(0xFFFFFFFF),
+  graphBg:          Color(0xFFF1F5F9),
+  tonicTint:        Color(0xFF94A3B8),
+  tooltipBg:        Color(0xFFFFFFFF),
+  playheadColor:    Color(0xFFE11D48),
+  bassColor:        Color(0xFFD97756),
+  otherColor:       Color(0xFF5B9E8F),
+  sargamShuddhColor: Color(0xFF334155),
+  sargamShuddhBg:    Color(0x15000000),
+  sargamKomalColor:  Color(0xFF6482A6),
+  sargamTivraColor:  Color(0xFFC25B64),
+  trimHandleColor:  Color(0xFF334155),
+);
+
+// ─── Active palette — change this one line to switch ───────────────────
+const appPalette = minimalistPalette;
