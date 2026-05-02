@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_palette.dart';
 import '../../models/pitch_data.dart';
 import '../graph_constants.dart';
 
@@ -31,8 +32,8 @@ class GridRenderer {
   void drawBackground(Canvas canvas, Rect rect) {
     final paint = Paint()
       ..color = brightness == Brightness.dark
-          ? const Color(0xFF12121A)
-          : const Color(0xFFF8F9FA);
+          ? appPalette.darkGraphBg
+          : appPalette.lightGraphBg;
     canvas.drawRect(rect, paint);
   }
 
@@ -78,8 +79,8 @@ class GridRenderer {
       if (midi % 12 == tonicSemitone) {
         final tonicPaint = Paint()
           ..color = (brightness == Brightness.dark
-                  ? const Color(0xFF6699CC)
-                  : const Color(0xFF336699))
+                  ? appPalette.darkTonicTint
+                  : appPalette.lightTonicTint)
               .withValues(alpha: 0.06)
           ..style = PaintingStyle.fill;
         canvas.drawRect(bandRect, tonicPaint);

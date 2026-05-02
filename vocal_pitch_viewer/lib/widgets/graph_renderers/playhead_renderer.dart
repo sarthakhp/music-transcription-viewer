@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_palette.dart';
 import '../../utils/music_utils.dart';
 import '../graph_constants.dart';
 
@@ -94,8 +95,8 @@ class PlayheadRenderer {
     // Background for tooltip
     final bgPaint = Paint()
       ..color = brightness == Brightness.dark
-          ? const Color(0xFF2A2A3A)
-          : const Color(0xFFE8E8EC);
+          ? appPalette.darkTooltipBg
+          : appPalette.lightTooltipBg;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(
@@ -169,8 +170,8 @@ class PlayheadRenderer {
     final labelY = (rowCenterY - labelH / 2).clamp(rect.top, rect.bottom - labelH);
 
     final bgColor = brightness == Brightness.dark
-        ? const Color(0xFF2A2A3A)
-        : const Color(0xFFE8E8EC);
+        ? appPalette.darkTooltipBg
+        : appPalette.lightTooltipBg;
     final bgPaint = Paint()..color = bgColor;
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(labelX, labelY, labelW, labelH),

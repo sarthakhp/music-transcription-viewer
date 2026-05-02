@@ -6,8 +6,7 @@ import 'display_settings_popover.dart';
 import 'track_switcher.dart';
 
 // Colors matching instrument_renderer.dart
-const Color _bassColor = Color(0xFFFF6B35);
-const Color _otherColor = Color(0xFF48BFE3);
+import '../../theme/app_palette.dart';
 
 /// Toolbar widget for the viewer layout
 class ViewerToolbar extends StatelessWidget {
@@ -215,7 +214,7 @@ class ViewerToolbar extends StatelessWidget {
           const SizedBox(width: 4),
           _LayerChip(
             label: 'Bass',
-            color: _bassColor,
+            color: appPalette.bassColor,
             selected: showBass,
             onToggled: onBassToggled,
           ),
@@ -224,7 +223,7 @@ class ViewerToolbar extends StatelessWidget {
           const SizedBox(width: 4),
           _LayerChip(
             label: 'Other',
-            color: _otherColor,
+            color: appPalette.otherColor,
             selected: showOther,
             onToggled: onOtherToggled,
           ),

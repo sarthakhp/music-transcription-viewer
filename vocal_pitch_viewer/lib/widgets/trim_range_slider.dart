@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_palette.dart';
 
 /// A dual-handle range slider for trimming audio.
 ///
@@ -249,7 +250,7 @@ class _TrimTrackPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(x, y),
       radius * 0.4,
-      Paint()..color = Colors.white,
+      Paint()..color = appPalette.trimHandleColor,
     );
   }
 

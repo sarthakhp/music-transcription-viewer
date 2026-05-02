@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' show Color, FontWeight;
+import '../theme/app_palette.dart';
 
 /// Music utility functions for MIDI and frequency conversions
 
@@ -86,19 +87,18 @@ class SargamStyle {
   final Color? backgroundColor;
   const SargamStyle({required this.color, required this.fontWeight, this.backgroundColor});
 }
-
 class SargamTheme {
-  static const shuddh = SargamStyle(
-    color: Color(0xFFE0E0E0),
+  static final shuddh = SargamStyle(
+    color: appPalette.sargamShuddhColor,
     fontWeight: FontWeight.bold,
-    backgroundColor: Color(0x22FFFFFF),
+    backgroundColor: appPalette.sargamShuddhBg,
   );
-  static const komal = SargamStyle(
-    color: Color(0xFF90CAF9),
+  static final komal = SargamStyle(
+    color: appPalette.sargamKomalColor,
     fontWeight: FontWeight.normal,
   );
-  static const tivra = SargamStyle(
-    color: Color(0xFFEF9A9A),
+  static final tivra = SargamStyle(
+    color: appPalette.sargamTivraColor,
     fontWeight: FontWeight.normal,
   );
 

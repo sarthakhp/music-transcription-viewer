@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/instrument_data.dart';
+import '../../theme/app_palette.dart';
 import '../../utils/music_utils.dart';
-
-const Color _bassColor = Color(0xFFFF6B35);   // orange
-const Color _otherColor = Color(0xFF48BFE3);  // cyan
 
 /// Renders instrument note bars (bass + other stems) on the pitch graph canvas
 class InstrumentRenderer {
@@ -44,14 +42,14 @@ class InstrumentRenderer {
     if (showBass) {
       final track = instrumentData.bass;
       if (track != null) {
-        _drawTrack(canvas, rect, track.notes, _bassColor, noteHeight, bassMinConfidence, transposeAmount);
+        _drawTrack(canvas, rect, track.notes, appPalette.bassColor, noteHeight, bassMinConfidence, transposeAmount);
       }
     }
 
     if (showOther) {
       final track = instrumentData.other;
       if (track != null) {
-        _drawTrack(canvas, rect, track.notes, _otherColor, noteHeight, otherMinConfidence, transposeAmount);
+        _drawTrack(canvas, rect, track.notes, appPalette.otherColor, noteHeight, otherMinConfidence, transposeAmount);
       }
     }
   }

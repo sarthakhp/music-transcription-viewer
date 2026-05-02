@@ -7,6 +7,7 @@ import '../models/view_state.dart';
 import 'graph_constants.dart';
 import 'pitch_graph_painter.dart';
 import 'playhead_painter.dart';
+import '../theme/app_palette.dart';
 
 /// Main pitch graph widget with axes and visualization.
 ///
@@ -230,7 +231,7 @@ class _PitchGraphState extends State<PitchGraph> {
                   foregroundPainter: PlayheadPainter(
                     viewState: _vs,
                     currentTime: widget.currentTime,
-                    playheadColor: Colors.red,
+                    playheadColor: appPalette.playheadColor,
                     onSurfaceColor: colorScheme.onSurface,
                     brightness: theme.brightness,
                     hoverTime: _hoverTime,

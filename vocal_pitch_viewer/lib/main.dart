@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'theme/app_palette.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
 
   ThemeData _buildLightTheme() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF6366F1),
+      seedColor: appPalette.seedColor,
       brightness: Brightness.light,
     );
 
@@ -63,7 +64,7 @@ class MyApp extends StatelessWidget {
 
   ThemeData _buildDarkTheme() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF6366F1),
+      seedColor: appPalette.seedColor,
       brightness: Brightness.dark,
     );
 
@@ -71,17 +72,17 @@ class MyApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      scaffoldBackgroundColor: const Color(0xFF0F0F14),
+      scaffoldBackgroundColor: appPalette.darkScaffoldBg,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: const Color(0xFF0F0F14),
+        backgroundColor: appPalette.darkScaffoldBg,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: const Color(0xFF1A1A24),
+        color: appPalette.darkCardBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),

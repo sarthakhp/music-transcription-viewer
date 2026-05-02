@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-const Color _bassColor = Color(0xFFFF6B35);
-const Color _otherColor = Color(0xFF48BFE3);
+import '../../theme/app_palette.dart';
 
 /// Icon button that opens a floating confidence-threshold settings card
 class DisplaySettingsButton extends StatefulWidget {
@@ -212,7 +211,7 @@ class _PanelOverlayState extends State<_PanelOverlay> {
                     const SizedBox(height: 6),
                     _SliderRow(
                       label: 'Other',
-                      color: _otherColor,
+                      color: appPalette.otherColor,
                       value: _other,
                       onChanged: (v) {
                         setState(() => _other = v);
@@ -224,7 +223,7 @@ class _PanelOverlayState extends State<_PanelOverlay> {
                     const SizedBox(height: 6),
                     _SliderRow(
                       label: 'Bass',
-                      color: _bassColor,
+                      color: appPalette.bassColor,
                       value: _bass,
                       onChanged: (v) {
                         setState(() => _bass = v);
