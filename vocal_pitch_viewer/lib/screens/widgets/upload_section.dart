@@ -340,6 +340,7 @@ class _UploadSectionState extends State<UploadSection> {
             ),
           ],
           selected: {_selectedTab},
+          expandedInsets: EdgeInsets.zero,
           onSelectionChanged: (selected) {
             setState(() {
               _selectedTab = selected.first;

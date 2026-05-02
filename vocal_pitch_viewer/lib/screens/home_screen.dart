@@ -8,9 +8,11 @@ import '../services/audio_service.dart';
 import '../services/transcription_api_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
+import '../services/user_settings.dart';
 import '../utils/file_service.dart';
 import '../utils/music_utils.dart';
 import '../utils/performance_monitor.dart';
+import '../models/view_state.dart';
 import '../widgets/pitch_graph.dart';
 import '../widgets/audio_controls.dart';
 import '../models/job.dart';
@@ -53,6 +55,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   double _lastStreamPosition = 0.0;     // last value reported by positionStream (debug)
   int _timerTickCount = 0;              // counts timer ticks for periodic debug logging
 
+  // Persisted user settings
+  final UserSettings _userSettings = UserSettings();
+
   // API services
   late final TranscriptionApiService _apiService;
   late final UploadService _uploadService;
@@ -86,28 +91,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _sargamEnabled = false;
   int _scaleRoot = 0; // 0=C, 1=C#, 2=D, ... 11=B
 
-  // View window for zoom/pan (in seconds)
-  double _viewStartTime = 0;
-  double _viewWindowSize = 30; // Show 30 seconds at a time (adjustable via zoom)
-  bool _autoScroll = true;
+  // View state (pan, zoom, auto-scroll) — isolated from main widget tree
+  final ViewState _viewState = ViewState();
 
-  // Y-axis (MIDI range) zoom — scale relative to data's natural range
-  // > 1.0 = zoomed in (fewer notes visible), < 1.0 = zoomed out
-  double _yZoomScale = 1.0;
-  static const double _minYZoomScale = 0.5;
-  static const double _maxYZoomScale = 6.0;
-
-  // Y-axis pan offset in MIDI notes (0 = centered on data's natural range)
-  double _yPanOffset = 0.0;
-
-  // Smooth scrolling animation
+  // Smooth scrolling animation (needs TickerProvider, so stays here)
   late AnimationController _scrollAnimationController;
   Animation<double>? _scrollAnimation;
-
-  // Zoom constraints
-  static const double _minWindowSize = 5; // Minimum 5 seconds view (max zoom in)
-  static const double _maxWindowSize = 120; // Maximum 120 seconds view (max zoom out)
-  static const double _zoomFactor = 1.2; // Zoom step factor
 
   // Keyboard focus
   final FocusNode _focusNode = FocusNode();
@@ -137,6 +126,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       appState: appState,
     );
 
+    // Load persisted user settings, then apply to state
+    _userSettings.load().then((_) {
+      if (!mounted) return;
+      setState(() {
+        _playbackSpeed = _userSettings.playbackSpeed;
+        _transposeAmount = _userSettings.transposeAmount;
+        _sargamEnabled = _userSettings.sargamEnabled;
+        _scaleRoot = _userSettings.scaleRoot;
+      });
+      final appState = context.read<AppState>();
+      appState.setReferenceFrequency(_userSettings.referenceFrequency);
+    });
+
     // Load completed jobs after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCompletedJobs();
@@ -148,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _stopPlayheadAnimation();
     _scrollAnimationController.removeListener(_onScrollAnimationUpdate);
     _scrollAnimationController.dispose();
+    _viewState.dispose();
     _focusNode.dispose();
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
@@ -164,69 +167,78 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Focus(
-      focusNode: _focusNode,
-      onKeyEvent: _handleKeyEvent,
-      autofocus: true,
-      child: GestureDetector(
-        onTap: () => _focusNode.requestFocus(),
-        child: Scaffold(
-          appBar: AppBar(
-            title: Row(
-              children: [
-                Icon(Icons.graphic_eq_rounded, color: colorScheme.primary),
-                const SizedBox(width: 12),
-                const Text('Vocal Pitch Viewer'),
-              ],
-            ),
-            actions: [
-              // Keyboard shortcuts help button
-              if (appState.isReady)
-                IconButton(
-                  icon: const Icon(Icons.keyboard_rounded),
-                  onPressed: () => KeyboardShortcutsDialog.show(context),
-                  tooltip: 'Keyboard shortcuts',
+    // Only rebuild the outer shell when ready/loading state changes — NOT on
+    // every currentTime tick. Fast-changing fields (currentTime, isPlaying,
+    // duration) are consumed via Consumer/Selector inside specific widgets.
+    return Selector<AppState, ({bool isReady, bool isLoading, bool isPreparingAudio})>(
+      selector: (_, s) => (isReady: s.isReady, isLoading: s.isLoading, isPreparingAudio: s.isPreparingAudio),
+      builder: (context, shell, _) {
+        final appState = context.read<AppState>();
+
+        return Focus(
+          focusNode: _focusNode,
+          onKeyEvent: _handleKeyEvent,
+          autofocus: true,
+          child: GestureDetector(
+            onTap: () => _focusNode.requestFocus(),
+            child: Scaffold(
+              appBar: AppBar(
+                title: Row(
+                  children: [
+                    Icon(Icons.graphic_eq_rounded, color: colorScheme.primary),
+                    const SizedBox(width: 12),
+                    const Text('Vocal Pitch Viewer'),
+                  ],
                 ),
-              // Load New button
-              if (appState.isReady)
-                TextButton.icon(
-                  onPressed: () {
-                    _audioService.stop();
-                    _audioLoaded = false;
-                    _positionSubscription?.cancel();
-                    _durationSubscription?.cancel();
-                    _playingSubscription?.cancel();
-                    appState.reset();
-                  },
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Load New'),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
+                actions: [
+                  if (shell.isReady)
+                    IconButton(
+                      icon: const Icon(Icons.keyboard_rounded),
+                      onPressed: () => KeyboardShortcutsDialog.show(context),
+                      tooltip: 'Keyboard shortcuts',
+                    ),
+                  if (shell.isReady)
+                    TextButton.icon(
+                      onPressed: () {
+                        _stopPlayheadAnimation();
+                        _audioService.stop();
+                        _audioLoaded = false;
+                        _positionSubscription?.cancel();
+                        _durationSubscription?.cancel();
+                        _playingSubscription?.cancel();
+                        _processingStateSubscription?.cancel();
+                        _viewState.resetZoom();
+                        appState.reset();
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Load New'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+              body: Stack(
+                children: [
+                  SafeArea(
+                    child: shell.isReady
+                        ? _buildViewerLayout(context, appState)
+                        : _buildUploadLayout(context, appState),
                   ),
-                ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          body: Stack(
-            children: [
-              SafeArea(
-                child: appState.isReady
-                    ? _buildViewerLayout(context, appState)
-                    : _buildUploadLayout(context, appState),
+                  LoadingOverlay(
+                    isVisible: (shell.isLoading && !shell.isReady) || shell.isPreparingAudio,
+                    message: shell.isPreparingAudio ? 'Preparing audio files...' : null,
+                  ),
+                ],
               ),
-              // Loading overlay when loading job data OR preparing audio
-              LoadingOverlay(
-                isVisible: (appState.isLoading && !appState.isReady) || appState.isPreparingAudio,
-                message: appState.isPreparingAudio ? 'Preparing audio files...' : null,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -284,91 +296,89 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onOtherConfidenceChanged: (v) => setState(() => _otherMinConfidence = v),
         ),
 
-        // Main content area - pitch graph with zoom controls
+        // Main content area — during pan/zoom, only the CustomPaint repaints
+        // via ViewState's repaint listenable. No widget rebuild at all.
         Expanded(
           child: ClipRect(
             child: Stack(
               children: [
-                // Pitch graph with RepaintBoundary for performance isolation
                 RepaintBoundary(
-                  child: Builder(builder: (context) {
-                    // Compute MIDI range from vocal pitch data, then extend to include instrument notes
-                    final pitchData = appState.pitchData!;
-                    final range = pitchData.frequencyRange;
-                    double baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2.0;
-                    double baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2.0;
-                    final instrData = appState.instrumentData;
-                    if (instrData != null) {
-                      final (instrMin, instrMax) = instrData.midiRange;
-                      if (instrMin - 1.0 < baseMin) baseMin = instrMin - 1.0;
-                      if (instrMax + 1.0 > baseMax) baseMax = instrMax + 1.0;
-                    }
-                    // Shift Y-axis by transpose so note-name labels reflect transposed view
-                    baseMin += _transposeAmount;
-                    baseMax += _transposeAmount;
-                    final center = (baseMin + baseMax) / 2.0 + _yPanOffset;
-                    final halfSpan = (baseMax - baseMin) / 2.0 / _yZoomScale;
-                    final effectiveMinMidi = center - halfSpan;
-                    final effectiveMaxMidi = center + halfSpan;
+                  child: Selector<AppState, double>(
+                    selector: (_, s) => s.currentTime,
+                    builder: (context, currentTime, _) {
+                      // Update base MIDI range (only changes when data/transpose changes)
+                      final pitchData = appState.pitchData!;
+                      final range = pitchData.frequencyRange;
+                      double baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2.0;
+                      double baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2.0;
+                      final instrData = appState.instrumentData;
+                      if (instrData != null) {
+                        final (instrMin, instrMax) = instrData.midiRange;
+                        if (instrMin - 1.0 < baseMin) baseMin = instrMin - 1.0;
+                        if (instrMax + 1.0 > baseMax) baseMax = instrMax + 1.0;
+                      }
+                      _viewState.setBaseMidiRange(baseMin + _transposeAmount, baseMax + _transposeAmount);
 
-                    return PitchGraph(
-                      data: pitchData,
-                      chordData: appState.chordData,
-                      instrumentData: appState.instrumentData,
-                      currentTime: appState.currentTime,
-                      viewStartTime: _viewStartTime,
-                      viewEndTime: _viewStartTime + _viewWindowSize,
-                      referenceFrequency: appState.referenceFrequency,
-                      autoScroll: _autoScroll,
-                      minMidi: effectiveMinMidi,
-                      maxMidi: effectiveMaxMidi,
-                      showVocals: _showVocals,
-                      showBass: _showBass,
-                      showOther: _showOther,
-                      vocalsMinConfidence: _vocalsMinConfidence,
-                      bassMinConfidence: _bassMinConfidence,
-                      otherMinConfidence: _otherMinConfidence,
-                      transposeAmount: _transposeAmount,
-                      sargamEnabled: _sargamEnabled,
-                      scaleRoot: _scaleRoot,
-                      onSeek: _seekTo,
-                      onZoom: _handleZoom,
-                      onYZoom: _handleYZoom,
-                      onYPan: _handleYPan,
-                      onPan: _handlePan,
-                    );
-                  }),
+                      return PitchGraph(
+                        viewState: _viewState,
+                        data: pitchData,
+                        chordData: appState.chordData,
+                        instrumentData: appState.instrumentData,
+                        currentTime: currentTime,
+                        referenceFrequency: appState.referenceFrequency,
+                        showVocals: _showVocals,
+                        showBass: _showBass,
+                        showOther: _showOther,
+                        vocalsMinConfidence: _vocalsMinConfidence,
+                        bassMinConfidence: _bassMinConfidence,
+                        otherMinConfidence: _otherMinConfidence,
+                        transposeAmount: _transposeAmount,
+                        sargamEnabled: _sargamEnabled,
+                        scaleRoot: _scaleRoot,
+                        onSeek: _seekTo,
+                        onZoom: _handleZoom,
+                        onYZoom: _handleYZoom,
+                        onYPan: _handleYPan,
+                        onPan: _handlePan,
+                      );
+                    },
+                  ),
                 ),
 
-                // Auto-scroll toggle (bottom-right corner)
                 Positioned(
                   bottom: 8,
                   right: 8,
-                  child: GestureDetector(
-                    onTap: () => setState(() => _autoScroll = !_autoScroll),
-                    child: Chip(
-                      avatar: Icon(
-                        _autoScroll ? Icons.play_arrow_rounded : Icons.play_arrow_outlined,
-                        size: 16,
-                        color: _autoScroll
-                            ? colorScheme.onSecondaryContainer
-                            : colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                      label: Text(
-                        'Auto-scroll',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _autoScroll
-                              ? colorScheme.onSecondaryContainer
-                              : colorScheme.onSurface.withValues(alpha: 0.5),
+                  child: ListenableBuilder(
+                    listenable: _viewState,
+                    builder: (context, _) {
+                      final isOn = _viewState.autoScroll;
+                      return GestureDetector(
+                        onTap: () => _viewState.setAutoScroll(!isOn),
+                        child: Chip(
+                          avatar: Icon(
+                            isOn ? Icons.play_arrow_rounded : Icons.play_arrow_outlined,
+                            size: 16,
+                            color: isOn
+                                ? colorScheme.onSecondaryContainer
+                                : colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                          label: Text(
+                            'Auto-scroll',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isOn
+                                  ? colorScheme.onSecondaryContainer
+                                  : colorScheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          backgroundColor: isOn
+                              ? colorScheme.secondaryContainer.withValues(alpha: 0.8)
+                              : colorScheme.surface.withValues(alpha: 0.6),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
                         ),
-                      ),
-                      backgroundColor: _autoScroll
-                          ? colorScheme.secondaryContainer.withValues(alpha: 0.8)
-                          : colorScheme.surface.withValues(alpha: 0.6),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -376,33 +386,56 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
 
-        // Audio controls bar
-        AudioControls(
-          isPlaying: appState.isPlaying,
-          currentTime: appState.currentTime,
-          duration: appState.duration > 0 ? appState.duration : appState.pitchData!.maxTime,
-          referenceFrequency: appState.referenceFrequency,
-          onPlayPause: () => _audioService.togglePlayPause(),
-          onStop: () => _audioService.stop(),
-          onSeek: _seekTo,
-          onReferenceFrequencyChange: (frequency) => appState.setReferenceFrequency(frequency),
-          onZoomIn: _zoomIn,
-          onZoomOut: _zoomOut,
-          viewWindowSize: _viewWindowSize,
-          playbackSpeed: _playbackSpeed,
-          onSpeedChanged: (speed) {
-            setState(() => _playbackSpeed = speed);
-            _audioService.setSpeed(speed);
-          },
-          transposeAmount: _transposeAmount,
-          onTransposeChanged: (n) {
-            setState(() => _transposeAmount = n);
-            _audioService.setPitchSemitones(n);
-          },
-          sargamEnabled: _sargamEnabled,
-          onSargamToggled: (v) => setState(() => _sargamEnabled = v),
-          scaleRoot: _scaleRoot,
-          onScaleRootChanged: (v) => setState(() => _scaleRoot = v),
+        // AudioControls — rebuilds on currentTime/isPlaying/duration (Selector)
+        // and on viewWindowSize (ListenableBuilder).
+        Selector<AppState, ({double currentTime, bool isPlaying, double duration, double referenceFrequency})>(
+          selector: (_, s) => (
+            currentTime: s.currentTime,
+            isPlaying: s.isPlaying,
+            duration: s.duration,
+            referenceFrequency: s.referenceFrequency,
+          ),
+          builder: (context, audio, _) => ListenableBuilder(
+            listenable: _viewState,
+            builder: (context, _) => AudioControls(
+              isPlaying: audio.isPlaying,
+              currentTime: audio.currentTime,
+              duration: audio.duration > 0 ? audio.duration : appState.pitchData!.maxTime,
+              referenceFrequency: audio.referenceFrequency,
+              onPlayPause: () => _audioService.togglePlayPause(),
+              onStop: () => _audioService.stop(),
+              onSeek: _seekTo,
+              onReferenceFrequencyChange: (frequency) {
+                appState.setReferenceFrequency(frequency);
+                _userSettings.saveReferenceFrequency(frequency);
+              },
+              onZoomIn: () => _viewState.zoomIn(maxTime: appState.pitchData?.maxTime ?? 120),
+              onZoomOut: () => _viewState.zoomOut(maxTime: appState.pitchData?.maxTime ?? 120),
+              viewWindowSize: _viewState.viewWindowSize,
+              playbackSpeed: _playbackSpeed,
+              onSpeedChanged: (speed) {
+                setState(() => _playbackSpeed = speed);
+                _audioService.setSpeed(speed);
+                _userSettings.savePlaybackSpeed(speed);
+              },
+              transposeAmount: _transposeAmount,
+              onTransposeChanged: (n) {
+                setState(() => _transposeAmount = n);
+                _audioService.setPitchSemitones(n);
+                _userSettings.saveTransposeAmount(n);
+              },
+              sargamEnabled: _sargamEnabled,
+              onSargamToggled: (v) {
+                setState(() => _sargamEnabled = v);
+                _userSettings.saveSargamEnabled(v);
+              },
+              scaleRoot: _scaleRoot,
+              onScaleRootChanged: (v) {
+                setState(() => _scaleRoot = v);
+                _userSettings.saveScaleRoot(v);
+              },
+            ),
+          ),
         ),
       ],
     );

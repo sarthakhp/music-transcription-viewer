@@ -17,6 +17,8 @@ class PitchRenderer {
   final double maxMidi;
   final double minConfidence;
   final int transposeAmount;
+  final bool sargamEnabled;
+  final int scaleRoot;
 
   PitchRenderer({
     required this.data,
@@ -30,6 +32,8 @@ class PitchRenderer {
     required this.maxMidi,
     this.minConfidence = 0.0,
     this.transposeAmount = 0,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
   });
 
   void drawPitchPoints(Canvas canvas, Rect rect) {
@@ -42,12 +46,10 @@ class PitchRenderer {
       return; // No visible frames
     }
 
-    // Group points by their rendering properties for batching
-    // We'll use a map to group points by their alpha value (confidence)
-    final Map<double, List<Offset>> voicedPointsByAlpha = {};
+    // Key: (alpha, sargamNoteTypeIndex) — noteType is -1 when sargam is off
+    final Map<(double, int), List<Offset>> voicedBuckets = {};
     final List<Offset> unvoicedPoints = [];
 
-    // Iterate only through visible frames
     for (int i = startIndex; i <= endIndex; i++) {
       final frame = data.displayFrames[i];
 
@@ -56,8 +58,6 @@ class PitchRenderer {
 
       final x = _timeToX(frame.time, rect);
 
-      // Always use MIDI/piano mode
-      // Recalculate MIDI pitch from frequency using current reference frequency
       if (frame.frequency <= 0) continue;
       final midiPitch = frequencyToMidi(frame.frequency, referenceFrequency: referenceFrequency) + transposeAmount;
       final y = _midiToY(midiPitch, rect, minMidi, maxMidi);
@@ -67,15 +67,17 @@ class PitchRenderer {
       final offset = Offset(x, y);
 
       if (frame.isVoiced) {
-        // Group voiced points by alpha (confidence) for batching
-        final alpha = frame.confidence.clamp(0.3, 1.0);
-        voicedPointsByAlpha.putIfAbsent(alpha, () => []).add(offset);
+        final alpha = GraphConstants.voicedMinAlpha +
+            frame.confidence * (GraphConstants.voicedMaxAlpha - GraphConstants.voicedMinAlpha);
+        final typeIndex = sargamEnabled
+            ? getSargamNoteType(midiPitch.round() - scaleRoot).index
+            : -1;
+        voicedBuckets.putIfAbsent((alpha, typeIndex), () => []).add(offset);
       } else {
         unvoicedPoints.add(offset);
       }
     }
 
-    // Draw all unvoiced points in one batch
     if (unvoicedPoints.isNotEmpty) {
       final paint = Paint()
         ..color = unvoicedColor
@@ -86,17 +88,32 @@ class PitchRenderer {
       canvas.drawPoints(ui.PointMode.points, unvoicedPoints, paint);
     }
 
-    // Draw voiced points batched by alpha value
-    voicedPointsByAlpha.forEach((alpha, points) {
-      if (points.isNotEmpty) {
-        final paint = Paint()
-          ..color = primaryColor.withValues(alpha: alpha)
-          ..strokeWidth = GraphConstants.voicedPointRadius * 2
-          ..strokeCap = StrokeCap.round
-          ..style = PaintingStyle.stroke;
+    // Two-pass drawing: fill circles, then border rings (batched via drawPoints)
+    final fillDiameter = GraphConstants.voicedPointRadius * 2;
+    final borderDiameter = fillDiameter + GraphConstants.voicedPointBorderWidth;
 
-        canvas.drawPoints(ui.PointMode.points, points, paint);
-      }
+    voicedBuckets.forEach((key, points) {
+      if (points.isEmpty) return;
+      final (alpha, typeIndex) = key;
+      final baseColor = typeIndex >= 0
+          ? SargamTheme.forType(SargamNoteType.values[typeIndex]).color
+          : primaryColor;
+
+      // Pass 1: filled circle
+      final fillPaint = Paint()
+        ..color = baseColor.withValues(alpha: alpha)
+        ..strokeWidth = fillDiameter
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.fill;
+      canvas.drawPoints(ui.PointMode.points, points, fillPaint);
+
+      // Pass 2: border ring
+      final borderPaint = Paint()
+        ..color = baseColor.withValues(alpha: GraphConstants.voicedPointBorderAlpha)
+        ..strokeWidth = borderDiameter
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawPoints(ui.PointMode.points, points, borderPaint);
     });
   }
 

@@ -1,37 +1,34 @@
 import 'package:flutter/material.dart';
+import '../models/view_state.dart';
 import 'graph_constants.dart';
 import 'graph_renderers/playhead_renderer.dart';
 
-/// Painter for just the playhead (dynamic layer that repaints frequently)
-/// This is separated from the main graph to avoid repainting pitch points
+/// Painter for just the playhead (dynamic layer that repaints frequently).
+///
+/// Reads view parameters from [ViewState] directly so pan/zoom repaints
+/// happen via the repaint listenable without widget rebuilds.
 class PlayheadPainter extends CustomPainter {
+  final ViewState viewState;
   final double currentTime;
-  final double viewStartTime;
-  final double viewEndTime;
   final Color playheadColor;
   final Color onSurfaceColor;
   final Brightness brightness;
   final double? hoverTime;
   final double? hoverY;
-  final double minMidi;
-  final double maxMidi;
   final bool sargamEnabled;
   final int scaleRoot;
 
   PlayheadPainter({
+    required this.viewState,
     required this.currentTime,
-    required this.viewStartTime,
-    required this.viewEndTime,
     required this.playheadColor,
     required this.onSurfaceColor,
     required this.brightness,
     this.hoverTime,
     this.hoverY,
-    required this.minMidi,
-    required this.maxMidi,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
-  });
+  }) : super(repaint: viewState);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -44,15 +41,15 @@ class PlayheadPainter extends CustomPainter {
 
     final playheadRenderer = PlayheadRenderer(
       currentTime: currentTime,
-      viewStartTime: viewStartTime,
-      viewEndTime: viewEndTime,
+      viewStartTime: viewState.viewStartTime,
+      viewEndTime: viewState.viewEndTime,
       playheadColor: playheadColor,
       onSurfaceColor: onSurfaceColor,
       brightness: brightness,
       hoverTime: hoverTime,
       hoverY: hoverY,
-      minMidi: minMidi,
-      maxMidi: maxMidi,
+      minMidi: viewState.effectiveMinMidi,
+      maxMidi: viewState.effectiveMaxMidi,
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
     );
@@ -64,11 +61,8 @@ class PlayheadPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PlayheadPainter oldDelegate) {
-    // Only repaint when currentTime or hoverTime changes
-    // This is much more efficient than repainting the entire graph
     return oldDelegate.currentTime != currentTime ||
         oldDelegate.hoverTime != hoverTime ||
         oldDelegate.hoverY != hoverY;
   }
 }
-

@@ -200,6 +200,9 @@ class AudioService {
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
     _stateSubscription?.cancel();
+    _positionController.close();
+    _durationController.close();
+    _playingController.close();
     _stateController.close();
 
     for (final player in _players.values) {

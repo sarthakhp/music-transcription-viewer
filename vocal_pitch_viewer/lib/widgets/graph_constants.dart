@@ -6,8 +6,14 @@ class GraphConstants {
   static const double topPadding = 20.0;
   static const double bottomPadding = 40.0;
 
-  // Point sizes
-  static const double voicedPointRadius = 3.0;
+  // Voiced point appearance
+  static const double voicedPointRadius = 4.5;
+  static const double voicedPointBorderWidth = 1.0;
+  static const double voicedPointBorderAlpha = 0.7;
+  static const double voicedMinAlpha = 0.45;
+  static const double voicedMaxAlpha = 1.0;
+
+  // Unvoiced point appearance
   static const double unvoicedPointRadius = 2.0;
 
   // Line widths
@@ -22,11 +28,11 @@ class GraphConstants {
 
   // Time step calculation
   static double calculateTimeStep(double range) {
-    if (range <= 10) return 1;
-    if (range <= 30) return 5;
-    if (range <= 60) return 10;
-    if (range <= 120) return 15;
-    if (range <= 300) return 30;
+    if (range < 10.5) return 1;
+    if (range < 31) return 5;
+    if (range < 61) return 10;
+    if (range < 121) return 15;
+    if (range < 301) return 30;
     return 60;
   }
 }

@@ -114,10 +114,22 @@ class PerformanceMonitor {
         .map((e) => '${e.key.name}:${e.value}')
         .join(' ');
 
+    // Compute average build vs raster from recent frames
+    double totalBuild = 0, totalRaster = 0;
+    int count = 0;
+    for (final r in _frameTimes) {
+      totalBuild += r.buildMs;
+      totalRaster += r.rasterMs;
+      count++;
+    }
+    final avgBuild = count > 0 ? (totalBuild / count).toStringAsFixed(1) : '?';
+    final avgRaster = count > 0 ? (totalRaster / count).toStringAsFixed(1) : '?';
+
     debugPrint(
       '[Perf] FPS:${fps.toStringAsFixed(0)} '
       'jank:$jankPct% ($_jankFrames/$_totalFrames) '
       'worst:${_worstFrameMs.toStringAsFixed(1)}ms '
+      'avg[build:${avgBuild}ms raster:${avgRaster}ms] '
       'actions:[$actionBreakdown] '
       'jankBy:[$jankBreakdown]',
     );

@@ -36,10 +36,11 @@ class AxisRenderer {
     final timeRange = viewEndTime - viewStartTime;
     final timeStep = GraphConstants.calculateTimeStep(timeRange);
 
-    // Draw time labels
-    for (double t = (viewStartTime / timeStep).ceil() * timeStep;
-        t <= viewEndTime;
-        t += timeStep) {
+    // Draw time labels — use integer multiplier to avoid floating-point drift
+    final firstTick = (viewStartTime / timeStep).ceil();
+    final lastTick = (viewEndTime / timeStep).floor();
+    for (int i = firstTick; i <= lastTick; i++) {
+      final t = i * timeStep;
       final x = _timeToX(t, rect);
       final textSpan = TextSpan(text: formatTime(t), style: textStyle);
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/instrument_data.dart';
+import '../../utils/music_utils.dart';
 
 const Color _bassColor = Color(0xFFFF6B35);   // orange
 const Color _otherColor = Color(0xFF48BFE3);  // cyan
@@ -16,6 +17,8 @@ class InstrumentRenderer {
   final double bassMinConfidence;
   final double otherMinConfidence;
   final int transposeAmount;
+  final bool sargamEnabled;
+  final int scaleRoot;
 
   static const double _minNoteWidth = 3.0;
 
@@ -30,6 +33,8 @@ class InstrumentRenderer {
     this.bassMinConfidence = 0.0,
     this.otherMinConfidence = 0.0,
     this.transposeAmount = 0,
+    this.sargamEnabled = false,
+    this.scaleRoot = 0,
   });
 
   void drawNotes(Canvas canvas, Rect rect) {
@@ -76,9 +81,11 @@ class InstrumentRenderer {
 
       final drawWidth = (x2 - x1).clamp(_minNoteWidth, double.infinity);
 
-      // Map velocity to opacity in range 55%-95%
       final opacity = 0.55 + (note.velocity / 127.0) * 0.4;
-      paint.color = color.withValues(alpha: opacity);
+      final baseColor = sargamEnabled
+          ? SargamTheme.forType(getSargamNoteType(note.pitch - scaleRoot)).color
+          : color;
+      paint.color = baseColor.withValues(alpha: opacity);
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(

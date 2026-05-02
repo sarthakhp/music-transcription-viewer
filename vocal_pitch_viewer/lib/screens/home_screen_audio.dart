@@ -93,7 +93,17 @@ extension _HomeScreenAudio on _HomeScreenState {
       });
       appState.setPreparingAudio(false);
 
-      // Listen to position updates (~5 times/sec); interpolate for smooth 60fps playhead
+      // Apply current settings to the audio engine so persisted
+      // values (speed, transpose) take effect immediately.
+      _audioService.setSpeed(_playbackSpeed);
+      _audioService.setPitchSemitones(_transposeAmount);
+
+      // Cancel any previous subscriptions before creating new ones
+      _positionSubscription?.cancel();
+      _durationSubscription?.cancel();
+      _playingSubscription?.cancel();
+      _processingStateSubscription?.cancel();
+
       _positionSubscription = _audioService.positionStream.listen((position) {
         if (!mounted) return;
         final time = position.inMilliseconds / 1000.0;
@@ -102,7 +112,7 @@ extension _HomeScreenAudio on _HomeScreenState {
         if (timerRunning) {
           _lastStreamPosition = time;
           final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
-          final interpolated = _lastKnownPosition + elapsed.inMilliseconds / 1000.0;
+          final interpolated = _lastKnownPosition + elapsed.inMilliseconds / 1000.0 * _playbackSpeed;
           final diff = time - interpolated;
 
           if (_awaitingFirstStreamSync) {
@@ -128,7 +138,7 @@ extension _HomeScreenAudio on _HomeScreenState {
           _lastKnownPosition = time;
           _lastPositionUpdateTime = DateTime.now();
           appState.setCurrentTime(time);
-          _updateViewWindow(time, appState.pitchData?.maxTime ?? 120);
+          _viewState.updateViewWindowForPlayback(time, appState.pitchData?.maxTime ?? 120);
         }
       });
 
@@ -225,9 +235,9 @@ extension _HomeScreenAudio on _HomeScreenState {
 
       if (_lastPositionUpdateTime != null) {
         final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
-        final interpolatedPosition = _lastKnownPosition + elapsed.inMilliseconds / 1000.0;
+        final interpolatedPosition = _lastKnownPosition + elapsed.inMilliseconds / 1000.0 * _playbackSpeed;
         appState.setCurrentTime(interpolatedPosition);
-        _updateViewWindow(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
+        _viewState.updateViewWindowForPlayback(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
 
         // Log display vs last-known stream position every ~1 second (60 ticks)
         _timerTickCount++;

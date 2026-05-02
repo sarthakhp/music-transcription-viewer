@@ -45,10 +45,10 @@ class GridRenderer {
     final timeRange = viewEndTime - viewStartTime;
     final timeStep = GraphConstants.calculateTimeStep(timeRange);
 
-    for (double t = (viewStartTime / timeStep).ceil() * timeStep;
-        t <= viewEndTime;
-        t += timeStep) {
-      final x = _timeToX(t, rect);
+    final firstTick = (viewStartTime / timeStep).ceil();
+    final lastTick = (viewEndTime / timeStep).floor();
+    for (int i = firstTick; i <= lastTick; i++) {
+      final x = _timeToX(i * timeStep, rect);
       canvas.drawLine(Offset(x, rect.top), Offset(x, rect.bottom), paint);
     }
 

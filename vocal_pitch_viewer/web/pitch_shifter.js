@@ -169,4 +169,8 @@
       _currentSemitones = 0;
     },
   };
+
+  window.addEventListener('beforeunload', () => {
+    window.pitchShifter.reset();
+  });
 })();
