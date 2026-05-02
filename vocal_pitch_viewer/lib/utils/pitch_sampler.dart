@@ -20,14 +20,15 @@ const int kDisplayFramesPerSecond = 10;
 ///   return frames;
 List<PitchFrame> sampleDisplayFrames(
   List<PitchFrame> frames,
-  double duration,
-) {
+  double duration, {
+  int framesPerSecond = kDisplayFramesPerSecond,
+}) {
   if (duration <= 0 || frames.isEmpty) return frames;
 
   final sourceRate = frames.length / duration;
-  if (sourceRate <= kDisplayFramesPerSecond) return frames;
+  if (sourceRate <= framesPerSecond) return frames;
 
-  final bucketSize = 1.0 / kDisplayFramesPerSecond;
+  final bucketSize = 1.0 / framesPerSecond;
   final totalBuckets = (duration / bucketSize).ceil();
   final result = <PitchFrame>[];
   int frameIndex = 0;

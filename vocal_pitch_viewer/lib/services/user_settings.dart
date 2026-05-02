@@ -6,12 +6,14 @@ class UserSettings {
   static const _keySargamEnabled = 'sargamEnabled';
   static const _keyScaleRoot = 'scaleRoot';
   static const _keyReferenceFrequency = 'referenceFrequency';
+  static const _keyVocalDetail = 'vocalDetail';
 
   static const double defaultPlaybackSpeed = 1.0;
   static const int defaultTransposeAmount = 0;
   static const bool defaultSargamEnabled = false;
   static const int defaultScaleRoot = 0;
   static const double defaultReferenceFrequency = 440.0;
+  static const int defaultVocalDetail = 10;
 
   late final SharedPreferences _prefs;
 
@@ -20,6 +22,7 @@ class UserSettings {
   bool sargamEnabled = defaultSargamEnabled;
   int scaleRoot = defaultScaleRoot;
   double referenceFrequency = defaultReferenceFrequency;
+  int vocalDetail = defaultVocalDetail;
 
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
@@ -28,6 +31,7 @@ class UserSettings {
     sargamEnabled = _prefs.getBool(_keySargamEnabled) ?? defaultSargamEnabled;
     scaleRoot = _prefs.getInt(_keyScaleRoot) ?? defaultScaleRoot;
     referenceFrequency = _prefs.getDouble(_keyReferenceFrequency) ?? defaultReferenceFrequency;
+    vocalDetail = _prefs.getInt(_keyVocalDetail) ?? defaultVocalDetail;
   }
 
   void savePlaybackSpeed(double value) {
@@ -53,5 +57,10 @@ class UserSettings {
   void saveReferenceFrequency(double value) {
     referenceFrequency = value;
     _prefs.setDouble(_keyReferenceFrequency, value);
+  }
+
+  void saveVocalDetail(int value) {
+    vocalDetail = value;
+    _prefs.setInt(_keyVocalDetail, value);
   }
 }

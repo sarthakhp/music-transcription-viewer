@@ -54,7 +54,8 @@ class ProcessedFramesData {
   final List<PitchFrame> processedFrames;
   final int frameCount;
 
-  // Lazy cache for downsampled display frames
+  // Cache for downsampled display frames, keyed by framesPerSecond
+  int _cachedRate = -1;
   List<PitchFrame>? _displayFramesCache;
 
   ProcessedFramesData({
@@ -109,9 +110,15 @@ class ProcessedFramesData {
     return (minFreq, maxFreq);
   }
 
-  /// Downsampled frames for rendering. Computed once and cached.
-  /// See [sampleDisplayFrames] in pitch_sampler.dart for the algorithm.
-  List<PitchFrame> get displayFrames {
-    return _displayFramesCache ??= sampleDisplayFrames(processedFrames, maxTime);
+  /// Downsampled frames for rendering. Recomputed when [framesPerSecond] changes.
+  List<PitchFrame> getDisplayFrames({int framesPerSecond = kDisplayFramesPerSecond}) {
+    if (_displayFramesCache == null || _cachedRate != framesPerSecond) {
+      _cachedRate = framesPerSecond;
+      _displayFramesCache = sampleDisplayFrames(processedFrames, maxTime, framesPerSecond: framesPerSecond);
+    }
+    return _displayFramesCache!;
   }
+
+  /// Convenience getter using the default rate (for backward compatibility).
+  List<PitchFrame> get displayFrames => getDisplayFrames();
 }

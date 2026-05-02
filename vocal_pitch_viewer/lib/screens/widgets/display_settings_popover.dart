@@ -13,6 +13,8 @@ class DisplaySettingsButton extends StatefulWidget {
   final ValueChanged<double> onVocalsConfidenceChanged;
   final ValueChanged<double> onBassConfidenceChanged;
   final ValueChanged<double> onOtherConfidenceChanged;
+  final int vocalDetail;
+  final ValueChanged<int> onVocalDetailChanged;
 
   const DisplaySettingsButton({
     super.key,
@@ -25,6 +27,8 @@ class DisplaySettingsButton extends StatefulWidget {
     required this.onVocalsConfidenceChanged,
     required this.onBassConfidenceChanged,
     required this.onOtherConfidenceChanged,
+    this.vocalDetail = 10,
+    required this.onVocalDetailChanged,
   });
 
   @override
@@ -62,6 +66,8 @@ class _DisplaySettingsButtonState extends State<DisplaySettingsButton> {
         onVocalsChanged: widget.onVocalsConfidenceChanged,
         onBassChanged: widget.onBassConfidenceChanged,
         onOtherChanged: widget.onOtherConfidenceChanged,
+        vocalDetail: widget.vocalDetail,
+        onVocalDetailChanged: widget.onVocalDetailChanged,
       ),
     );
     Overlay.of(context).insert(_entry!);
@@ -127,6 +133,8 @@ class _PanelOverlay extends StatefulWidget {
   final ValueChanged<double> onVocalsChanged;
   final ValueChanged<double> onBassChanged;
   final ValueChanged<double> onOtherChanged;
+  final int vocalDetail;
+  final ValueChanged<int> onVocalDetailChanged;
 
   const _PanelOverlay({
     required this.layerLink,
@@ -139,6 +147,8 @@ class _PanelOverlay extends StatefulWidget {
     required this.onVocalsChanged,
     required this.onBassChanged,
     required this.onOtherChanged,
+    this.vocalDetail = 10,
+    required this.onVocalDetailChanged,
   });
 
   @override
@@ -149,6 +159,7 @@ class _PanelOverlayState extends State<_PanelOverlay> {
   late double _vocals;
   late double _bass;
   late double _other;
+  late int _detail;
 
   @override
   void initState() {
@@ -156,6 +167,7 @@ class _PanelOverlayState extends State<_PanelOverlay> {
     _vocals = widget.vocalsMinConfidence;
     _bass = widget.bassMinConfidence;
     _other = widget.otherMinConfidence;
+    _detail = widget.vocalDetail;
   }
 
   @override
@@ -191,12 +203,47 @@ class _PanelOverlayState extends State<_PanelOverlay> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Min. Confidence',
+                    'Display Settings',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.5),
                       letterSpacing: 0.8,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  // Vocal detail slider
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text('Vocal Detail', style: theme.textTheme.bodySmall),
+                      ),
+                      Expanded(
+                        child: Slider(
+                          value: _detail.toDouble(),
+                          min: 5,
+                          max: 50,
+                          divisions: 9,
+                          onChanged: (v) {
+                            final intVal = v.round();
+                            setState(() => _detail = intVal);
+                            widget.onVocalDetailChanged(intVal);
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '$_detail',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.3), height: 1),
                   const SizedBox(height: 10),
                   _SliderRow(
                     label: 'Vocals',

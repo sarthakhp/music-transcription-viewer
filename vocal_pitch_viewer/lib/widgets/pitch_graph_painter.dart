@@ -37,6 +37,7 @@ class PitchGraphPainter extends CustomPainter {
   final int transposeAmount;
   final bool sargamEnabled;
   final int scaleRoot;
+  final int vocalDetail;
 
   PitchGraphPainter({
     required this.viewState,
@@ -59,6 +60,7 @@ class PitchGraphPainter extends CustomPainter {
     this.transposeAmount = 0,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.vocalDetail = 10,
   }) : super(repaint: viewState);
 
   @override
@@ -117,6 +119,7 @@ class PitchGraphPainter extends CustomPainter {
       transposeAmount: transposeAmount,
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
+      vocalDetail: vocalDetail,
     );
 
     final chordRenderer = ChordRenderer(
@@ -194,6 +197,7 @@ class PitchGraphPainter extends CustomPainter {
         oldDelegate.otherMinConfidence != otherMinConfidence ||
         oldDelegate.transposeAmount != transposeAmount ||
         oldDelegate.sargamEnabled != sargamEnabled ||
-        oldDelegate.scaleRoot != scaleRoot;
+        oldDelegate.scaleRoot != scaleRoot ||
+        oldDelegate.vocalDetail != vocalDetail;
   }
 }

@@ -91,6 +91,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _sargamEnabled = false;
   int _scaleRoot = 0; // 0=C, 1=C#, 2=D, ... 11=B
 
+  // Vocal detail (frames per second for pitch display)
+  int _vocalDetail = 10;
+
   // View state (pan, zoom, auto-scroll) — isolated from main widget tree
   final ViewState _viewState = ViewState();
 
@@ -134,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _transposeAmount = _userSettings.transposeAmount;
         _sargamEnabled = _userSettings.sargamEnabled;
         _scaleRoot = _userSettings.scaleRoot;
+        _vocalDetail = _userSettings.vocalDetail;
       });
       final appState = context.read<AppState>();
       appState.setReferenceFrequency(_userSettings.referenceFrequency);
@@ -294,6 +298,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onVocalsConfidenceChanged: (v) => setState(() => _vocalsMinConfidence = v),
           onBassConfidenceChanged: (v) => setState(() => _bassMinConfidence = v),
           onOtherConfidenceChanged: (v) => setState(() => _otherMinConfidence = v),
+          vocalDetail: _vocalDetail,
+          onVocalDetailChanged: (v) {
+            setState(() => _vocalDetail = v);
+            _userSettings.saveVocalDetail(v);
+          },
         ),
 
         // Main content area — during pan/zoom, only the CustomPaint repaints
@@ -335,6 +344,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         transposeAmount: _transposeAmount,
                         sargamEnabled: _sargamEnabled,
                         scaleRoot: _scaleRoot,
+                        vocalDetail: _vocalDetail,
                         onSeek: _seekTo,
                         onZoom: _handleZoom,
                         onYZoom: _handleYZoom,
@@ -409,8 +419,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 appState.setReferenceFrequency(frequency);
                 _userSettings.saveReferenceFrequency(frequency);
               },
-              onZoomIn: () => _viewState.zoomIn(maxTime: appState.pitchData?.maxTime ?? 120),
-              onZoomOut: () => _viewState.zoomOut(maxTime: appState.pitchData?.maxTime ?? 120),
+              onZoomIn: () => _viewState.zoomY(ViewState.zoomFactor),
+              onZoomOut: () => _viewState.zoomY(1.0 / ViewState.zoomFactor),
               viewWindowSize: _viewState.viewWindowSize,
               playbackSpeed: _playbackSpeed,
               onSpeedChanged: (speed) {

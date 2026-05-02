@@ -88,6 +88,14 @@ extension _HomeScreenViewControls on _HomeScreenState {
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
+    // Don't intercept keys when a text field has focus
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    if (primaryFocus != null &&
+        primaryFocus.context != null &&
+        primaryFocus.context!.findAncestorWidgetOfExactType<EditableText>() != null) {
+      return KeyEventResult.ignored;
+    }
+
     final appState = context.read<AppState>();
     if (!appState.isReady) return KeyEventResult.ignored;
 
@@ -130,12 +138,12 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
     if (event.logicalKey == LogicalKeyboardKey.equal ||
         event.logicalKey == LogicalKeyboardKey.add) {
-      _viewState.zoomIn(maxTime: maxTime);
+      _viewState.zoomY(ViewState.zoomFactor);
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.minus) {
-      _viewState.zoomOut(maxTime: maxTime);
+      _viewState.zoomY(1.0 / ViewState.zoomFactor);
       return KeyEventResult.handled;
     }
 

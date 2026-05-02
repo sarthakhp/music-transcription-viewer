@@ -19,6 +19,7 @@ class PitchRenderer {
   final int transposeAmount;
   final bool sargamEnabled;
   final int scaleRoot;
+  final int vocalDetail;
 
   PitchRenderer({
     required this.data,
@@ -34,6 +35,7 @@ class PitchRenderer {
     this.transposeAmount = 0,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.vocalDetail = 10,
   });
 
   void drawPitchPoints(Canvas canvas, Rect rect) {
@@ -51,7 +53,7 @@ class PitchRenderer {
     final List<Offset> unvoicedPoints = [];
 
     for (int i = startIndex; i <= endIndex; i++) {
-      final frame = data.displayFrames[i];
+      final frame = data.getDisplayFrames(framesPerSecond: vocalDetail)[i];
 
       if (!frame.isVoiced && !showUnvoiced) continue;
       if (frame.confidence < minConfidence) continue;
@@ -119,7 +121,7 @@ class PitchRenderer {
 
   /// Binary search to find the first frame that might be visible
   int _findStartIndex() {
-    final frames = data.displayFrames;
+    final frames = data.getDisplayFrames(framesPerSecond: vocalDetail);
     if (frames.isEmpty) return -1;
 
     // If the first frame is already past our view, return -1
@@ -148,7 +150,7 @@ class PitchRenderer {
 
   /// Binary search to find the last frame that might be visible
   int _findEndIndex() {
-    final frames = data.displayFrames;
+    final frames = data.getDisplayFrames(framesPerSecond: vocalDetail);
     if (frames.isEmpty) return -1;
 
     // If the first frame is already past our view, return -1

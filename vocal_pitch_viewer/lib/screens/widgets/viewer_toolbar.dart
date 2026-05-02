@@ -33,6 +33,10 @@ class ViewerToolbar extends StatelessWidget {
   final ValueChanged<double> onBassConfidenceChanged;
   final ValueChanged<double> onOtherConfidenceChanged;
 
+  // Vocal detail (frames per second)
+  final int vocalDetail;
+  final ValueChanged<int> onVocalDetailChanged;
+
   const ViewerToolbar({
     super.key,
     required this.appState,
@@ -53,6 +57,8 @@ class ViewerToolbar extends StatelessWidget {
     required this.onVocalsConfidenceChanged,
     required this.onBassConfidenceChanged,
     required this.onOtherConfidenceChanged,
+    this.vocalDetail = 10,
+    required this.onVocalDetailChanged,
   });
 
   @override
@@ -239,6 +245,8 @@ class ViewerToolbar extends StatelessWidget {
           onVocalsConfidenceChanged: onVocalsConfidenceChanged,
           onBassConfidenceChanged: onBassConfidenceChanged,
           onOtherConfidenceChanged: onOtherConfidenceChanged,
+          vocalDetail: vocalDetail,
+          onVocalDetailChanged: onVocalDetailChanged,
         ),
       ],
     );

@@ -30,6 +30,7 @@ class PitchGraph extends StatefulWidget {
   final int transposeAmount;
   final bool sargamEnabled;
   final int scaleRoot;
+  final int vocalDetail;
   final Function(double time)? onSeek;
   final Function(double zoomDelta, double focalPointRatio)? onZoom;
   final Function(double scaleFactor)? onYZoom;
@@ -53,6 +54,7 @@ class PitchGraph extends StatefulWidget {
     this.transposeAmount = 0,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.vocalDetail = 10,
     this.onSeek,
     this.onZoom,
     this.onYZoom,
@@ -116,10 +118,11 @@ class _PitchGraphState extends State<PitchGraph> {
   void _handleScaleUpdate(ScaleUpdateDetails details, double width) {
     if (_initialScale == null) return;
     if (details.pointerCount >= 2) _isPinching = true;
-    if (details.scale != 1.0 && _isPinching && widget.onYZoom != null) {
+    if (details.scale != 1.0 && _isPinching && widget.onZoom != null) {
       final scaleFactor = details.scale / _lastScale;
       _lastScale = details.scale;
-      widget.onYZoom!(scaleFactor);
+      final zoomDelta = scaleFactor > 1.0 ? (scaleFactor - 1.0) : -(1.0 / scaleFactor - 1.0);
+      widget.onZoom!(zoomDelta, 0.5);
     }
   }
 
@@ -168,9 +171,11 @@ class _PitchGraphState extends State<PitchGraph> {
           onPointerMove: (event) => _handlePointerMove(event, width),
           onPointerUp: _handlePointerUp,
           onPointerSignal: (event) {
-            if (event is PointerScaleEvent && widget.onYZoom != null) {
+            if (event is PointerScaleEvent && widget.onZoom != null) {
               GestureBinding.instance.pointerSignalResolver.register(event, (event) {
-                widget.onYZoom!((event as PointerScaleEvent).scale);
+                final scale = (event as PointerScaleEvent).scale;
+                final zoomDelta = scale > 1.0 ? (scale - 1.0) : -(1.0 / scale - 1.0);
+                widget.onZoom!(zoomDelta, 0.5);
               });
             } else if (event is PointerScrollEvent) {
               final dx = event.scrollDelta.dx;
@@ -227,6 +232,7 @@ class _PitchGraphState extends State<PitchGraph> {
                     transposeAmount: widget.transposeAmount,
                     sargamEnabled: widget.sargamEnabled,
                     scaleRoot: widget.scaleRoot,
+                    vocalDetail: widget.vocalDetail,
                   ),
                   foregroundPainter: PlayheadPainter(
                     viewState: _vs,
