@@ -42,7 +42,8 @@ class _DisplaySettingsButtonState extends State<DisplaySettingsButton> {
 
   @override
   void dispose() {
-    _closePanel();
+    _entry?.remove();
+    _entry = null;
     super.dispose();
   }
 

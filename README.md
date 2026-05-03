@@ -5,6 +5,9 @@ A new Flutter project.
 ## Getting Started
 
 flutter run cmd: 
+
+flutter run -d chrome --profile
+
 flutter run -d chrome --web-port 8080
 
 This project is a starting point for a Flutter application.
