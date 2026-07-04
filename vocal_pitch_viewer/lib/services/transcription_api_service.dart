@@ -9,13 +9,26 @@ import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
 import '../utils/api_error_handler.dart';
+import 'remote_data_source.dart';
 
-/// Main API service for Music Transcription backend
+/// Main API service for Music Transcription backend.
+///
+/// In `--dart-define=DATA_SOURCE=remote` builds, read operations are served by
+/// [RemoteDataSource] (Firebase Storage public URLs) instead of HTTP, turning
+/// the app into a backend-free hosted viewer. Mutating operations
+/// (upload/url/cancel/delete/retry) are unsupported in remote mode.
 class TranscriptionApiService {
   final http.Client _client;
+  final RemoteDataSource? _remote;
 
   TranscriptionApiService({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _remote = ApiConfig.isRemote ? RemoteDataSource() : null;
+
+  static ApiResponse<T> _remoteUnsupported<T>() => ApiResponse.error(
+        'This action is not available in the hosted viewer.',
+        statusCode: 405,
+      );
 
   /// Get common headers for all requests (includes ngrok bypass header)
   Map<String, String> get _commonHeaders => {
@@ -30,6 +43,7 @@ class TranscriptionApiService {
     required Uint8List fileBytes,
     required String fileName,
   }) async {
+    if (_remote != null) return _remoteUnsupported();
     try {
       final uri = Uri.parse(ApiConfig.getUrl(ApiConfig.transcribeEndpoint));
 
@@ -66,6 +80,7 @@ class TranscriptionApiService {
     double? startTime,
     double? endTime,
   }) async {
+    if (_remote != null) return _remoteUnsupported();
     try {
       final body = <String, dynamic>{'url': url};
       if (startTime != null) body['start_time'] = startTime;
@@ -124,6 +139,7 @@ class TranscriptionApiService {
   /// Get aggregated results and availability flags
   /// GET /api/v1/jobs/{job_id}/results
   Future<ApiResponse<JobResultsSummary>> getJobResults(String jobId) async {
+    if (_remote != null) return _remote.getJobResults(jobId);
     return ApiErrorHandler.executeApiCall(
       () => _client.get(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/results')),
@@ -156,6 +172,7 @@ class TranscriptionApiService {
     required String jobId,
     required String stemName,
   }) async {
+    if (_remote != null) return _remote.downloadStem(jobId: jobId, stemName: stemName);
     return ApiErrorHandler.executeBinaryApiCall(
       () => _client.get(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/stems/$stemName')),
@@ -170,6 +187,7 @@ class TranscriptionApiService {
   /// GET /api/v1/jobs/{job_id}/frames
   /// Uses isolate-based parsing to avoid blocking the main thread with large JSON
   Future<ApiResponse<ProcessedFramesData>> getFrames(String jobId) async {
+    if (_remote != null) return _remote.getFrames(jobId);
     try {
       final response = await _client.get(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/frames')),
@@ -197,6 +215,7 @@ class TranscriptionApiService {
   /// Get detected chord progression
   /// GET /api/v1/jobs/{job_id}/chords
   Future<ApiResponse<ChordData>> getChords(String jobId) async {
+    if (_remote != null) return _remote.getChords(jobId);
     return ApiErrorHandler.executeApiCall(
       () => _client.get(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/chords')),
@@ -212,6 +231,7 @@ class TranscriptionApiService {
   /// GET /api/v1/jobs/{job_id}/instruments
   /// Returns 404 for older jobs that don't have instrument data
   Future<ApiResponse<InstrumentData>> getInstruments(String jobId) async {
+    if (_remote != null) return _remote.getInstruments(jobId);
     return ApiErrorHandler.executeApiCallAsync(
       () => _client.get(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/instruments')),
@@ -226,6 +246,7 @@ class TranscriptionApiService {
   /// Cancel an in-progress or queued job
   /// POST /api/v1/jobs/{job_id}/cancel
   Future<ApiResponse<JobCancelResponse>> cancelJob(String jobId) async {
+    if (_remote != null) return _remoteUnsupported();
     return ApiErrorHandler.executeApiCall(
       () => _client.post(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/cancel')),
@@ -240,12 +261,28 @@ class TranscriptionApiService {
   /// Delete job and all associated files
   /// DELETE /api/v1/jobs/{job_id}
   Future<ApiResponse<JobDeletionResponse>> deleteJob(String jobId) async {
+    if (_remote != null) return _remoteUnsupported();
     return ApiErrorHandler.executeApiCall(
       () => _client.delete(
         Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId')),
         headers: _commonHeaders,
       ).timeout(ApiConfig.requestTimeout),
       (json) => JobDeletionResponse.fromJson(json),
+    );
+  }
+
+  // ========== Endpoint 9b: Retry Job ==========
+
+  /// Retry a failed (or cancelled) job, reusing already-downloaded audio.
+  /// POST /api/v1/jobs/{job_id}/retry
+  Future<ApiResponse<JobCreationResponse>> retryJob(String jobId) async {
+    if (_remote != null) return _remoteUnsupported();
+    return ApiErrorHandler.executeApiCall(
+      () => _client.post(
+        Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/retry')),
+        headers: _commonHeaders,
+      ).timeout(ApiConfig.requestTimeout),
+      (json) => JobCreationResponse.fromJson(json),
     );
   }
 
@@ -268,6 +305,7 @@ class TranscriptionApiService {
   /// List jobs with optional status filter
   /// GET /api/v1/jobs?status={status}
   Future<ApiResponse<JobListResponse>> listJobs({String? status}) async {
+    if (_remote != null) return _remote.listJobs(status: status);
     final uri = Uri.parse(ApiConfig.getUrl(ApiConfig.jobsEndpoint));
     final uriWithParams = status != null
         ? uri.replace(queryParameters: {'status': status})
@@ -282,6 +320,7 @@ class TranscriptionApiService {
   /// Dispose of the HTTP client
   void dispose() {
     _client.close();
+    _remote?.dispose();
   }
 
   // ========== Helper Methods ==========

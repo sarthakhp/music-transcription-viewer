@@ -3,25 +3,77 @@ part of 'home_screen.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _HomeScreenJobs on _HomeScreenState {
-  /// Load completed jobs from API
+  /// Load completed and failed jobs from API.
+  ///
+  /// Failed jobs are surfaced separately so the user can retry them without
+  /// re-uploading the file / re-entering the URL.
   Future<void> _loadCompletedJobs() async {
     setState(() => _isLoadingJobs = true);
 
     try {
-      final response = await _apiService.listJobs(status: 'completed');
+      final results = await Future.wait([
+        _apiService.listJobs(status: 'completed'),
+        _apiService.listJobs(status: 'failed'),
+      ]);
 
-      if (response.isSuccess && response.data != null) {
-        setState(() {
-          _completedJobs = response.data!.jobs;
-          _isLoadingJobs = false;
-        });
-      } else {
-        setState(() => _isLoadingJobs = false);
-        debugPrint('Failed to load completed jobs: ${response.error}');
-      }
+      final completedResponse = results[0];
+      final failedResponse = results[1];
+
+      setState(() {
+        if (completedResponse.isSuccess && completedResponse.data != null) {
+          _completedJobs = completedResponse.data!.jobs;
+        } else {
+          debugPrint('Failed to load completed jobs: ${completedResponse.error}');
+        }
+        if (failedResponse.isSuccess && failedResponse.data != null) {
+          _failedJobs = failedResponse.data!.jobs;
+        } else {
+          debugPrint('Failed to load failed jobs: ${failedResponse.error}');
+        }
+        _isLoadingJobs = false;
+      });
     } catch (e) {
       setState(() => _isLoadingJobs = false);
-      debugPrint('Error loading completed jobs: $e');
+      debugPrint('Error loading jobs: $e');
+    }
+  }
+
+  /// Retry a failed job. Reuses audio already on the server (no re-download).
+  Future<void> _onJobRetry(String jobId) async {
+    final appState = context.read<AppState>();
+
+    try {
+      final response = await _apiService.retryJob(jobId);
+
+      if (!mounted) return;
+
+      if (response.isSuccess && response.data != null) {
+        // Move the job out of the failed list and into active processing.
+        setState(() {
+          _failedJobs.removeWhere((job) => job.id == jobId);
+        });
+        appState.completeUpload(jobId);
+        _pollingService.startPolling(jobId);
+
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(response.data!.message),
+          behavior: SnackBarBehavior.floating,
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to retry job: ${response.error ?? "Unknown error"}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Failed to retry job. Please try again.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     }
   }
 
@@ -90,6 +142,7 @@ extension _HomeScreenJobs on _HomeScreenState {
       if (response.isSuccess) {
         setState(() {
           _completedJobs.removeWhere((job) => job.id == jobId);
+          _failedJobs.removeWhere((job) => job.id == jobId);
         });
 
         if (mounted) {

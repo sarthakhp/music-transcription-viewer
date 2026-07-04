@@ -1,19 +1,37 @@
 import 'package:flutter/material.dart';
 import '../models/job.dart';
 
-/// Widget to display a list of completed jobs
+/// Widget to display a list of jobs (completed history, or failed jobs that
+/// can be retried).
 class JobListCard extends StatelessWidget {
   final List<JobListItem> jobs;
   final Function(String jobId) onJobSelected;
   final Future<void> Function(String jobId)? onJobDeleted;
+  final Future<void> Function(String jobId)? onJobRetry;
   final bool isLoading;
+
+  /// Header title. Defaults to the completed-jobs history title.
+  final String title;
+
+  /// Render in the "failed" style — warning accent, retry affordance, and the
+  /// error message instead of metrics. Tapping a tile triggers retry rather
+  /// than opening the (non-existent) results.
+  final bool isFailedList;
+
+  /// Size to content instead of expanding to fill available height. Used when
+  /// the card is stacked above another list in a Column.
+  final bool shrinkWrap;
 
   const JobListCard({
     super.key,
     required this.jobs,
     required this.onJobSelected,
     this.onJobDeleted,
+    this.onJobRetry,
     this.isLoading = false,
+    this.title = 'Previous Jobs',
+    this.isFailedList = false,
+    this.shrinkWrap = false,
   });
 
   @override
@@ -85,18 +103,44 @@ class JobListCard extends StatelessWidget {
       );
     }
 
+    final accentColor = isFailedList ? colorScheme.error : colorScheme.primary;
+
+    final listView = ListView.separated(
+      padding: const EdgeInsets.all(12),
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const ClampingScrollPhysics() : null,
+      itemCount: jobs.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final job = jobs[index];
+        return _JobListTile(
+          job: job,
+          isFailed: isFailedList,
+          onTap: isFailedList
+              ? (onJobRetry != null ? () => onJobRetry!(job.id) : () {})
+              : () => onJobSelected(job.id),
+          onDelete: onJobDeleted != null ? () => onJobDeleted!(job.id) : null,
+          onRetry: onJobRetry != null ? () => onJobRetry!(job.id) : null,
+        );
+      },
+    );
+
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                Icon(Icons.history_rounded, color: colorScheme.primary),
+                Icon(
+                  isFailedList ? Icons.error_outline_rounded : Icons.history_rounded,
+                  color: accentColor,
+                ),
                 const SizedBox(width: 12),
                 Text(
-                  'Previous Jobs',
+                  title,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -112,21 +156,7 @@ class JobListCard extends StatelessWidget {
             ),
           ),
           const Divider(height: 1),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: jobs.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final job = jobs[index];
-                return _JobListTile(
-                  job: job,
-                  onTap: () => onJobSelected(job.id),
-                  onDelete: onJobDeleted != null ? () => onJobDeleted!(job.id) : null,
-                );
-              },
-            ),
-          ),
+          if (shrinkWrap) Flexible(child: listView) else Expanded(child: listView),
         ],
       ),
     );
@@ -138,11 +168,15 @@ class _JobListTile extends StatefulWidget {
   final JobListItem job;
   final VoidCallback onTap;
   final Future<void> Function()? onDelete;
+  final Future<void> Function()? onRetry;
+  final bool isFailed;
 
   const _JobListTile({
     required this.job,
     required this.onTap,
     this.onDelete,
+    this.onRetry,
+    this.isFailed = false,
   });
 
   @override
@@ -152,6 +186,19 @@ class _JobListTile extends StatefulWidget {
 class _JobListTileState extends State<_JobListTile> {
   bool _isHovered = false;
   bool _isDeleting = false;
+  bool _isRetrying = false;
+
+  Future<void> _handleRetry() async {
+    if (widget.onRetry == null) return;
+    setState(() => _isRetrying = true);
+    try {
+      await widget.onRetry!();
+    } finally {
+      if (mounted) {
+        setState(() => _isRetrying = false);
+      }
+    }
+  }
 
   Future<void> _handleDelete() async {
     if (widget.onDelete == null) return;
@@ -230,14 +277,18 @@ class _JobListTileState extends State<_JobListTile> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
+                          color: widget.isFailed
+                              ? colorScheme.errorContainer
+                              : colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           widget.job.isUrlSource
                               ? Icons.link_rounded
                               : Icons.music_note_rounded,
-                          color: colorScheme.primary,
+                          color: widget.isFailed
+                              ? colorScheme.error
+                              : colorScheme.primary,
                           size: 20,
                         ),
                       ),
@@ -257,48 +308,72 @@ class _JobListTileState extends State<_JobListTile> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: colorScheme.onSurface.withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  widget.job.durationFormatted,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                            if (widget.isFailed)
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 14,
+                                    color: colorScheme.error.withValues(alpha: 0.8),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Icon(
-                                  Icons.speed_rounded,
-                                  size: 14,
-                                  color: colorScheme.onSurface.withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${widget.job.tempoBpm.toStringAsFixed(0)} BPM',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      widget.job.errorMessage?.isNotEmpty == true
+                                          ? widget.job.errorMessage!
+                                          : 'Processing failed',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.error.withValues(alpha: 0.9),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Icon(
-                                  Icons.library_music_rounded,
-                                  size: 14,
-                                  color: colorScheme.onSurface.withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${widget.job.numChords} chords',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                ],
+                              )
+                            else
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time_rounded,
+                                    size: 14,
+                                    color: colorScheme.onSurface.withValues(alpha: 0.5),
                                   ),
-                                ),
-                              ],
-                            ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    widget.job.durationFormatted,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Icon(
+                                    Icons.speed_rounded,
+                                    size: 14,
+                                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${widget.job.tempoBpm.toStringAsFixed(0)} BPM',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Icon(
+                                    Icons.library_music_rounded,
+                                    size: 14,
+                                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${widget.job.numChords} chords',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -319,9 +394,10 @@ class _JobListTileState extends State<_JobListTile> {
 
                       const SizedBox(width: 8),
 
-                      // Timestamp
+                      // Timestamp + trailing action
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             widget.job.createdAtFormatted,
@@ -330,11 +406,31 @@ class _JobListTileState extends State<_JobListTile> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: colorScheme.onSurface.withValues(alpha: 0.3),
-                            size: 20,
-                          ),
+                          if (widget.isFailed && widget.onRetry != null)
+                            FilledButton.tonalIcon(
+                              onPressed: _isRetrying ? null : _handleRetry,
+                              icon: _isRetrying
+                                  ? SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: colorScheme.primary,
+                                      ),
+                                    )
+                                  : const Icon(Icons.refresh_rounded, size: 16),
+                              label: Text(_isRetrying ? 'Retrying' : 'Retry'),
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              ),
+                            )
+                          else
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: colorScheme.onSurface.withValues(alpha: 0.3),
+                              size: 20,
+                            ),
                         ],
                       ),
                     ],

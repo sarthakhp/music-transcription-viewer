@@ -9,6 +9,7 @@ import '../services/transcription_api_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
 import '../services/user_settings.dart';
+import '../config/api_config.dart';
 import '../utils/file_service.dart';
 import '../utils/music_utils.dart';
 import '../utils/performance_monitor.dart';
@@ -65,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // Job list state
   List<JobListItem> _completedJobs = [];
+  List<JobListItem> _failedJobs = [];
   bool _isLoadingJobs = false;
 
   // Audio track switching
@@ -251,15 +253,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       appState: appState,
       apiService: _apiService,
       completedJobs: _completedJobs,
+      failedJobs: _failedJobs,
       isLoadingJobs: _isLoadingJobs,
       onJobSelected: _onJobSelected,
       onJobDeleted: _onJobDeleted,
+      onJobRetry: _onJobRetry,
       onUploadPressed: _uploadAudioFileToAPI,
       onUrlSubmitted: _submitUrlForTranscription,
       onCancel: _cancelCurrentJob,
       isLoadingJson: _isLoadingJson,
       isLoadingAudio: _isLoadingAudio,
       loadingAudioStatus: _loadingAudioStatus,
+      isRemote: ApiConfig.isRemote,
     );
   }
 

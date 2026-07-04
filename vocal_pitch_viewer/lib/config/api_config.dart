@@ -1,5 +1,19 @@
 /// API configuration for the Music Transcription service
 class ApiConfig {
+  // Data source mode, set at build time:
+  //   flutter build web --dart-define=DATA_SOURCE=remote \
+  //       --dart-define=FIREBASE_INDEX_URL=<public index.json URL>
+  // 'local'  → talk to the processing backend (full create + process + view).
+  // 'remote' → read-only hosted viewer that reads published artifacts from
+  //            Firebase Storage public URLs; no backend required.
+  static const String dataSource =
+      String.fromEnvironment('DATA_SOURCE', defaultValue: 'local');
+  static bool get isRemote => dataSource == 'remote';
+
+  /// Public download URL of index.json in Firebase Storage (remote mode only).
+  static const String firebaseIndexUrl =
+      String.fromEnvironment('FIREBASE_INDEX_URL');
+
   // Base URL for the API - Switch between ngrok and localhost here
   static const bool _useNgrok = false; // Change to false for localhost
   static const String _ngrokUrl = 'https://hypocotylous-krysten-abominably.ngrok-free.dev';

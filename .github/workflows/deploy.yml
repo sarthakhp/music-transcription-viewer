@@ -35,9 +35,17 @@ jobs:
         working-directory: ./vocal_pitch_viewer
         run: flutter pub get
 
-      - name: Build web
+      - name: Build web (hosted, read-only viewer)
         working-directory: ./vocal_pitch_viewer
-        run: flutter build web --release --base-href /music-transcription-viewer/
+        env:
+          # Set in repo Settings → Secrets and variables → Actions → Variables.
+          # The public Firebase Storage download URL of index.json.
+          FIREBASE_INDEX_URL: ${{ vars.FIREBASE_INDEX_URL }}
+        run: |
+          flutter build web --release \
+            --base-href /music-transcription-viewer/ \
+            --dart-define=DATA_SOURCE=remote \
+            --dart-define=FIREBASE_INDEX_URL="$FIREBASE_INDEX_URL"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
