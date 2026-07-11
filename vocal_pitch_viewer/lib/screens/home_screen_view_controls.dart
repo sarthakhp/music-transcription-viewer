@@ -4,7 +4,7 @@ part of 'home_screen.dart';
 
 extension _HomeScreenViewControls on _HomeScreenState {
 
-  // ─── Scroll animation (needs AnimationController from State) ──────────────
+  // --- Scroll animation (needs AnimationController from State) --------------
 
   void _onScrollAnimationUpdate() {
     if (_scrollAnimation != null) {
@@ -23,7 +23,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _scrollAnimationController.forward(from: 0);
   }
 
-  // ─── Gesture callbacks (passed to PitchGraph) ─────────────────────────────
+  // --- Gesture callbacks (passed to PitchGraph) -----------------------------
 
   void _handleZoom(double zoomDelta, double focalPointRatio) {
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120.0;
@@ -49,7 +49,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _viewState.panX(panDelta, maxTime: maxTime);
   }
 
-  // ─── Seek ─────────────────────────────────────────────────────────────────
+  // --- Seek -----------------------------------------------------------------
 
   void _seekTo(double time) {
     PerformanceMonitor.instance.reportAction(UserAction.seek);
@@ -58,8 +58,8 @@ extension _HomeScreenViewControls on _HomeScreenState {
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
     final isOutsideView = time < _viewState.viewStartTime || time > _viewState.viewEndTime;
 
-    _viewState.setAutoScroll(false);
-
+    // Only scroll to the seek position if it's outside the current view
+    // Don't disable auto-scroll - let it continue if enabled
     if (isOutsideView) {
       final newStartTime = (time - _viewState.viewWindowSize / 2)
           .clamp(0.0, max(0.0, maxTime - _viewState.viewWindowSize).toDouble());
@@ -67,7 +67,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
     }
   }
 
-  // ─── Speed ────────────────────────────────────────────────────────────────
+  // --- Speed ----------------------------------------------------------------
 
   static const _speedPresets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -83,10 +83,10 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _audioService.setSpeed(speed);
   }
 
-  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
+  // --- Keyboard shortcuts ---------------------------------------------------
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
 
     // Don't intercept keys when a text field has focus
     final primaryFocus = FocusManager.instance.primaryFocus;

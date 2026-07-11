@@ -17,6 +17,7 @@ class InstrumentRenderer {
   final int transposeAmount;
   final bool sargamEnabled;
   final int scaleRoot;
+  final double currentTime;
 
   static const double _minNoteWidth = 3.0;
 
@@ -33,6 +34,7 @@ class InstrumentRenderer {
     this.transposeAmount = 0,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    required this.currentTime,
   });
 
   void drawNotes(Canvas canvas, Rect rect) {
@@ -42,16 +44,101 @@ class InstrumentRenderer {
     if (showBass) {
       final track = instrumentData.bass;
       if (track != null) {
-        _drawTrack(canvas, rect, track.notes, appPalette.bassColor, noteHeight, bassMinConfidence, transposeAmount);
+        _drawTrack(
+          canvas,
+          rect,
+          track.notes,
+          appPalette.bassColor,
+          appPalette.bassHighlightColor,
+          noteHeight,
+          bassMinConfidence,
+          transposeAmount,
+        );
       }
     }
 
     if (showOther) {
       final track = instrumentData.other;
       if (track != null) {
-        _drawTrack(canvas, rect, track.notes, appPalette.otherColor, noteHeight, otherMinConfidence, transposeAmount);
+        _drawTrack(
+          canvas,
+          rect,
+          track.notes,
+          appPalette.otherColor,
+          appPalette.otherHighlightColor,
+          noteHeight,
+          otherMinConfidence,
+          transposeAmount,
+        );
       }
     }
+  }
+
+  /// Finds active notes at the current playhead time
+  /// Linear scan through all notes (data is not sorted by onset)
+  Map<int, Color> getActiveNotesAtTime(double time) {
+    final Map<int, Color> activeNotes = {};
+
+    if (showBass) {
+      final track = instrumentData.bass;
+      if (track != null) {
+        final bassActive = _findActiveNotesInTrack(
+          track.notes,
+          time,
+          appPalette.bassColor,
+          bassMinConfidence,
+          transposeAmount,
+        );
+        activeNotes.addAll(bassActive);
+      }
+    }
+
+    if (showOther) {
+      final track = instrumentData.other;
+      if (track != null) {
+        final otherActive = _findActiveNotesInTrack(
+          track.notes,
+          time,
+          appPalette.otherColor,
+          otherMinConfidence,
+          transposeAmount,
+        );
+        activeNotes.addAll(otherActive);
+      }
+    }
+
+    return activeNotes;
+  }
+
+  /// Linear scan to find active notes (data is unsorted, so binary search not applicable)
+  Map<int, Color> _findActiveNotesInTrack(
+    List<InstrumentNote> notes,
+    double time,
+    Color color,
+    double minConfidence,
+    int transpose,
+  ) {
+    final Map<int, Color> activeNotes = {};
+
+    if (notes.isEmpty) return activeNotes;
+
+    // Linear scan through all notes
+    for (final note in notes) {
+      // Skip low confidence notes
+      if (note.confidence < minConfidence) continue;
+
+      // Check if playhead intersects this note
+      if (time >= note.onset && time <= note.offset) {
+        final midiPitch = note.pitch + transpose;
+
+        // Only track notes within visible MIDI range
+        if (midiPitch >= minMidi && midiPitch <= maxMidi) {
+          activeNotes[midiPitch] = color;
+        }
+      }
+    }
+
+    return activeNotes;
   }
 
   void _drawTrack(
@@ -59,6 +146,7 @@ class InstrumentRenderer {
     Rect rect,
     List<InstrumentNote> notes,
     Color color,
+    Color highlightColor,
     double noteHeight,
     double minConfidence,
     int transpose,
@@ -79,15 +167,19 @@ class InstrumentRenderer {
 
       final drawWidth = (x2 - x1).clamp(_minNoteWidth, double.infinity);
 
+      // Check if playhead intersects with this note
+      final isActive = currentTime >= note.onset && currentTime <= note.offset;
+
       final opacity = 0.55 + (note.velocity / 127.0) * 0.4;
-      final baseColor = sargamEnabled
-          ? SargamTheme.forType(getSargamNoteType(note.pitch - scaleRoot)).color
-          : color;
+      final baseColor = isActive ? highlightColor : color;
       paint.color = baseColor.withValues(alpha: opacity);
+
+      // Highlighted notes are 1.5x taller for better visibility
+      final drawHeight = isActive ? noteHeight * 1.5 : noteHeight;
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(x1, y - noteHeight / 2, drawWidth, noteHeight),
+          Rect.fromLTWH(x1, y - drawHeight / 2, drawWidth, drawHeight),
           radius,
         ),
         paint,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/view_state.dart';
 import 'graph_constants.dart';
 import 'graph_renderers/playhead_renderer.dart';
+import 'pitch_graph.dart'; // for ActiveNotesHolder
 
 /// Painter for just the playhead (dynamic layer that repaints frequently).
 ///
@@ -12,22 +13,32 @@ class PlayheadPainter extends CustomPainter {
   final double currentTime;
   final Color playheadColor;
   final Color onSurfaceColor;
+  final Color hoverRowBgColor;
+  final Color hoverLabelColor;
+  final Color hoverLabelBgColor;
+  final Color tooltipBgColor;
   final Brightness brightness;
   final double? hoverTime;
   final double? hoverY;
   final bool sargamEnabled;
   final int scaleRoot;
+  final ActiveNotesHolder? activeNotesHolder;
 
   PlayheadPainter({
     required this.viewState,
     required this.currentTime,
     required this.playheadColor,
     required this.onSurfaceColor,
+    required this.hoverRowBgColor,
+    required this.hoverLabelColor,
+    required this.hoverLabelBgColor,
+    required this.tooltipBgColor,
     required this.brightness,
     this.hoverTime,
     this.hoverY,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.activeNotesHolder,
   }) : super(repaint: viewState);
 
   @override
@@ -45,6 +56,10 @@ class PlayheadPainter extends CustomPainter {
       viewEndTime: viewState.viewEndTime,
       playheadColor: playheadColor,
       onSurfaceColor: onSurfaceColor,
+      hoverRowBgColor: hoverRowBgColor,
+      hoverLabelColor: hoverLabelColor,
+      hoverLabelBgColor: hoverLabelBgColor,
+      tooltipBgColor: tooltipBgColor,
       brightness: brightness,
       hoverTime: hoverTime,
       hoverY: hoverY,
@@ -52,8 +67,10 @@ class PlayheadPainter extends CustomPainter {
       maxMidi: viewState.effectiveMaxMidi,
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
+      activeNotePitches: activeNotesHolder?.notes ?? {},
     );
 
+    playheadRenderer.drawActiveNoteLabels(canvas, graphRect);
     playheadRenderer.drawNoteRowHighlight(canvas, graphRect);
     playheadRenderer.drawHoverIndicator(canvas, graphRect);
     playheadRenderer.drawPlayhead(canvas, graphRect);
@@ -61,6 +78,8 @@ class PlayheadPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PlayheadPainter oldDelegate) {
+    // Always repaint when currentTime changes (which happens every frame during playback)
+    // The activeNotesHolder is mutated in place, so we don't check it here
     return oldDelegate.currentTime != currentTime ||
         oldDelegate.hoverTime != hoverTime ||
         oldDelegate.hoverY != hoverY;

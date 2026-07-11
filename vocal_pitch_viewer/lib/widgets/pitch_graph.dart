@@ -9,6 +9,12 @@ import 'pitch_graph_painter.dart';
 import 'playhead_painter.dart';
 import '../theme/app_palette.dart';
 
+/// Mutable holder for active note pitches shared between painters
+/// Avoids widget rebuild cycle while allowing painters to communicate
+class ActiveNotesHolder {
+  Map<int, Color> notes = {};
+}
+
 /// Main pitch graph widget with axes and visualization.
 ///
 /// View parameters (viewStartTime, viewEndTime, minMidi, maxMidi) are read
@@ -76,7 +82,11 @@ class _PitchGraphState extends State<PitchGraph> {
   bool _isDragging = false;
   double? _dragStartX;
   bool _isPinching = false;
-  double _lastScale = 1.0;
+  double _lastHorizontalScale = 1.0;
+  double _lastVerticalScale = 1.0;
+
+  // Shared mutable state for active notes - both painters reference this
+  final ActiveNotesHolder _activeNotesHolder = ActiveNotesHolder();
 
   ViewState get _vs => widget.viewState;
 
@@ -111,24 +121,44 @@ class _PitchGraphState extends State<PitchGraph> {
 
   void _handleScaleStart(ScaleStartDetails details) {
     _initialScale = 1.0;
-    _lastScale = 1.0;
+    _lastHorizontalScale = 1.0;
+    _lastVerticalScale = 1.0;
     _isPinching = details.pointerCount >= 2;
   }
 
+  // A two-finger touch pinch reports independent horizontal/vertical scale
+  // factors (unlike a trackpad pinch, which is a single uniform PointerScaleEvent
+  // handled separately below). Spreading fingers left-right zooms the time
+  // (X) axis; spreading them up-down zooms the pitch (Y) axis — most graph/
+  // chart apps use this mapping, and it's what lets touch users reach Y-zoom
+  // without hunting for the toolbar buttons.
   void _handleScaleUpdate(ScaleUpdateDetails details, double width) {
     if (_initialScale == null) return;
     if (details.pointerCount >= 2) _isPinching = true;
-    if (details.scale != 1.0 && _isPinching && widget.onZoom != null) {
-      final scaleFactor = details.scale / _lastScale;
-      _lastScale = details.scale;
-      final zoomDelta = scaleFactor > 1.0 ? (scaleFactor - 1.0) : -(1.0 / scaleFactor - 1.0);
-      widget.onZoom!(zoomDelta, 0.5);
+    if (!_isPinching) return;
+
+    if (details.horizontalScale != 1.0 && widget.onZoom != null) {
+      final scaleFactor = details.horizontalScale / _lastHorizontalScale;
+      _lastHorizontalScale = details.horizontalScale;
+      if (scaleFactor != 1.0) {
+        final zoomDelta = scaleFactor > 1.0 ? (scaleFactor - 1.0) : -(1.0 / scaleFactor - 1.0);
+        widget.onZoom!(zoomDelta, 0.5);
+      }
+    }
+
+    if (details.verticalScale != 1.0 && widget.onYZoom != null) {
+      final scaleFactorY = details.verticalScale / _lastVerticalScale;
+      _lastVerticalScale = details.verticalScale;
+      if (scaleFactorY != 1.0) {
+        widget.onYZoom!(scaleFactorY);
+      }
     }
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
     _initialScale = null;
-    _lastScale = 1.0;
+    _lastHorizontalScale = 1.0;
+    _lastVerticalScale = 1.0;
     _isPinching = false;
   }
 
@@ -160,6 +190,11 @@ class _PitchGraphState extends State<PitchGraph> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    // Get the appropriate palette based on current theme brightness
+    final palette = theme.brightness == Brightness.dark
+        ? indigoPalette
+        : minimalistPalette;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -219,6 +254,8 @@ class _PitchGraphState extends State<PitchGraph> {
                     primaryColor: colorScheme.primary,
                     onSurfaceColor: colorScheme.onSurface,
                     gridColor: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    graphBgColor: palette.graphBg,
+                    tonicTintColor: palette.tonicTint,
                     unvoicedColor: colorScheme.onSurface.withValues(alpha: 0.2),
                     chordColor: colorScheme.tertiary,
                     brightness: theme.brightness,
@@ -233,17 +270,24 @@ class _PitchGraphState extends State<PitchGraph> {
                     sargamEnabled: widget.sargamEnabled,
                     scaleRoot: widget.scaleRoot,
                     vocalDetail: widget.vocalDetail,
+                    currentTime: widget.currentTime,
+                    activeNotesHolder: _activeNotesHolder,
                   ),
                   foregroundPainter: PlayheadPainter(
                     viewState: _vs,
                     currentTime: widget.currentTime,
-                    playheadColor: appPalette.playheadColor,
+                    playheadColor: palette.playheadColor,
                     onSurfaceColor: colorScheme.onSurface,
+                    hoverRowBgColor: palette.hoverRowBg,
+                    hoverLabelColor: palette.hoverLabelColor,
+                    hoverLabelBgColor: palette.hoverLabelBg,
+                    tooltipBgColor: palette.tooltipBg,
                     brightness: theme.brightness,
                     hoverTime: _hoverTime,
                     hoverY: _hoverY,
                     sargamEnabled: widget.sargamEnabled,
                     scaleRoot: widget.scaleRoot,
+                    activeNotesHolder: _activeNotesHolder,
                   ),
                 ),
               ),

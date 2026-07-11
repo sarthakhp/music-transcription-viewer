@@ -3,12 +3,14 @@ import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
 import '../models/view_state.dart';
+import '../theme/app_palette.dart';
 import 'graph_constants.dart';
 import 'graph_renderers/grid_renderer.dart';
 import 'graph_renderers/axis_renderer.dart';
 import 'graph_renderers/pitch_renderer.dart';
 import 'graph_renderers/chord_renderer.dart';
 import 'graph_renderers/instrument_renderer.dart';
+import 'pitch_graph.dart'; // for ActiveNotesHolder
 
 /// Custom painter for the pitch visualization (static layer).
 ///
@@ -24,6 +26,8 @@ class PitchGraphPainter extends CustomPainter {
   final Color primaryColor;
   final Color onSurfaceColor;
   final Color gridColor;
+  final Color graphBgColor;
+  final Color tonicTintColor;
   final Color unvoicedColor;
   final Color chordColor;
   final Brightness brightness;
@@ -38,6 +42,8 @@ class PitchGraphPainter extends CustomPainter {
   final bool sargamEnabled;
   final int scaleRoot;
   final int vocalDetail;
+  final double currentTime;
+  final ActiveNotesHolder? activeNotesHolder;
 
   PitchGraphPainter({
     required this.viewState,
@@ -47,6 +53,8 @@ class PitchGraphPainter extends CustomPainter {
     required this.primaryColor,
     required this.onSurfaceColor,
     required this.gridColor,
+    required this.graphBgColor,
+    required this.tonicTintColor,
     required this.unvoicedColor,
     required this.chordColor,
     required this.brightness,
@@ -61,6 +69,8 @@ class PitchGraphPainter extends CustomPainter {
     this.sargamEnabled = false,
     this.scaleRoot = 0,
     this.vocalDetail = 10,
+    required this.currentTime,
+    this.activeNotesHolder,
   }) : super(repaint: viewState);
 
   @override
@@ -85,6 +95,8 @@ class PitchGraphPainter extends CustomPainter {
       viewStartTime: viewStartTime,
       viewEndTime: viewEndTime,
       gridColor: gridColor,
+      graphBgColor: graphBgColor,
+      tonicTintColor: tonicTintColor,
       brightness: brightness,
       referenceFrequency: referenceFrequency,
       minMidi: minMidi,
@@ -111,6 +123,7 @@ class PitchGraphPainter extends CustomPainter {
       viewStartTime: viewStartTime,
       viewEndTime: viewEndTime,
       primaryColor: primaryColor,
+      primaryHighlightColor: appPalette.vocalHighlightColor, // Bright orange for visibility
       unvoicedColor: unvoicedColor,
       referenceFrequency: referenceFrequency,
       minMidi: minMidi,
@@ -120,6 +133,7 @@ class PitchGraphPainter extends CustomPainter {
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
       vocalDetail: vocalDetail,
+      currentTime: currentTime,
     );
 
     final chordRenderer = ChordRenderer(
@@ -147,7 +161,7 @@ class PitchGraphPainter extends CustomPainter {
     double instrMs = 0;
     if (instrumentData != null) {
       sw.reset();
-      InstrumentRenderer(
+      final renderer = InstrumentRenderer(
         instrumentData: instrumentData!,
         viewStartTime: viewStartTime,
         viewEndTime: viewEndTime,
@@ -160,8 +174,18 @@ class PitchGraphPainter extends CustomPainter {
         transposeAmount: transposeAmount,
         sargamEnabled: sargamEnabled,
         scaleRoot: scaleRoot,
-      ).drawNotes(canvas, graphRect);
+        currentTime: currentTime,
+      );
+
+      // Draw instrument bars
+      renderer.drawNotes(canvas, graphRect);
       instrMs = sw.elapsedMicroseconds / 1000.0;
+
+      // Find active notes at playhead and update shared holder
+      // (works even if playhead is off-screen)
+      if (activeNotesHolder != null) {
+        activeNotesHolder!.notes = renderer.getActiveNotesAtTime(currentTime);
+      }
     }
 
     double pitchMs = 0;
@@ -174,10 +198,10 @@ class PitchGraphPainter extends CustomPainter {
     final totalMs = gridMs + axisMs + chordMs + instrMs + pitchMs;
     _paintCount++;
     if (_paintCount % 30 == 0) {
-      debugPrint('[Paint] total:${totalMs.toStringAsFixed(1)}ms  '
-          'grid:${gridMs.toStringAsFixed(1)} axis:${axisMs.toStringAsFixed(1)} '
-          'chord:${chordMs.toStringAsFixed(1)} instr:${instrMs.toStringAsFixed(1)} '
-          'pitch:${pitchMs.toStringAsFixed(1)}');
+      // debugPrint('[Paint] total:${totalMs.toStringAsFixed(1)}ms  '
+      //     'grid:${gridMs.toStringAsFixed(1)} axis:${axisMs.toStringAsFixed(1)} '
+      //     'chord:${chordMs.toStringAsFixed(1)} instr:${instrMs.toStringAsFixed(1)} '
+      //     'pitch:${pitchMs.toStringAsFixed(1)}');
     }
   }
 
@@ -198,6 +222,7 @@ class PitchGraphPainter extends CustomPainter {
         oldDelegate.transposeAmount != transposeAmount ||
         oldDelegate.sargamEnabled != sargamEnabled ||
         oldDelegate.scaleRoot != scaleRoot ||
-        oldDelegate.vocalDetail != vocalDetail;
+        oldDelegate.vocalDetail != vocalDetail ||
+        (oldDelegate.currentTime - currentTime).abs() > 0.001; // Repaint when playhead moves
   }
 }

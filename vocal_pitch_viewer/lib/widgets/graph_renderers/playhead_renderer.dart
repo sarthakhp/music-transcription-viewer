@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_palette.dart';
 import '../../utils/music_utils.dart';
 import '../graph_constants.dart';
 
@@ -10,6 +9,10 @@ class PlayheadRenderer {
   final double viewEndTime;
   final Color playheadColor;
   final Color onSurfaceColor;
+  final Color hoverRowBgColor;
+  final Color hoverLabelColor;
+  final Color hoverLabelBgColor;
+  final Color tooltipBgColor;
   final Brightness brightness;
   final double? hoverTime;
   final double? hoverY;
@@ -17,6 +20,7 @@ class PlayheadRenderer {
   final double maxMidi;
   final bool sargamEnabled;
   final int scaleRoot;
+  final Map<int, Color> activeNotePitches;
 
   PlayheadRenderer({
     required this.currentTime,
@@ -24,6 +28,10 @@ class PlayheadRenderer {
     required this.viewEndTime,
     required this.playheadColor,
     required this.onSurfaceColor,
+    required this.hoverRowBgColor,
+    required this.hoverLabelColor,
+    required this.hoverLabelBgColor,
+    required this.tooltipBgColor,
     required this.brightness,
     this.hoverTime,
     this.hoverY,
@@ -31,6 +39,7 @@ class PlayheadRenderer {
     required this.maxMidi,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.activeNotePitches = const {},
   });
 
   void drawPlayhead(Canvas canvas, Rect rect) {
@@ -94,7 +103,7 @@ class PlayheadRenderer {
 
     // Background for tooltip
     final bgPaint = Paint()
-      ..color = appPalette.tooltipBg;
+      ..color = tooltipBgColor;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(
@@ -131,9 +140,9 @@ class PlayheadRenderer {
     final clampedBottom = rowBottom.clamp(rect.top, rect.bottom);
     if (clampedTop >= clampedBottom) return;
 
-    // Subtle row highlight.
+    // Subtle row highlight with accent color.
     final highlightPaint = Paint()
-      ..color = onSurfaceColor.withValues(alpha: brightness == Brightness.dark ? 0.07 : 0.06);
+      ..color = hoverRowBgColor;
     canvas.drawRect(
       Rect.fromLTRB(rect.left, clampedTop, rect.right, clampedBottom),
       highlightPaint,
@@ -167,8 +176,7 @@ class PlayheadRenderer {
     final labelX = (cursorX + 14).clamp(rect.left, rect.right - labelW);
     final labelY = (rowCenterY - labelH / 2).clamp(rect.top, rect.bottom - labelH);
 
-    final bgColor = appPalette.tooltipBg;
-    final bgPaint = Paint()..color = bgColor;
+    final bgPaint = Paint()..color = tooltipBgColor;
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(labelX, labelY, labelW, labelH),
       const Radius.circular(4),
@@ -193,7 +201,7 @@ class PlayheadRenderer {
     final rowCenterY = _midiToY(midi, rect);
 
     final labelStyle = TextStyle(
-      color: onSurfaceColor,
+      color: hoverLabelColor,
       fontSize: fontSize,
       fontWeight: FontWeight.bold,
     );
@@ -205,7 +213,7 @@ class PlayheadRenderer {
     final labelX = rect.left - tp.width - 8;
     final labelY = rowCenterY - tp.height / 2;
 
-    // Background pill behind the label.
+    // Background pill behind the label with accent color.
     final pillRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(
         labelX - 4,
@@ -215,12 +223,59 @@ class PlayheadRenderer {
       ),
       const Radius.circular(3),
     );
-    final pillColor = brightness == Brightness.dark
-        ? onSurfaceColor.withValues(alpha: 0.12)
-        : onSurfaceColor.withValues(alpha: 0.08);
-    canvas.drawRRect(pillRect, Paint()..color = pillColor);
+    canvas.drawRRect(pillRect, Paint()..color = hoverLabelBgColor);
 
     tp.paint(canvas, Offset(labelX, labelY));
+  }
+
+  /// Draw highlighted labels for active instrument notes
+  void drawActiveNoteLabels(Canvas canvas, Rect rect) {
+    if (activeNotePitches.isEmpty) return;
+
+    final midiRange = maxMidi - minMidi;
+    if (midiRange <= 0) return;
+
+    // Match adaptive font size from AxisRenderer
+    final rowHeight = rect.height / midiRange;
+    final fontSize = rowHeight.clamp(8.0, 14.0);
+
+    activeNotePitches.forEach((midiPitch, highlightColor) {
+      final midi = midiPitch.toDouble();
+      if (midi < minMidi || midi > maxMidi) return;
+
+      final noteName = sargamEnabled
+          ? midiToSargam(midi, scaleRoot: scaleRoot)
+          : midiToNoteName(midi);
+
+      final labelStyle = TextStyle(
+        color: Colors.white, // White text on colored background
+        fontSize: fontSize,
+        fontWeight: FontWeight.bold,
+      );
+
+      final tp = TextPainter(
+        text: TextSpan(text: noteName, style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final rowCenterY = _midiToY(midi, rect);
+      final labelX = rect.left - tp.width - 8;
+      final labelY = rowCenterY - tp.height / 2;
+
+      // Background pill with the instrument's highlight color
+      final pillRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          labelX - 4,
+          labelY - 2,
+          tp.width + 8,
+          tp.height + 4,
+        ),
+        const Radius.circular(3),
+      );
+      canvas.drawRRect(pillRect, Paint()..color = highlightColor);
+
+      tp.paint(canvas, Offset(labelX, labelY));
+    });
   }
 
   double _timeToX(double time, Rect rect) {
