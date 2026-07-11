@@ -110,7 +110,6 @@ extension _HomeScreenAudio on _HomeScreenState {
         final timerRunning = _playheadAnimationTimer != null && _lastPositionUpdateTime != null;
 
         if (timerRunning) {
-          _lastStreamPosition = time;
           final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
           final interpolated = _lastKnownPosition + elapsed.inMilliseconds / 1000.0 * _playbackSpeed;
           final diff = time - interpolated;
@@ -119,8 +118,6 @@ extension _HomeScreenAudio on _HomeScreenState {
             // First stream event after pressing play: always snap to stream.
             // On web, the audio engine may start from a keyframe slightly before the
             // seeked position, so the stream position is the ground truth here.
-            final correction = time - _lastKnownPosition;
-            debugPrint('[FirstSync] seeded=$_lastKnownPosition → stream=$time  correction=${correction.toStringAsFixed(3)}s');
             _awaitingFirstStreamSync = false;
             _lastKnownPosition = time;
           } else if (diff.abs() > 1.0) {
@@ -134,7 +131,6 @@ extension _HomeScreenAudio on _HomeScreenState {
           _lastPositionUpdateTime = DateTime.now();
         } else {
           // Paused — stream is authoritative
-          _lastStreamPosition = time;
           _lastKnownPosition = time;
           _lastPositionUpdateTime = DateTime.now();
           appState.setCurrentTime(time);
@@ -214,11 +210,10 @@ extension _HomeScreenAudio on _HomeScreenState {
     // keyframe-snap offset introduced by the web audio engine after a seek.
     final audioPos = _audioService.position.inMilliseconds / 1000.0;
     final appState = context.read<AppState>();
-    debugPrint('[StartAnim] audioPos=$audioPos, appCurrentTime=${appState.currentTime}, prev_lastKnown=$_lastKnownPosition');
+    // debugPrint('[StartAnim] audioPos=$audioPos, appCurrentTime=${appState.currentTime}, prev_lastKnown=$_lastKnownPosition');
     _lastKnownPosition = audioPos;
     _lastPositionUpdateTime = DateTime.now();
     _awaitingFirstStreamSync = true;
-    _timerTickCount = 0;
 
     // Arm _waitingForBuffer regardless of current processingState — buffering may fire
     // either before or after this point (race with the audio engine). The listener will
@@ -239,12 +234,6 @@ extension _HomeScreenAudio on _HomeScreenState {
         appState.setCurrentTime(interpolatedPosition);
         _viewState.updateViewWindowForPlayback(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
 
-        // Log display vs last-known stream position every ~1 second (60 ticks)
-        _timerTickCount++;
-        if (_timerTickCount % 60 == 0) {
-          final gap = interpolatedPosition - _lastStreamPosition;
-          debugPrint('[Timer] display=${interpolatedPosition.toStringAsFixed(3)}  lastStream=${_lastStreamPosition.toStringAsFixed(3)}  gap=${gap.toStringAsFixed(3)}s');
-        }
       }
     });
   }

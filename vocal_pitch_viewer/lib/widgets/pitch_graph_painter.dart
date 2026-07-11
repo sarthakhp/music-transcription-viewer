@@ -18,7 +18,6 @@ import 'pitch_graph.dart'; // for ActiveNotesHolder
 /// directly from [ViewState] so that pan/zoom triggers a repaint via the
 /// `repaint` listenable — no widget rebuild needed.
 class PitchGraphPainter extends CustomPainter {
-  static int _paintCount = 0;
   final ViewState viewState;
   final ProcessedFramesData data;
   final ChordData? chordData;
@@ -88,8 +87,6 @@ class PitchGraphPainter extends CustomPainter {
       size.height - GraphConstants.bottomPadding,
     );
 
-    final sw = Stopwatch()..start();
-
     final gridRenderer = GridRenderer(
       data: data,
       viewStartTime: viewStartTime,
@@ -148,19 +145,12 @@ class PitchGraphPainter extends CustomPainter {
 
     gridRenderer.drawBackground(canvas, graphRect);
     gridRenderer.drawGrid(canvas, graphRect);
-    final gridMs = sw.elapsedMicroseconds / 1000.0;
 
-    sw.reset();
     axisRenderer.drawAxes(canvas, size, graphRect);
-    final axisMs = sw.elapsedMicroseconds / 1000.0;
 
-    sw.reset();
     chordRenderer.drawChords(canvas, graphRect);
-    final chordMs = sw.elapsedMicroseconds / 1000.0;
 
-    double instrMs = 0;
     if (instrumentData != null) {
-      sw.reset();
       final renderer = InstrumentRenderer(
         instrumentData: instrumentData!,
         viewStartTime: viewStartTime,
@@ -179,7 +169,6 @@ class PitchGraphPainter extends CustomPainter {
 
       // Draw instrument bars
       renderer.drawNotes(canvas, graphRect);
-      instrMs = sw.elapsedMicroseconds / 1000.0;
 
       // Find active notes at playhead and update shared holder
       // (works even if playhead is off-screen)
@@ -188,20 +177,8 @@ class PitchGraphPainter extends CustomPainter {
       }
     }
 
-    double pitchMs = 0;
     if (showVocals) {
-      sw.reset();
       pitchRenderer.drawPitchPoints(canvas, graphRect);
-      pitchMs = sw.elapsedMicroseconds / 1000.0;
-    }
-
-    final totalMs = gridMs + axisMs + chordMs + instrMs + pitchMs;
-    _paintCount++;
-    if (_paintCount % 30 == 0) {
-      // debugPrint('[Paint] total:${totalMs.toStringAsFixed(1)}ms  '
-      //     'grid:${gridMs.toStringAsFixed(1)} axis:${axisMs.toStringAsFixed(1)} '
-      //     'chord:${chordMs.toStringAsFixed(1)} instr:${instrMs.toStringAsFixed(1)} '
-      //     'pitch:${pitchMs.toStringAsFixed(1)}');
     }
   }
 

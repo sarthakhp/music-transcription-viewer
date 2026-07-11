@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/instrument_data.dart';
 import '../../theme/app_palette.dart';
-import '../../utils/music_utils.dart';
 
 /// Renders instrument note bars (bass + other stems) on the pitch graph canvas
 class InstrumentRenderer {

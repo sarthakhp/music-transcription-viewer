@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../providers/theme_provider.dart';
 import '../services/audio_service.dart';
 import '../services/transcription_api_service.dart';
 import '../services/upload_service.dart';
@@ -53,8 +54,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   double _lastKnownPosition = 0.0;
   DateTime? _lastPositionUpdateTime;
   bool _awaitingFirstStreamSync = false; // true until first positionStream event after play
-  double _lastStreamPosition = 0.0;     // last value reported by positionStream (debug)
-  int _timerTickCount = 0;              // counts timer ticks for periodic debug logging
 
   // Persisted user settings
   final UserSettings _userSettings = UserSettings();
@@ -106,9 +105,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Keyboard focus
   final FocusNode _focusNode = FocusNode();
 
+  // Per-job settings auto-save debouncing
+  Timer? _saveSettingsTimer;
+  String? _currentJobId;
+
   @override
   void initState() {
     super.initState();
+
+    // Listen to ViewState changes to auto-save zoom/pan
+    _viewState.addListener(_onViewStateChanged);
 
     PerformanceMonitor.instance.start();
 
@@ -129,6 +135,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _pollingService = JobPollingService(
       apiService: _apiService,
       appState: appState,
+      onJobReady: (jobId) => _userSettings.saveLastJobId(jobId),
     );
 
     // Load persisted user settings, then apply to state
@@ -143,6 +150,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       });
       final appState = context.read<AppState>();
       appState.setReferenceFrequency(_userSettings.referenceFrequency);
+
+      // Apply saved theme mode
+      final themeProvider = context.read<ThemeProvider>();
+      themeProvider.setThemeMode(_userSettings.themeMode);
+
+      // Reopen whatever job was in the viewer before this reload, if any.
+      final lastJobId = _userSettings.lastJobId;
+      if (lastJobId != null) {
+        _restoreLastJob(lastJobId);
+      }
     });
 
     // Load completed jobs after first frame
@@ -153,6 +170,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _saveSettingsTimer?.cancel();
+    _viewState.removeListener(_onViewStateChanged);
     _stopPlayheadAnimation();
     _scrollAnimationController.removeListener(_onScrollAnimationUpdate);
     _scrollAnimationController.dispose();
@@ -171,6 +190,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  // --- Per-job settings auto-save ------------------------------------------
+
+  void _onViewStateChanged() {
+    _debouncedSaveJobSettings();
+  }
+
+  void _debouncedSaveJobSettings() {
+    _saveSettingsTimer?.cancel();
+    _saveSettingsTimer = Timer(const Duration(milliseconds: 500), () {
+      _saveCurrentJobSettings();
+    });
+  }
+
+  void _saveCurrentJobSettings() {
+    if (_currentJobId == null) return;
+
+    final settings = _viewState.extractViewSettings(
+      playbackSpeed: _playbackSpeed,
+      transposeAmount: _transposeAmount,
+      sargamEnabled: _sargamEnabled,
+      scaleRoot: _scaleRoot,
+    );
+
+    _userSettings.saveJobSettings(_currentJobId!, settings);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -183,6 +228,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       selector: (_, s) => (isReady: s.isReady, isLoading: s.isLoading, isPreparingAudio: s.isPreparingAudio),
       builder: (context, shell, _) {
         final appState = context.read<AppState>();
+        final isNarrowAppBar = MediaQuery.sizeOf(context).width < 480;
+
+        void handleLoadNew() {
+          _stopPlayheadAnimation();
+          _audioService.stop();
+          _audioLoaded = false;
+          _positionSubscription?.cancel();
+          _durationSubscription?.cancel();
+          _playingSubscription?.cancel();
+          _processingStateSubscription?.cancel();
+          _viewState.resetZoom();
+          appState.reset();
+          _userSettings.saveLastJobId(null);
+          _currentJobId = null; // Clear current job for settings tracking
+        }
 
         return Focus(
           focusNode: _focusNode,
@@ -192,39 +252,66 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             onTap: () => _focusNode.requestFocus(),
             child: Scaffold(
               appBar: AppBar(
-                title: Row(
-                  children: [
-                    Icon(Icons.graphic_eq_rounded, color: colorScheme.primary),
-                    const SizedBox(width: 12),
-                    const Text('Vocal Pitch Viewer'),
-                  ],
+                title: InkWell(
+                  onTap: shell.isReady ? handleLoadNew : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.graphic_eq_rounded, color: colorScheme.primary),
+                        const SizedBox(width: 12),
+                        // Flexible + ellipsis instead of a bare Text: without this
+                        // the title Row overflows once the actions squeeze its
+                        // space on narrow screens (RenderFlex overflow banner).
+                        const Flexible(
+                          child: Text(
+                            'Vocal Pitch Viewer',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 actions: [
-                  if (shell.isReady)
+                  // Theme toggle button (always visible)
+                  Consumer<ThemeProvider>(
+                    builder: (context, themeProvider, _) => IconButton(
+                      icon: Icon(themeProvider.themeModeIcon),
+                      onPressed: () {
+                        themeProvider.cycleThemeMode();
+                        _userSettings.saveThemeMode(themeProvider.themeMode);
+                      },
+                      tooltip: themeProvider.themeModeTooltip,
+                    ),
+                  ),
+                  // Hidden on narrow screens — a keyboard-shortcuts dialog
+                  // isn't relevant without a physical keyboard, and it just
+                  // steals space that "Load New" needs.
+                  if (shell.isReady && !isNarrowAppBar)
                     IconButton(
                       icon: const Icon(Icons.keyboard_rounded),
                       onPressed: () => KeyboardShortcutsDialog.show(context),
                       tooltip: 'Keyboard shortcuts',
                     ),
                   if (shell.isReady)
-                    TextButton.icon(
-                      onPressed: () {
-                        _stopPlayheadAnimation();
-                        _audioService.stop();
-                        _audioLoaded = false;
-                        _positionSubscription?.cancel();
-                        _durationSubscription?.cancel();
-                        _playingSubscription?.cancel();
-                        _processingStateSubscription?.cancel();
-                        _viewState.resetZoom();
-                        appState.reset();
-                      },
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('Load New'),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
+                    isNarrowAppBar
+                        ? IconButton(
+                            icon: const Icon(Icons.refresh_rounded),
+                            onPressed: handleLoadNew,
+                            tooltip: 'Load New',
+                          )
+                        : TextButton.icon(
+                            onPressed: handleLoadNew,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Load New'),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
                   const SizedBox(width: 8),
                 ],
               ),
@@ -432,22 +519,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 setState(() => _playbackSpeed = speed);
                 _audioService.setSpeed(speed);
                 _userSettings.savePlaybackSpeed(speed);
+                _saveCurrentJobSettings();
               },
               transposeAmount: _transposeAmount,
               onTransposeChanged: (n) {
                 setState(() => _transposeAmount = n);
                 _audioService.setPitchSemitones(n);
                 _userSettings.saveTransposeAmount(n);
+                _saveCurrentJobSettings();
               },
               sargamEnabled: _sargamEnabled,
               onSargamToggled: (v) {
                 setState(() => _sargamEnabled = v);
                 _userSettings.saveSargamEnabled(v);
+                _saveCurrentJobSettings();
               },
               scaleRoot: _scaleRoot,
               onScaleRootChanged: (v) {
                 setState(() => _scaleRoot = v);
                 _userSettings.saveScaleRoot(v);
+                _saveCurrentJobSettings();
               },
             ),
           ),
