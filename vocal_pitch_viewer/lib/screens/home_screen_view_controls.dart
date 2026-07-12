@@ -35,13 +35,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   }
 
   void _handleYPan(double scrollDeltaY) {
-    final pitchData = context.read<AppState>().pitchData;
-    if (pitchData == null) return;
-    final appState = context.read<AppState>();
-    final range = pitchData.frequencyRange;
-    final baseSpan = (frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2) -
-        (frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2);
-    _viewState.panY(scrollDeltaY, baseSpan: baseSpan);
+    _viewState.panY(scrollDeltaY);
   }
 
   void _handlePan(double panDelta) {

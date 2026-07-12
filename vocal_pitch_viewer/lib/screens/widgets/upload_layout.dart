@@ -49,6 +49,8 @@ class UploadLayout extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 1000;
+    final isMobile = screenWidth < 600;
+    final outerPadding = isMobile ? 16.0 : 32.0;
 
     return Stack(
       children: [
@@ -70,7 +72,7 @@ class UploadLayout extends StatelessWidget {
 
         // Content
         Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(outerPadding),
           child: isWide
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,7 +130,7 @@ class UploadLayout extends StatelessWidget {
                         constraints: const BoxConstraints(maxWidth: 500),
                         child: _leftPanel(context),
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isMobile ? 20 : 32),
                       // Failed jobs (retryable) — sized to content
                       if (failedJobs.isNotEmpty) ...[
                         JobListCard(

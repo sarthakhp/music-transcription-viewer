@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/job_settings.dart';
 
 class UserSettings {
   static const _keyPlaybackSpeed = 'playbackSpeed';
@@ -7,6 +10,9 @@ class UserSettings {
   static const _keyScaleRoot = 'scaleRoot';
   static const _keyReferenceFrequency = 'referenceFrequency';
   static const _keyVocalDetail = 'vocalDetail';
+  static const _keyLastJobId = 'lastJobId';
+  static const _keyJobSettings = 'jobSettings'; // Map of jobId -> settings JSON
+  static const _keyThemeMode = 'themeMode';
 
   static const double defaultPlaybackSpeed = 1.0;
   static const int defaultTransposeAmount = 0;
@@ -14,6 +20,7 @@ class UserSettings {
   static const int defaultScaleRoot = 0;
   static const double defaultReferenceFrequency = 440.0;
   static const int defaultVocalDetail = 10;
+  static const ThemeMode defaultThemeMode = ThemeMode.system;
 
   late final SharedPreferences _prefs;
 
@@ -23,6 +30,11 @@ class UserSettings {
   int scaleRoot = defaultScaleRoot;
   double referenceFrequency = defaultReferenceFrequency;
   int vocalDetail = defaultVocalDetail;
+  ThemeMode themeMode = defaultThemeMode;
+
+  /// The job that was open in the viewer, so a page reload can restore it
+  /// instead of dropping back to the home screen. Null when no job is open.
+  String? lastJobId;
 
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
@@ -32,6 +44,13 @@ class UserSettings {
     scaleRoot = _prefs.getInt(_keyScaleRoot) ?? defaultScaleRoot;
     referenceFrequency = _prefs.getDouble(_keyReferenceFrequency) ?? defaultReferenceFrequency;
     vocalDetail = _prefs.getInt(_keyVocalDetail) ?? defaultVocalDetail;
+    lastJobId = _prefs.getString(_keyLastJobId);
+
+    // Load theme mode
+    final themeModeIndex = _prefs.getInt(_keyThemeMode);
+    themeMode = themeModeIndex != null
+        ? ThemeMode.values[themeModeIndex]
+        : defaultThemeMode;
   }
 
   void savePlaybackSpeed(double value) {
@@ -62,5 +81,69 @@ class UserSettings {
   void saveVocalDetail(int value) {
     vocalDetail = value;
     _prefs.setInt(_keyVocalDetail, value);
+  }
+
+  void saveThemeMode(ThemeMode value) {
+    themeMode = value;
+    _prefs.setInt(_keyThemeMode, value.index);
+  }
+
+  void saveLastJobId(String? jobId) {
+    lastJobId = jobId;
+    if (jobId == null) {
+      _prefs.remove(_keyLastJobId);
+    } else {
+      _prefs.setString(_keyLastJobId, jobId);
+    }
+  }
+
+  // --- Per-job settings ----------------------------------------------------
+
+  /// Load settings for a specific job. Returns defaults if not found.
+  JobSettings loadJobSettings(String jobId) {
+    final allSettingsJson = _prefs.getString(_keyJobSettings);
+    if (allSettingsJson == null) return const JobSettings();
+
+    try {
+      final allSettings = jsonDecode(allSettingsJson) as Map<String, dynamic>;
+      final jobSettingsJson = allSettings[jobId];
+      if (jobSettingsJson == null) return const JobSettings();
+
+      return JobSettings.fromJson(jobSettingsJson as Map<String, dynamic>);
+    } catch (e) {
+      return const JobSettings();
+    }
+  }
+
+  /// Save settings for a specific job
+  void saveJobSettings(String jobId, JobSettings settings) {
+    final allSettingsJson = _prefs.getString(_keyJobSettings);
+    Map<String, dynamic> allSettings = {};
+
+    if (allSettingsJson != null) {
+      try {
+        allSettings = jsonDecode(allSettingsJson) as Map<String, dynamic>;
+      } catch (e) {
+        // If parsing fails, start fresh
+        allSettings = {};
+      }
+    }
+
+    allSettings[jobId] = settings.toJson();
+    _prefs.setString(_keyJobSettings, jsonEncode(allSettings));
+  }
+
+  /// Clear settings for a specific job
+  void clearJobSettings(String jobId) {
+    final allSettingsJson = _prefs.getString(_keyJobSettings);
+    if (allSettingsJson == null) return;
+
+    try {
+      final allSettings = jsonDecode(allSettingsJson) as Map<String, dynamic>;
+      allSettings.remove(jobId);
+      _prefs.setString(_keyJobSettings, jsonEncode(allSettings));
+    } catch (e) {
+      // Ignore errors
+    }
   }
 }

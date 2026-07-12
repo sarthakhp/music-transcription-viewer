@@ -408,15 +408,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     selector: (_, s) => s.currentTime,
                     builder: (context, currentTime, _) {
                       // Update base MIDI range (only changes when data/transpose changes)
+                      // Uniform ±3 semitone margin from the most extreme note so the
+                      // user can't scroll into empty space beyond actual content.
+                      const double yMarginSemitones = 3.0;
                       final pitchData = appState.pitchData!;
                       final range = pitchData.frequencyRange;
-                      double baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - 2.0;
-                      double baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + 2.0;
+                      double baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - yMarginSemitones;
+                      double baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + yMarginSemitones;
                       final instrData = appState.instrumentData;
                       if (instrData != null) {
                         final (instrMin, instrMax) = instrData.midiRange;
-                        if (instrMin - 1.0 < baseMin) baseMin = instrMin - 1.0;
-                        if (instrMax + 1.0 > baseMax) baseMax = instrMax + 1.0;
+                        if (instrMin - yMarginSemitones < baseMin) baseMin = instrMin - yMarginSemitones;
+                        if (instrMax + yMarginSemitones > baseMax) baseMax = instrMax + yMarginSemitones;
                       }
                       _viewState.setBaseMidiRange(baseMin + _transposeAmount, baseMax + _transposeAmount);
 

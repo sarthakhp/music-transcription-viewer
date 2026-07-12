@@ -15,6 +15,12 @@ class AppPalette {
   final Color playheadColor;
   final Color bassColor;
   final Color otherColor;
+  final Color bassHighlightColor;
+  final Color otherHighlightColor;
+  final Color vocalHighlightColor;
+  final Color hoverRowBg;
+  final Color hoverLabelColor;
+  final Color hoverLabelBg;
   final Color sargamShuddhColor;
   final Color sargamShuddhBg;
   final Color sargamKomalColor;
@@ -32,6 +38,12 @@ class AppPalette {
     required this.playheadColor,
     required this.bassColor,
     required this.otherColor,
+    required this.bassHighlightColor,
+    required this.otherHighlightColor,
+    required this.vocalHighlightColor,
+    required this.hoverRowBg,
+    required this.hoverLabelColor,
+    required this.hoverLabelBg,
     required this.sargamShuddhColor,
     required this.sargamShuddhBg,
     required this.sargamKomalColor,
@@ -40,7 +52,7 @@ class AppPalette {
   });
 }
 
-// ─── Available palettes ────────────────────────────────────────────────
+// --- Available palettes ------------------------------------------------
 
 const indigoPalette = AppPalette(
   brightness:       Brightness.dark,
@@ -53,6 +65,12 @@ const indigoPalette = AppPalette(
   playheadColor:    Color(0xFFEF4444),
   bassColor:        Color(0xFFFF6B35),
   otherColor:       Color(0xFF48BFE3),
+  bassHighlightColor: Color(0xFFFF3300),
+  otherHighlightColor: Color(0xFF0066CC),
+  vocalHighlightColor: Color(0xFFFF9800), // Bright orange for vocal highlights
+  hoverRowBg: Color(0x266366F1), // Indigo at 15% opacity (more visible)
+  hoverLabelColor: Color(0xFF8B8FF7), // Light indigo for dark theme
+  hoverLabelBg: Color(0x4D6366F1), // Indigo at 30% opacity (more visible)
   sargamShuddhColor: Color(0xFFE0E0E0),
   sargamShuddhBg:    Color(0x22FFFFFF),
   sargamKomalColor:  Color(0xFF90CAF9),
@@ -71,6 +89,12 @@ const minimalistPalette = AppPalette(
   playheadColor:    Color(0xFFE11D48),
   bassColor:        Color(0xFFD97756),
   otherColor:       Color(0xFF5B9E8F),
+  bassHighlightColor: Color(0xFFDD3300),
+  otherHighlightColor: Color(0xFF0055AA),
+  vocalHighlightColor: Color(0xFFFF9800), // Bright orange for vocal highlights
+  hoverRowBg: Color(0x3364748B), // Slate at 20% opacity (more visible)
+  hoverLabelColor: Color(0xFFFFFFFF), // White text for light theme
+  hoverLabelBg: Color(0xFF3B82F6), // Bright blue background (solid)
   sargamShuddhColor: Color(0xFF334155),
   sargamShuddhBg:    Color(0x15000000),
   sargamKomalColor:  Color(0xFF6482A6),
@@ -78,5 +102,5 @@ const minimalistPalette = AppPalette(
   trimHandleColor:  Color(0xFF334155),
 );
 
-// ─── Active palette — change this one line to switch ───────────────────
+// --- Active palette — change this one line to switch -------------------
 const appPalette = minimalistPalette;

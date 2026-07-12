@@ -8,6 +8,10 @@ flutter run cmd:
 
 flutter run -d chrome --profile
 
+flutter run -d chrome --profile --web-port 8080
+
+flutter run -d chrome --web-port 8080
+
 flutter run -d chrome --web-port 8080
 
 This project is a starting point for a Flutter application.

@@ -54,7 +54,7 @@ class _UploadSectionState extends State<UploadSection> {
     super.dispose();
   }
 
-  // ─── Metadata fetching ──────────────────────────────────────────────────
+  // --- Metadata fetching --------------------------------------------------
 
   void _onUrlChanged(String text) {
     setState(() => _urlError = null);
@@ -121,7 +121,7 @@ class _UploadSectionState extends State<UploadSection> {
     }
   }
 
-  // ─── Submit ─────────────────────────────────────────────────────────────
+  // --- Submit -------------------------------------------------------------
 
   Future<void> _submitUrl() async {
     final url = _urlController.text.trim();
@@ -171,7 +171,7 @@ class _UploadSectionState extends State<UploadSection> {
     }
   }
 
-  // ─── Build ──────────────────────────────────────────────────────────────
+  // --- Build --------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {

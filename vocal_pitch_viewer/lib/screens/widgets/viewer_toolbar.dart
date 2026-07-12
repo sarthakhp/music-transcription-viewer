@@ -88,70 +88,62 @@ class ViewerToolbar extends StatelessWidget {
   Widget _buildWideToolbar(BuildContext context, ThemeData theme, ColorScheme colorScheme) {
     return Row(
       children: [
-        // Left side: Audio file info and metadata
-        Flexible(
-          flex: 2,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.audiotrack_rounded, size: 16, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Tooltip(
-                  message: appState.audioFileName ?? 'Audio',
-                  child: Text(
-                    FilenameUtils.shortenFilename(appState.audioFileName ?? 'Audio'),
-                    style: theme.textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
+        // Left side: Audio file info and metadata - wraps when narrow
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.audiotrack_rounded, size: 16, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Tooltip(
+                    message: appState.audioFileName ?? 'Audio',
+                    child: Text(
+                      FilenameUtils.shortenFilename(appState.audioFileName ?? 'Audio'),
+                      style: theme.textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Icon(Icons.timer_outlined, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-              const SizedBox(width: 4),
-              Text(appState.pitchData!.durationFormatted, style: theme.textTheme.bodySmall),
-              if (appState.pitchData!.metadata.bpm != null) ...[
                 const SizedBox(width: 12),
-                Icon(Icons.speed_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                Icon(Icons.timer_outlined, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
                 const SizedBox(width: 4),
-                Text('${appState.pitchData!.metadata.bpm!.toStringAsFixed(1)} BPM', style: theme.textTheme.bodySmall),
+                Text(appState.pitchData!.durationFormatted, style: theme.textTheme.bodySmall),
+                if (appState.pitchData!.metadata.bpm != null) ...[
+                  const SizedBox(width: 12),
+                  Icon(Icons.speed_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                  const SizedBox(width: 4),
+                  Text('${appState.pitchData!.metadata.bpm!.toStringAsFixed(1)} BPM', style: theme.textTheme.bodySmall),
+                ],
+                if (appState.chordData != null) ...[
+                  const SizedBox(width: 12),
+                  Icon(Icons.music_note_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                  const SizedBox(width: 4),
+                  Text('${appState.chordData!.uniqueChordsCount} chords', style: theme.textTheme.bodySmall),
+                ],
+                if (appState.instrumentData != null) ...[
+                  const SizedBox(width: 12),
+                  Icon(Icons.piano_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                  const SizedBox(width: 4),
+                  Text('${appState.instrumentData!.totalNotes} notes', style: theme.textTheme.bodySmall),
+                ],
               ],
-              if (appState.chordData != null) ...[
-                const SizedBox(width: 12),
-                Icon(Icons.music_note_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                const SizedBox(width: 4),
-                Text('${appState.chordData!.uniqueChordsCount} chords', style: theme.textTheme.bodySmall),
-              ],
-              if (appState.instrumentData != null) ...[
-                const SizedBox(width: 12),
-                Icon(Icons.piano_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                const SizedBox(width: 4),
-                Text('${appState.instrumentData!.totalNotes} notes', style: theme.textTheme.bodySmall),
-              ],
-            ],
+            ),
           ),
         ),
         const SizedBox(width: 8),
-        // Right side: Layer toggles + track switcher
-        Flexible(
-          flex: 3,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              _buildLayerToggles(colorScheme),
-              const SizedBox(width: 8),
-              Flexible(
-                child: TrackSwitcher(
-                  audioService: audioService,
-                  currentTrack: currentTrack,
-                  isSwitching: isSwitchingTrack,
-                  onTrackChanged: onTrackChanged,
-                  compact: true,
-                ),
-              ),
-            ],
-          ),
+        // Right side: Layer toggles + track switcher - always visible
+        _buildLayerToggles(colorScheme),
+        const SizedBox(width: 8),
+        TrackSwitcher(
+          audioService: audioService,
+          currentTrack: currentTrack,
+          isSwitching: isSwitchingTrack,
+          onTrackChanged: onTrackChanged,
+          compact: true,
         ),
       ],
     );
@@ -180,12 +172,14 @@ class ViewerToolbar extends StatelessWidget {
         ),
         // Layer toggles
         _buildLayerToggles(colorScheme),
-        // Track switcher row
+        // Track switcher row — compact (icon-only) so segment labels don't
+        // wrap mid-word when squeezed into a narrow width.
         TrackSwitcher(
           audioService: audioService,
           currentTrack: currentTrack,
           isSwitching: isSwitchingTrack,
           onTrackChanged: onTrackChanged,
+          compact: true,
         ),
       ],
     );

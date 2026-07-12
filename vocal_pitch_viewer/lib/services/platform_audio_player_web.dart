@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 import 'platform_audio_player.dart';
 
-// ─── SoundTouchNode JS interop ──────────────────────────────────────────────
+// --- SoundTouchNode JS interop ----------------------------------------------
 
 /// Dart binding for SoundTouchNode (exposed globally via ESM shim in index.html).
 /// SoundTouchNode extends AudioWorkletNode in JS.
@@ -28,7 +28,7 @@ extension type SoundTouchNodeJS._(JSObject _) implements web.AudioWorkletNode {
 @JS('SoundTouchNode')
 external JSObject? get _soundTouchNodeClass;
 
-// ─── Shared AudioContext ────────────────────────────────────────────────────
+// --- Shared AudioContext ----------------------------------------------------
 
 /// Shared AudioContext across all WebAudioPlayer instances.
 /// Created lazily on first use, resumed on user gesture.
@@ -57,7 +57,7 @@ Future<void> _ensureWorkletRegistered(web.AudioContext ctx) async {
   }
 }
 
-// ─── WebAudioPlayer ─────────────────────────────────────────────────────────
+// --- WebAudioPlayer ---------------------------------------------------------
 
 class WebAudioPlayer implements PlatformAudioPlayer {
   web.HTMLAudioElement? _audio;
@@ -114,7 +114,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   @override
   AudioPlayerState get state => _state;
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
+  // --- Loading --------------------------------------------------------------
 
   @override
   Future<void> load(Uint8List bytes, String mimeType) async {
@@ -175,7 +175,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     debugPrint('[WebAudio] Loaded, duration=${duration?.inSeconds}s');
   }
 
-  // ─── Web Audio Graph ──────────────────────────────────────────────────────
+  // --- Web Audio Graph ------------------------------------------------------
 
   Future<void> _setupGraph() async {
     _ctx = await _getOrCreateContext();
@@ -231,7 +231,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     }
   }
 
-  // ─── Event Listeners ──────────────────────────────────────────────────────
+  // --- Event Listeners ------------------------------------------------------
 
   void _setupEventListeners() {
     final audio = _audio!;
@@ -316,7 +316,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     _onError = null;
   }
 
-  // ─── Playback ─────────────────────────────────────────────────────────────
+  // --- Playback -------------------------------------------------------------
 
   @override
   Future<void> play() async {
@@ -375,7 +375,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     }
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  // --- Helpers --------------------------------------------------------------
 
   void _setState(AudioPlayerState newState) {
     if (_state == newState) return;
@@ -383,7 +383,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     _stateController.add(newState);
   }
 
-  // ─── Dispose ──────────────────────────────────────────────────────────────
+  // --- Dispose --------------------------------------------------------------
 
   @override
   Future<void> dispose() async {

@@ -51,7 +51,7 @@ class AudioService {
       _player?.state ?? AudioPlayerState.idle;
   AudioTrackType get activeTrack => _activeTrack;
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
+  // --- Loading --------------------------------------------------------------
 
   Future<bool> loadFromBytes(Uint8List bytes, String mimeType) =>
       loadTrack(AudioTrackType.original, bytes, mimeType, setActive: true);
@@ -90,7 +90,7 @@ class AudioService {
     }
   }
 
-  // ─── Listeners ────────────────────────────────────────────────────────────
+  // --- Listeners ------------------------------------------------------------
 
   void _setupListeners(PlatformAudioPlayer player) {
     _positionSubscription?.cancel();
@@ -107,7 +107,7 @@ class AudioService {
     _stateSubscription = player.stateStream.listen(_stateController.add);
   }
 
-  // ─── Playback ─────────────────────────────────────────────────────────────
+  // --- Playback -------------------------------------------------------------
 
   Future<void> play() async {
     await _player?.play();
@@ -160,7 +160,7 @@ class AudioService {
     }
   }
 
-  // ─── Track switching ──────────────────────────────────────────────────────
+  // --- Track switching ------------------------------------------------------
 
   Future<bool> switchToTrack(AudioTrackType trackType) async {
     if (!_players.containsKey(trackType)) return false;
@@ -193,7 +193,7 @@ class AudioService {
   bool isTrackLoaded(AudioTrackType trackType) =>
       _players.containsKey(trackType);
 
-  // ─── Dispose ──────────────────────────────────────────────────────────────
+  // --- Dispose --------------------------------------------------------------
 
   Future<void> dispose() async {
     _positionSubscription?.cancel();

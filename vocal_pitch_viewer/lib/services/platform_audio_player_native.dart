@@ -39,7 +39,7 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
   @override
   AudioPlayerState get state => _mapState(_player?.processingState);
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
+  // --- Loading --------------------------------------------------------------
 
   @override
   Future<void> load(Uint8List bytes, String mimeType) async {
@@ -53,7 +53,7 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
     await _player!.setAudioSource(source);
   }
 
-  // ─── Playback ─────────────────────────────────────────────────────────────
+  // --- Playback -------------------------------------------------------------
 
   @override
   Future<void> play() async => _player?.play();
@@ -87,7 +87,7 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
     // For now, no-op on native. Could be wired up per-platform later.
   }
 
-  // ─── Listeners ────────────────────────────────────────────────────────────
+  // --- Listeners ------------------------------------------------------------
 
   void _setupListeners() {
     _posSub?.cancel();
@@ -122,7 +122,7 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
     }
   }
 
-  // ─── Dispose ──────────────────────────────────────────────────────────────
+  // --- Dispose --------------------------------------------------------------
 
   @override
   Future<void> dispose() async {

@@ -55,7 +55,7 @@ bool isBlackKey(int midiNote) {
 /// Get MIDI range for typical vocal range (E2 to C6)
 (int min, int max) get typicalVocalMidiRange => (40, 84);
 
-// ─── Sargam (Indian classical notation) ─────────────────────────────────────
+// --- Sargam (Indian classical notation) -------------------------------------
 
 enum SargamNoteType { shuddh, komal, tivra }
 
@@ -113,7 +113,7 @@ class SargamTheme {
 ///   0=Sa  1=komal Re  2=Re  3=komal Ga  4=Ga  5=Ma  6=tivra Ma
 ///   7=Pa  8=komal Dha 9=Dha 10=komal Ni 11=Ni
 const List<String> sargamLabels = [
-  'Sa', 're', 'Re', 'ga', 'Ga', 'ma', 'Ma', 'Pa', 'dha', 'Dha', 'ni', 'Ni',
+  'Sa', '\'re', 'Re', '\'ga', 'Ga', 'ma', 'Ma\'', 'Pa', '\'dha', 'Dha', '\'ni', 'Ni',
 ];
 
 /// Full display names for Sargam notes (for tooltips / accessibility).

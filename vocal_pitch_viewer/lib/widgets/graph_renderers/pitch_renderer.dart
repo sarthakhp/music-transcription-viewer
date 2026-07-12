@@ -11,6 +11,7 @@ class PitchRenderer {
   final double viewStartTime;
   final double viewEndTime;
   final Color primaryColor;
+  final Color primaryHighlightColor;
   final Color unvoicedColor;
   final double referenceFrequency;
   final double minMidi;
@@ -20,6 +21,7 @@ class PitchRenderer {
   final bool sargamEnabled;
   final int scaleRoot;
   final int vocalDetail;
+  final double currentTime;
 
   PitchRenderer({
     required this.data,
@@ -27,6 +29,7 @@ class PitchRenderer {
     required this.viewStartTime,
     required this.viewEndTime,
     required this.primaryColor,
+    required this.primaryHighlightColor,
     required this.unvoicedColor,
     required this.referenceFrequency,
     required this.minMidi,
@@ -36,6 +39,7 @@ class PitchRenderer {
     this.sargamEnabled = false,
     this.scaleRoot = 0,
     this.vocalDetail = 10,
+    this.currentTime = 0.0,
   });
 
   void drawPitchPoints(Canvas canvas, Rect rect) {
@@ -48,8 +52,9 @@ class PitchRenderer {
       return; // No visible frames
     }
 
-    // Key: (alpha, sargamNoteTypeIndex) — noteType is -1 when sargam is off
-    final Map<(double, int), List<Offset>> voicedBuckets = {};
+    // Key: alpha only — no color variation by note type
+    final Map<double, List<Offset>> normalBuckets = {};
+    final Map<double, List<Offset>> highlightBuckets = {};
     final List<Offset> unvoicedPoints = [];
 
     for (int i = startIndex; i <= endIndex; i++) {
@@ -69,12 +74,11 @@ class PitchRenderer {
       final offset = Offset(x, y);
 
       if (frame.isVoiced) {
+        final isActive = (frame.time - currentTime).abs() < 0.2; // Within 200ms of playhead
         final alpha = GraphConstants.voicedMinAlpha +
             frame.confidence * (GraphConstants.voicedMaxAlpha - GraphConstants.voicedMinAlpha);
-        final typeIndex = sargamEnabled
-            ? getSargamNoteType(midiPitch.round() - scaleRoot).index
-            : -1;
-        voicedBuckets.putIfAbsent((alpha, typeIndex), () => []).add(offset);
+        final targetBuckets = isActive ? highlightBuckets : normalBuckets;
+        targetBuckets.putIfAbsent(alpha, () => []).add(offset);
       } else {
         unvoicedPoints.add(offset);
       }
@@ -94,16 +98,17 @@ class PitchRenderer {
     final fillDiameter = GraphConstants.voicedPointRadius * 2;
     final borderDiameter = fillDiameter + GraphConstants.voicedPointBorderWidth;
 
-    voicedBuckets.forEach((key, points) {
+    // Highlighted dots are 1.5x bigger for better visibility
+    final highlightFillDiameter = fillDiameter * 1.5;
+    final highlightBorderDiameter = highlightFillDiameter + GraphConstants.voicedPointBorderWidth;
+
+    // Draw normal points
+    normalBuckets.forEach((alpha, points) {
       if (points.isEmpty) return;
-      final (alpha, typeIndex) = key;
-      final baseColor = typeIndex >= 0
-          ? SargamTheme.forType(SargamNoteType.values[typeIndex]).color
-          : primaryColor;
 
       // Pass 1: filled circle
       final fillPaint = Paint()
-        ..color = baseColor.withValues(alpha: alpha)
+        ..color = primaryColor.withValues(alpha: alpha)
         ..strokeWidth = fillDiameter
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.fill;
@@ -111,8 +116,29 @@ class PitchRenderer {
 
       // Pass 2: border ring
       final borderPaint = Paint()
-        ..color = baseColor.withValues(alpha: GraphConstants.voicedPointBorderAlpha)
+        ..color = primaryColor.withValues(alpha: GraphConstants.voicedPointBorderAlpha)
         ..strokeWidth = borderDiameter
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawPoints(ui.PointMode.points, points, borderPaint);
+    });
+
+    // Draw highlighted points (bigger and orange)
+    highlightBuckets.forEach((alpha, points) {
+      if (points.isEmpty) return;
+
+      // Pass 1: filled circle (1.5x bigger)
+      final fillPaint = Paint()
+        ..color = primaryHighlightColor.withValues(alpha: alpha)
+        ..strokeWidth = highlightFillDiameter
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.fill;
+      canvas.drawPoints(ui.PointMode.points, points, fillPaint);
+
+      // Pass 2: border ring (1.5x bigger)
+      final borderPaint = Paint()
+        ..color = primaryHighlightColor.withValues(alpha: GraphConstants.voicedPointBorderAlpha)
+        ..strokeWidth = highlightBorderDiameter
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke;
       canvas.drawPoints(ui.PointMode.points, points, borderPaint);

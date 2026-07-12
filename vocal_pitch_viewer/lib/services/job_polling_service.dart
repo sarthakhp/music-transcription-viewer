@@ -9,7 +9,11 @@ import 'transcription_api_service.dart';
 class JobPollingService {
   final TranscriptionApiService _apiService;
   final AppState _appState;
-  
+
+  /// Called once a job's data has fully loaded and is ready to view, so the
+  /// caller can persist it (e.g. to survive a page reload).
+  final void Function(String jobId)? onJobReady;
+
   Timer? _pollingTimer;
   bool _isPolling = false;
   String? _currentJobId;
@@ -17,6 +21,7 @@ class JobPollingService {
   JobPollingService({
     required TranscriptionApiService apiService,
     required AppState appState,
+    this.onJobReady,
   })  : _apiService = apiService,
         _appState = appState;
 
@@ -152,6 +157,7 @@ class JobPollingService {
       ]);
 
       _appState.setLoading(false);
+      onJobReady?.call(jobId);
     } catch (e) {
       _appState.setError('Failed to fetch job data: ${e.toString()}');
       _appState.setLoading(false);

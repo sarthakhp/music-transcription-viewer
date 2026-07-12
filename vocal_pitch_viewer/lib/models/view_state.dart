@@ -2,9 +2,10 @@ import 'dart:math' show max;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import '../utils/performance_monitor.dart';
+import 'job_settings.dart';
 
 class ViewState extends ChangeNotifier {
-  // ─── X-axis (time) ────────────────────────────────────────────────────────
+  // --- X-axis (time) --------------------------------------------------------
   double _viewStartTime = 0;
   double _viewWindowSize = 30;
 
@@ -16,7 +17,7 @@ class ViewState extends ChangeNotifier {
   double get viewEndTime => _viewStartTime + _viewWindowSize;
   double get viewWindowSize => _viewWindowSize;
 
-  // ─── Y-axis (MIDI range) ──────────────────────────────────────────────────
+  // --- Y-axis (MIDI range) --------------------------------------------------
   double _yZoomScale = 1.0;
   double _yPanOffset = 0.0;
 
@@ -26,7 +27,7 @@ class ViewState extends ChangeNotifier {
   double get yZoomScale => _yZoomScale;
   double get yPanOffset => _yPanOffset;
 
-  // ─── Auto-scroll ──────────────────────────────────────────────────────────
+  // --- Auto-scroll ----------------------------------------------------------
   bool _autoScroll = true;
   bool get autoScroll => _autoScroll;
 
@@ -36,7 +37,7 @@ class ViewState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Frame-rate throttle ──────────────────────────────────────────────────
+  // --- Frame-rate throttle --------------------------------------------------
   //
   // Trackpads fire scroll events at 120Hz+. We accumulate state changes
   // silently and flush one notifyListeners() per animation frame so the
@@ -54,7 +55,7 @@ class ViewState extends ChangeNotifier {
     });
   }
 
-  // ─── Pan ──────────────────────────────────────────────────────────────────
+  // --- Pan ------------------------------------------------------------------
 
   void panX(double delta, {required double maxTime}) {
     PerformanceMonitor.instance.reportAction(UserAction.panX);
@@ -64,16 +65,18 @@ class ViewState extends ChangeNotifier {
     _markDirty();
   }
 
-  void panY(double scrollDeltaY, {required int baseSpan}) {
+  void panY(double scrollDeltaY) {
     PerformanceMonitor.instance.reportAction(UserAction.panY);
+    // Use the stored base range (which includes instrument data and transpose)
+    // so panning can reach all visible content after zooming in.
+    final baseSpan = _baseMaxMidi - _baseMinMidi;
     final currentSpan = baseSpan / _yZoomScale;
-    final midiDelta = -scrollDeltaY * currentSpan / 400.0;
-    _yPanOffset = (_yPanOffset + midiDelta)
-        .clamp(-baseSpan.toDouble(), baseSpan.toDouble());
+    final midiDelta = -scrollDeltaY * currentSpan / 150.0;
+    _yPanOffset = (_yPanOffset + midiDelta).clamp(-baseSpan, baseSpan);
     _markDirty();
   }
 
-  // ─── Zoom ─────────────────────────────────────────────────────────────────
+  // --- Zoom -----------------------------------------------------------------
 
   void zoomIn({required double maxTime}) {
     final centerTime = _viewStartTime + _viewWindowSize / 2;
@@ -126,7 +129,7 @@ class ViewState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Auto-scroll during playback ─────────────────────────────────────────
+  // --- Auto-scroll during playback -----------------------------------------
 
   void updateViewWindowForPlayback(double currentTime, double maxTime) {
     if (!_autoScroll) return;
@@ -153,7 +156,7 @@ class ViewState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── MIDI range (computed from zoom/pan + base range) ─────────────────────
+  // --- MIDI range (computed from zoom/pan + base range) ---------------------
 
   double _baseMinMidi = 40;
   double _baseMaxMidi = 84;
@@ -173,5 +176,37 @@ class ViewState extends ChangeNotifier {
     final center = (_baseMinMidi + _baseMaxMidi) / 2.0 + _yPanOffset;
     final halfSpan = (_baseMaxMidi - _baseMinMidi) / 2.0 / _yZoomScale;
     return center + halfSpan;
+  }
+
+  // --- Save/Restore view state ----------------------------------------------
+
+  /// Extract view state to save to per-job settings
+  JobSettings extractViewSettings({
+    required double playbackSpeed,
+    required int transposeAmount,
+    required bool sargamEnabled,
+    required int scaleRoot,
+  }) {
+    return JobSettings(
+      viewStartTime: _viewStartTime,
+      viewWindowSize: _viewWindowSize,
+      yZoomScale: _yZoomScale,
+      yPanOffset: _yPanOffset,
+      autoScroll: _autoScroll,
+      playbackSpeed: playbackSpeed,
+      transposeAmount: transposeAmount,
+      sargamEnabled: sargamEnabled,
+      scaleRoot: scaleRoot,
+    );
+  }
+
+  /// Restore view state from saved settings
+  void applyViewSettings(JobSettings settings) {
+    _viewStartTime = settings.viewStartTime;
+    _viewWindowSize = settings.viewWindowSize;
+    _yZoomScale = settings.yZoomScale;
+    _yPanOffset = settings.yPanOffset;
+    _autoScroll = settings.autoScroll;
+    notifyListeners();
   }
 }

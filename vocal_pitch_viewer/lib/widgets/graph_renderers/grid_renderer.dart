@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_palette.dart';
 import '../../models/pitch_data.dart';
 import '../graph_constants.dart';
 
@@ -9,6 +8,8 @@ class GridRenderer {
   final double viewStartTime;
   final double viewEndTime;
   final Color gridColor;
+  final Color graphBgColor;
+  final Color tonicTintColor;
   final Brightness brightness;
   final double referenceFrequency;
   final double minMidi;
@@ -21,6 +22,8 @@ class GridRenderer {
     required this.viewStartTime,
     required this.viewEndTime,
     required this.gridColor,
+    required this.graphBgColor,
+    required this.tonicTintColor,
     required this.brightness,
     required this.referenceFrequency,
     required this.minMidi,
@@ -31,7 +34,7 @@ class GridRenderer {
 
   void drawBackground(Canvas canvas, Rect rect) {
     final paint = Paint()
-      ..color = appPalette.graphBg;
+      ..color = graphBgColor;
     canvas.drawRect(rect, paint);
   }
 
@@ -76,8 +79,7 @@ class GridRenderer {
       // Subtle tonic row tint for octave reference
       if (midi % 12 == tonicSemitone) {
         final tonicPaint = Paint()
-          ..color = (appPalette.tonicTint)
-              .withValues(alpha: 0.06)
+          ..color = tonicTintColor.withValues(alpha: 0.06)
           ..style = PaintingStyle.fill;
         canvas.drawRect(bandRect, tonicPaint);
       }

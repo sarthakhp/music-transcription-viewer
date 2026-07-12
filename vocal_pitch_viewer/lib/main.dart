@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'theme/app_palette.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() {
@@ -14,24 +15,30 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: MaterialApp(
-        title: 'Vocal Pitch Viewer',
-        debugShowCheckedModeBanner: false,
-        theme: _buildLightTheme(),
-        darkTheme: _buildDarkTheme(),
-        themeMode: appPalette.brightness == Brightness.dark
-            ? ThemeMode.dark
-            : ThemeMode.light,
-        home: const HomeScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'Vocal Pitch Viewer',
+            debugShowCheckedModeBanner: false,
+            theme: _buildLightTheme(),
+            darkTheme: _buildDarkTheme(),
+            themeMode: themeProvider.themeMode,
+            home: const HomeScreen(),
+          );
+        },
       ),
     );
   }
 
   ThemeData _buildLightTheme() {
+    const palette = minimalistPalette; // Light theme palette
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: appPalette.seedColor,
+      seedColor: palette.seedColor,
       brightness: Brightness.light,
     );
 
@@ -39,17 +46,17 @@ class MyApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: GoogleFonts.interTextTheme(),
-      scaffoldBackgroundColor: appPalette.scaffoldBg,
+      scaffoldBackgroundColor: palette.scaffoldBg,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: appPalette.scaffoldBg,
+        backgroundColor: palette.scaffoldBg,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: appPalette.cardBg,
+        color: palette.cardBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: colorScheme.outlineVariant),
@@ -67,8 +74,9 @@ class MyApp extends StatelessWidget {
   }
 
   ThemeData _buildDarkTheme() {
+    const palette = indigoPalette; // Dark theme palette
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: appPalette.seedColor,
+      seedColor: palette.seedColor,
       brightness: Brightness.dark,
     );
 
@@ -76,17 +84,17 @@ class MyApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      scaffoldBackgroundColor: appPalette.scaffoldBg,
+      scaffoldBackgroundColor: palette.scaffoldBg,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: appPalette.scaffoldBg,
+        backgroundColor: palette.scaffoldBg,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: appPalette.cardBg,
+        color: palette.cardBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
