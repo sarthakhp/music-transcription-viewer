@@ -1,11 +1,11 @@
 {
-    "name": "vocal_pitch_viewer",
-    "short_name": "vocal_pitch_viewer",
+    "name": "RiyazScope",
+    "short_name": "RiyazScope",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Music transcription and practice tool",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

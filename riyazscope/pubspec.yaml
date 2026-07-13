@@ -1,5 +1,5 @@
-name: vocal_pitch_viewer
-description: "Interactive vocal pitch visualization webapp"
+name: riyazscope
+description: "Music transcription and practice tool"
 publish_to: 'none'
 version: 1.0.0+1
 

@@ -225,7 +225,7 @@ class _UploadSectionState extends State<UploadSection> {
           curve: Curves.easeOut,
           builder: (context, value, child) => Opacity(opacity: value, child: child),
           child: Text(
-            'Vocal Pitch Viewer',
+            'RiyazScope',
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,

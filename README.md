@@ -1,8 +1,8 @@
-# Music Transcription Viewer
+# RiyazScope
 
 🌐 **Live demo:** https://sarthakhp.github.io/music-transcription-viewer/
 
-An interactive Flutter web app for visualizing music transcription data — vocal pitch contours, instrument note bars, and chord labels — synced with audio playback.
+RiyazScope is an interactive Flutter web app for breaking down, analyzing, and practicing music. It visualizes vocal pitch contours, instrument note bars, and chord labels — synced with audio playback — to support daily riyaz (music practice) at home.
 
 ![Flutter](https://img.shields.io/badge/Flutter-^3.10-blue) ![Dart](https://img.shields.io/badge/Dart-^3.10-blue) ![Web](https://img.shields.io/badge/Platform-Web-blue)
 
@@ -61,7 +61,7 @@ An interactive Flutter web app for visualizing music transcription data — voca
 
 ### Run locally (with backend)
 ```bash
-cd vocal_pitch_viewer
+cd riyazscope
 flutter pub get
 flutter run -d chrome --profile --web-port 8080
 ```
@@ -86,7 +86,7 @@ MP3, WAV, FLAC, M4A, OGG, WEBM (max 100 MB)
 ## Project Structure
 
 ```
-vocal_pitch_viewer/
+riyazscope/
 ├── lib/
 │   ├── config/          # API & build-time configuration
 │   ├── models/          # Data classes (pitch, chords, instruments, jobs)
