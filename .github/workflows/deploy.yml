@@ -32,11 +32,11 @@ jobs:
           cache: true
 
       - name: Get dependencies
-        working-directory: ./riyazscope
+        working-directory: ./music_transcriber
         run: flutter pub get
 
       - name: Build web (hosted, read-only viewer)
-        working-directory: ./riyazscope
+        working-directory: ./music_transcriber
         env:
           # Set in repo Settings → Secrets and variables → Actions → Variables.
           # The public Firebase Storage download URL of index.json.
@@ -50,7 +50,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./riyazscope/build/web
+          path: ./music_transcriber/build/web
 
   deploy:
     environment:

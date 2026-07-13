@@ -191,7 +191,7 @@ class UploadLayout extends StatelessWidget {
               children: [
                 Icon(Icons.graphic_eq_rounded, color: colorScheme.primary, size: 28),
                 const SizedBox(width: 12),
-                Text('RiyazScope',
+                Text('Music Transcriber',
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
               ],
             ),

@@ -27,7 +27,7 @@ part 'home_screen_audio.dart';
 part 'home_screen_jobs.dart';
 part 'home_screen_view_controls.dart';
 
-/// Main home screen of the RiyazScope app
+/// Main home screen of the Music Transcriber app
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         // space on narrow screens (RenderFlex overflow banner).
                         const Flexible(
                           child: Text(
-                            'RiyazScope',
+                            'Music Transcriber',
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),

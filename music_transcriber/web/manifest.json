@@ -1,6 +1,6 @@
 {
-    "name": "RiyazScope",
-    "short_name": "RiyazScope",
+    "name": "Music Transcriber",
+    "short_name": "Music Transcriber",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
