@@ -50,14 +50,23 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _audioService.seekToSeconds(time);
 
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
-    final isOutsideView = time < _viewState.viewStartTime || time > _viewState.viewEndTime;
+    final maxStart = max(0.0, maxTime - _viewState.viewWindowSize).toDouble();
+    final centeredStart =
+        (time - _viewState.viewWindowSize / 2).clamp(0.0, maxStart).toDouble();
 
-    // Only scroll to the seek position if it's outside the current view
-    // Don't disable auto-scroll - let it continue if enabled
+    if (_viewState.autoScroll) {
+      // Keep playhead centered with auto-scroll. Set immediately (no scroll
+      // animation) so continuous follow during playback doesn't fight the tween.
+      _scrollAnimationController.stop();
+      _viewState.setViewStartTime(centeredStart);
+      return;
+    }
+
+    // Auto-scroll off: only move the window if the target is off-screen.
+    final isOutsideView =
+        time < _viewState.viewStartTime || time > _viewState.viewEndTime;
     if (isOutsideView) {
-      final newStartTime = (time - _viewState.viewWindowSize / 2)
-          .clamp(0.0, max(0.0, maxTime - _viewState.viewWindowSize).toDouble());
-      _animateScrollTo(newStartTime);
+      _animateScrollTo(centeredStart);
     }
   }
 
@@ -141,8 +150,16 @@ extension _HomeScreenViewControls on _HomeScreenState {
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.digit0) {
-      _viewState.resetZoom();
+    // Top-row and numpad 0: seek audio + playhead to t=0 (keeps playing if already playing)
+    if (event.logicalKey == LogicalKeyboardKey.digit0 ||
+        event.logicalKey == LogicalKeyboardKey.numpad0) {
+      _seekTo(0);
+      return KeyEventResult.handled;
+    }
+
+    // A: toggle auto-scroll during playback
+    if (event.logicalKey == LogicalKeyboardKey.keyA) {
+      _viewState.setAutoScroll(!_viewState.autoScroll);
       return KeyEventResult.handled;
     }
 

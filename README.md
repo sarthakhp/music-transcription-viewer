@@ -46,7 +46,8 @@ Music Transcriber is an interactive Flutter web app for breaking down, analyzing
 | `Space` | Play / Pause |
 | `←` / `→` | Seek back / forward 1s |
 | `+` / `-` | Zoom in / out (vertical) |
-| `0` | Reset zoom |
+| `0` | Seek to start |
+| `A` | Toggle auto-scroll |
 | `[` / `]` | Slow down / speed up |
 | `\` | Reset speed to 1× |
 | `⌘⇧↑` / `⌘⇧↓` | Pitch up / down 1 semitone |

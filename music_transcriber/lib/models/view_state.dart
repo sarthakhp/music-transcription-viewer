@@ -69,9 +69,13 @@ class ViewState extends ChangeNotifier {
     PerformanceMonitor.instance.reportAction(UserAction.panY);
     // Use the stored base range (which includes instrument data and transpose)
     // so panning can reach all visible content after zooming in.
+    // Divisor is the Y-only sensitivity knob (higher = slower). Horizontal panX
+    // is unaffected — it uses time/graphWidth ratio in the pitch_graph handler.
+    // 300 replaces the old 150 after pan clamp started using the full content
+    // span (vocals + instruments), which made the same scroll feel too fast.
     final baseSpan = _baseMaxMidi - _baseMinMidi;
     final currentSpan = baseSpan / _yZoomScale;
-    final midiDelta = -scrollDeltaY * currentSpan / 150.0;
+    final midiDelta = -scrollDeltaY * currentSpan / 300.0;
     _yPanOffset = (_yPanOffset + midiDelta).clamp(-baseSpan, baseSpan);
     _markDirty();
   }
@@ -131,24 +135,27 @@ class ViewState extends ChangeNotifier {
 
   // --- Auto-scroll during playback -----------------------------------------
 
+  /// Keeps the playhead horizontally centered by continuously following
+  /// [currentTime]. Content scrolls under a fixed center playhead (no page jumps).
+  ///
+  /// Near song start/end the window is clamped, so the playhead sits off-center
+  /// until there is enough room — standard DAW behavior.
+  ///
+  /// Perf: only mutates when the start actually changes, and uses [_markDirty]
+  /// so notifies coalesce to one per vsync (content already repaints each frame
+  /// during playback for active-note highlighting via currentTime).
   void updateViewWindowForPlayback(double currentTime, double maxTime) {
     if (!_autoScroll) return;
 
-    final viewEnd = _viewStartTime + _viewWindowSize;
-    double? newStartTime;
+    final maxStart = max(0.0, maxTime - _viewWindowSize);
+    final targetStart =
+        (currentTime - _viewWindowSize / 2.0).clamp(0.0, maxStart);
 
-    if (currentTime > viewEnd - _viewWindowSize * 0.1) {
-      newStartTime = (currentTime - _viewWindowSize * 0.1)
-          .clamp(0.0, max(0.0, maxTime - _viewWindowSize).toDouble());
-    } else if (currentTime < _viewStartTime) {
-      newStartTime = currentTime
-          .clamp(0.0, max(0.0, maxTime - _viewWindowSize).toDouble());
-    }
+    // Skip no-op / float noise — avoids redundant paint scheduling.
+    if ((targetStart - _viewStartTime).abs() < 1e-6) return;
 
-    if (newStartTime != null) {
-      _viewStartTime = newStartTime;
-      notifyListeners();
-    }
+    _viewStartTime = targetStart;
+    _markDirty();
   }
 
   void setViewStartTime(double time) {
