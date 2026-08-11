@@ -49,7 +49,7 @@ Future<void> _ensureWorkletRegistered(web.AudioContext ctx) async {
     return;
   }
   try {
-    await SoundTouchNodeJS.register(ctx, '/soundtouch-processor.js').toDart;
+    await SoundTouchNodeJS.register(ctx, 'soundtouch-processor.js').toDart;
     _workletRegistered = true;
     debugPrint('[WebAudio] SoundTouch worklet registered');
   } catch (e) {
