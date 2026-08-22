@@ -38,22 +38,18 @@ bool _workletRegistered = false;
 Future<web.AudioContext> _getOrCreateContext() async {
   if (_sharedContext != null) return _sharedContext!;
   _sharedContext = web.AudioContext();
-  debugPrint('[WebAudio] AudioContext created, state=${_sharedContext!.state}');
   return _sharedContext!;
 }
 
 Future<void> _ensureWorkletRegistered(web.AudioContext ctx) async {
   if (_workletRegistered) return;
   if (_soundTouchNodeClass == null) {
-    debugPrint('[WebAudio] SoundTouchNode not available on globalThis');
     return;
   }
   try {
     await SoundTouchNodeJS.register(ctx, 'soundtouch-processor.js').toDart;
     _workletRegistered = true;
-    debugPrint('[WebAudio] SoundTouch worklet registered');
   } catch (e) {
-    debugPrint('[WebAudio] Worklet registration failed: $e');
   }
 }
 
@@ -159,7 +155,6 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     try {
       await readyCompleter.future.timeout(const Duration(seconds: 15));
     } catch (e) {
-      debugPrint('[WebAudio] Audio load failed: $e');
       _setState(AudioPlayerState.idle);
       rethrow;
     } finally {
@@ -172,7 +167,6 @@ class WebAudioPlayer implements PlatformAudioPlayer {
 
     _setState(AudioPlayerState.ready);
     _durationController.add(duration);
-    debugPrint('[WebAudio] Loaded, duration=${duration?.inSeconds}s');
   }
 
   // --- Web Audio Graph ------------------------------------------------------
@@ -191,15 +185,12 @@ class WebAudioPlayer implements PlatformAudioPlayer {
         _stNode!.pitchSemitones.value = _currentSemitones.toDouble();
         _source!.connect(_stNode!);
         _stNode!.connect(_ctx!.destination);
-        debugPrint('[WebAudio] Graph: source → SoundTouchNode → destination');
       } catch (e) {
-        debugPrint('[WebAudio] SoundTouchNode failed ($e), using passthrough');
         _stNode = null;
         _source!.connect(_ctx!.destination);
       }
     } else {
       _source!.connect(_ctx!.destination);
-      debugPrint('[WebAudio] Graph: source → destination (no pitch shift)');
     }
   }
 
@@ -278,7 +269,6 @@ class WebAudioPlayer implements PlatformAudioPlayer {
 
     _onError = ((web.Event event) {
       final err = _audio?.error;
-      debugPrint('[WebAudio] Audio element error: code=${err?.code} message=${err?.message}');
       _isPlaying = false;
       _playingController.add(false);
       _setState(AudioPlayerState.idle);
@@ -326,13 +316,11 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     // Resume AudioContext if suspended (needs user gesture chain).
     if (_ctx != null && _ctx!.state == 'suspended') {
       await _ctx!.resume().toDart;
-      debugPrint('[WebAudio] AudioContext resumed');
     }
 
     try {
       await _audio!.play().toDart;
     } catch (e) {
-      debugPrint('[WebAudio] play() failed: $e');
     }
   }
 
@@ -372,7 +360,6 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     _currentSemitones = semitones;
     if (_stNode != null) {
       _stNode!.pitchSemitones.value = semitones.toDouble();
-      debugPrint('[WebAudio] Pitch set to $semitones semitones');
     }
   }
 

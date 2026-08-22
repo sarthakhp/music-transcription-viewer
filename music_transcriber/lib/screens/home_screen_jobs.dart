@@ -23,18 +23,15 @@ extension _HomeScreenJobs on _HomeScreenState {
         if (completedResponse.isSuccess && completedResponse.data != null) {
           _completedJobs = completedResponse.data!.jobs;
         } else {
-          debugPrint('Failed to load completed jobs: ${completedResponse.error}');
         }
         if (failedResponse.isSuccess && failedResponse.data != null) {
           _failedJobs = failedResponse.data!.jobs;
         } else {
-          debugPrint('Failed to load failed jobs: ${failedResponse.error}');
         }
         _isLoadingJobs = false;
       });
     } catch (e) {
       setState(() => _isLoadingJobs = false);
-      debugPrint('Error loading jobs: $e');
     }
   }
 
@@ -166,7 +163,6 @@ extension _HomeScreenJobs on _HomeScreenState {
         appState.setInstrumentData(response.data);
       }
     } catch (e) {
-      debugPrint('Instrument data not available for job $jobId: $e');
     }
   }
 

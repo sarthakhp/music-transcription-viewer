@@ -133,16 +133,12 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
     final x = details.localPosition.dx;
     final distToStart = (x - startX).abs();
     final distToEnd = (x - endX).abs();
-    debugPrint('[TrimSlider] panStart x=$x startX=$startX endX=$endX '
         'distToStart=$distToStart distToEnd=$distToEnd totalWidth=$_currentTotalWidth');
     if (distToStart <= distToEnd && distToStart < _hitTolerance) {
-      debugPrint('[TrimSlider] → dragging START handle');
       setState(() => _draggingStart = true);
     } else if (distToEnd < _hitTolerance) {
-      debugPrint('[TrimSlider] → dragging END handle');
       setState(() => _draggingEnd = true);
     } else {
-      debugPrint('[TrimSlider] → missed both handles (tolerance=$_hitTolerance)');
     }
   }
 
@@ -156,7 +152,6 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
     final clampedX = (x - _handleRadius).clamp(0.0, _currentTotalWidth);
     final posSec = clampedX / _currentTotalWidth * widget.totalDuration;
 
-    debugPrint('[TrimSlider] panUpdate x=$x posSec=$posSec '
         'draggingStart=$_draggingStart draggingEnd=$_draggingEnd');
 
     if (_draggingStart) {
@@ -171,7 +166,6 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
   }
 
   void _onPanEnd() {
-    debugPrint('[TrimSlider] panEnd → cleared drag state');
     setState(() { _draggingStart = false; _draggingEnd = false; });
   }
 

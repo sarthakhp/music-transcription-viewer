@@ -30,16 +30,12 @@ class AudioRecorderService {
         await web.window.navigator.mediaDevices.getUserMedia(constraints).toDart;
 
     final tracks = _stream!.getAudioTracks().toDart;
-    debugPrint('[Recorder] mic acquired — tracks: ${tracks.length}');
     for (final t in tracks) {
-      debugPrint('[Recorder]   track: label="${t.label}" readyState=${t.readyState} enabled=${t.enabled} muted=${t.muted}');
     }
 
     final mimeType = _preferredMimeType();
-    debugPrint('[Recorder] selected MIME type: "$mimeType"');
     final options = web.MediaRecorderOptions(mimeType: mimeType);
     _recorder = web.MediaRecorder(_stream!, options);
-    debugPrint('[Recorder] MediaRecorder state: ${_recorder!.state}');
 
     int chunkCount = 0;
     _recorder!.addEventListener(
@@ -47,7 +43,6 @@ class AudioRecorderService {
       ((web.Event event) {
         final blobEvent = event as web.BlobEvent;
         chunkCount++;
-        debugPrint('[Recorder] chunk #$chunkCount size=${blobEvent.data.size}');
         if (blobEvent.data.size > 0) {
           _chunks.add(blobEvent.data);
         }
@@ -56,7 +51,6 @@ class AudioRecorderService {
 
     // Collect data every 250 ms so we get partial chunks and can show progress.
     _recorder!.start(250);
-    debugPrint('[Recorder] recording started');
   }
 
   /// Stop recording and return the captured audio as bytes.
@@ -69,16 +63,12 @@ class AudioRecorderService {
       'stop',
       ((web.Event _) {
         final mimeType = _recorder?.mimeType ?? 'audio/webm';
-        debugPrint('[Recorder] stopped — chunks collected: ${_chunks.length}, mimeType: "$mimeType"');
         final parts = <JSAny>[for (final c in _chunks) c].toJS;
         final blob = web.Blob(parts, web.BlobPropertyBag(type: mimeType));
-        debugPrint('[Recorder] blob size: ${blob.size}');
         blob.arrayBuffer().toDart.then((ab) {
           final bytes = Uint8List.fromList(Uint8List.view(ab.toDart));
-          debugPrint('[Recorder] final bytes: ${bytes.length}');
           completer.complete(bytes);
         }).catchError((Object e) {
-          debugPrint('[Recorder] ERROR converting blob: $e');
           completer.completeError(e);
         });
       }).toJS,
