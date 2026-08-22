@@ -276,8 +276,9 @@ class WebAudioPlayer implements PlatformAudioPlayer {
       }
     }).toJS;
 
-    _onError = ((web.Event _) {
-      debugPrint('[WebAudio] Audio element error');
+    _onError = ((web.Event event) {
+      final err = _audio?.error;
+      debugPrint('[WebAudio] Audio element error: code=${err?.code} message=${err?.message}');
       _isPlaying = false;
       _playingController.add(false);
       _setState(AudioPlayerState.idle);

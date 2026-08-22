@@ -82,7 +82,7 @@ class AppState extends ChangeNotifier {
   bool get hasData => _pitchData != null;
   bool get hasAudio => _audioBytes != null;
   bool get hasChords => _chordData != null;
-  bool get isReady => hasData && hasAudio; // Ready when we have data and audio bytes
+  bool get isReady => hasAudio; // Ready when audio is available (pitch data is optional)
   bool get hasActiveJob => _currentJobId != null;
   bool get isJobComplete => _jobStatus == JobStatus.completed;
   bool get isJobFailed => _jobStatus == JobStatus.failed;

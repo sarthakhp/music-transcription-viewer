@@ -406,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   child: Selector<AppState, double>(
                     selector: (_, s) => s.currentTime,
                     builder: (context, currentTime, _) {
+                      if (appState.pitchData == null) return const SizedBox.shrink();
                       // Update base MIDI range (only changes when data/transpose changes)
                       // Uniform ±3 semitone margin from the most extreme note so the
                       // user can't scroll into empty space beyond actual content.
@@ -504,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             builder: (context, _) => AudioControls(
               isPlaying: audio.isPlaying,
               currentTime: audio.currentTime,
-              duration: audio.duration > 0 ? audio.duration : appState.pitchData!.maxTime,
+              duration: audio.duration > 0 ? audio.duration : (appState.pitchData?.maxTime ?? 0.0),
               referenceFrequency: audio.referenceFrequency,
               onPlayPause: () => _audioService.togglePlayPause(),
               onStop: () => _audioService.stop(),

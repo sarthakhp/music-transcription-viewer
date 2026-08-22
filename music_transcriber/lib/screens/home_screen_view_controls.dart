@@ -153,20 +153,20 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
     final isPlus = event.logicalKey == LogicalKeyboardKey.equal ||
         event.logicalKey == LogicalKeyboardKey.add;
-    final isMinus = event.logicalKey == LogicalKeyboardKey.minus;
+    final isMinus = event.logicalKey == LogicalKeyboardKey.minus ||
+        event.logicalKey == LogicalKeyboardKey.underscore;
     if (isPlus || isMinus) {
       // Cmd held: let the browser handle page zoom (Cmd+Shift+= / Cmd+-)
       if (HardwareKeyboard.instance.isMetaPressed ||
           HardwareKeyboard.instance.isControlPressed) {
         return KeyEventResult.ignored;
       }
-      final factor = isPlus ? ViewState.zoomFactor : 1.0 / ViewState.zoomFactor;
       if (HardwareKeyboard.instance.isShiftPressed) {
-        // Shift+/- : horizontal zoom
-        _viewState.zoomXAtFocal(factor, 0.5, maxTime: maxTime);
+        // Shift+/- : horizontal zoom (zoomXAtFocal uses +delta=in, -delta=out)
+        _viewState.zoomXAtFocal(isPlus ? 1.0 : -1.0, 0.5, maxTime: maxTime);
       } else {
         // +/- : vertical zoom
-        _viewState.zoomY(factor);
+        _viewState.zoomY(isPlus ? ViewState.zoomFactor : 1.0 / ViewState.zoomFactor);
       }
       return KeyEventResult.handled;
     }

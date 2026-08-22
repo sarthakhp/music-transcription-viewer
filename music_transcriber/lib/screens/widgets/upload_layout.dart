@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../providers/app_state.dart';
 import '../../models/job.dart';
@@ -15,7 +16,7 @@ class UploadLayout extends StatelessWidget {
   final Future<void> Function(String) onJobSelected;
   final Future<void> Function(String) onJobDeleted;
   final Future<void> Function(String) onJobRetry;
-  final VoidCallback onUploadPressed;
+  final Future<void> Function(Uint8List bytes, String fileName)? onFileUpload;
   final bool isRemote;
   final Future<void> Function(String url, {double? startTime, double? endTime})? onUrlSubmitted;
   final Future<void> Function()? onCancel;
@@ -33,7 +34,7 @@ class UploadLayout extends StatelessWidget {
     required this.onJobSelected,
     required this.onJobDeleted,
     required this.onJobRetry,
-    required this.onUploadPressed,
+    this.onFileUpload,
     this.onUrlSubmitted,
     this.onCancel,
     this.isLoadingJson = false,
@@ -169,7 +170,7 @@ class UploadLayout extends StatelessWidget {
       return UploadSection(
         appState: appState,
         apiService: apiService,
-        onUploadPressed: onUploadPressed,
+        onFileUpload: onFileUpload,
         onUrlSubmitted: onUrlSubmitted,
         onCancel: onCancel,
         isLoadingJson: isLoadingJson,

@@ -111,12 +111,12 @@ class ViewerToolbar extends StatelessWidget {
                 const SizedBox(width: 12),
                 Icon(Icons.timer_outlined, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
                 const SizedBox(width: 4),
-                Text(appState.pitchData!.durationFormatted, style: theme.textTheme.bodySmall),
-                if (appState.pitchData!.metadata.bpm != null) ...[
+                Text(appState.pitchData?.durationFormatted ?? '', style: theme.textTheme.bodySmall),
+                if (appState.pitchData?.metadata.bpm != null) ...[
                   const SizedBox(width: 12),
                   Icon(Icons.speed_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
                   const SizedBox(width: 4),
-                  Text('${appState.pitchData!.metadata.bpm!.toStringAsFixed(1)} BPM', style: theme.textTheme.bodySmall),
+                  Text('${appState.pitchData?.metadata.bpm?.toStringAsFixed(1)} BPM', style: theme.textTheme.bodySmall),
                 ],
                 if (appState.chordData != null) ...[
                   const SizedBox(width: 12),
@@ -161,8 +161,9 @@ class ViewerToolbar extends StatelessWidget {
           spacing: 12,
           runSpacing: 4,
           children: [
-            _buildMetaChip(Icons.timer_outlined, appState.pitchData!.durationFormatted, colorScheme),
-            if (appState.pitchData!.metadata.bpm != null)
+            if (appState.pitchData != null)
+              _buildMetaChip(Icons.timer_outlined, appState.pitchData!.durationFormatted, colorScheme),
+            if (appState.pitchData?.metadata.bpm != null)
               _buildMetaChip(Icons.speed_rounded, '${appState.pitchData!.metadata.bpm!.toStringAsFixed(0)} BPM', colorScheme),
             if (appState.chordData != null)
               _buildMetaChip(Icons.music_note_rounded, '${appState.chordData!.uniqueChordsCount} chords', colorScheme),

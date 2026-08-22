@@ -27,7 +27,7 @@ class TrimRangeSlider extends StatefulWidget {
     required this.totalDuration,
     required this.start,
     required this.end,
-    this.minSelectionSeconds = 5.0,
+    this.minSelectionSeconds = 1.0,
     required this.onChanged,
   });
 
@@ -39,8 +39,13 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
   bool _draggingStart = false;
   bool _draggingEnd = false;
 
+  // Stored from LayoutBuilder so gesture handlers always have the current width
+  // without relying on closure capture (which can be stale across rebuilds).
+  double _currentTotalWidth = 0;
+
   static const double _handleRadius = 8.0;
   static const double _trackHeight = 4.0;
+  static const double _hitTolerance = 32.0;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +59,12 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final totalWidth = constraints.maxWidth - _handleRadius * 2;
+              // Keep state in sync so gesture handlers read latest width.
+              if (_currentTotalWidth != totalWidth) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() => _currentTotalWidth = totalWidth);
+                });
+              }
               final startFrac = widget.start / widget.totalDuration;
               final endFrac = widget.end / widget.totalDuration;
               final startX = _handleRadius + startFrac * totalWidth;
@@ -62,8 +73,9 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onPanStart: (details) => _onPanStart(details, startX, endX),
-                onPanUpdate: (details) => _onPanUpdate(details, totalWidth),
+                onPanUpdate: (details) => _onPanUpdate(details),
                 onPanEnd: (_) => _onPanEnd(),
+                onPanCancel: () => _onPanEnd(),
                 child: CustomPaint(
                   size: Size(constraints.maxWidth, 40),
                   painter: _TrimTrackPainter(
@@ -121,44 +133,46 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
     final x = details.localPosition.dx;
     final distToStart = (x - startX).abs();
     final distToEnd = (x - endX).abs();
-
-    // Pick the closer handle (with a tolerance zone).
-    if (distToStart <= distToEnd && distToStart < 24) {
+    debugPrint('[TrimSlider] panStart x=$x startX=$startX endX=$endX '
+        'distToStart=$distToStart distToEnd=$distToEnd totalWidth=$_currentTotalWidth');
+    if (distToStart <= distToEnd && distToStart < _hitTolerance) {
+      debugPrint('[TrimSlider] → dragging START handle');
       setState(() => _draggingStart = true);
-    } else if (distToEnd < 24) {
+    } else if (distToEnd < _hitTolerance) {
+      debugPrint('[TrimSlider] → dragging END handle');
       setState(() => _draggingEnd = true);
+    } else {
+      debugPrint('[TrimSlider] → missed both handles (tolerance=$_hitTolerance)');
     }
   }
 
-  void _onPanUpdate(DragUpdateDetails details, double totalWidth) {
+  void _onPanUpdate(DragUpdateDetails details) {
     if (!_draggingStart && !_draggingEnd) return;
+    if (_currentTotalWidth <= 0) return;
 
-    final dx = details.delta.dx;
-    final deltaSec = (dx / totalWidth) * widget.totalDuration;
+    // Use absolute localPosition, not delta — avoids accumulated error and
+    // handles missed events gracefully (handle snaps to cursor).
+    final x = details.localPosition.dx;
+    final clampedX = (x - _handleRadius).clamp(0.0, _currentTotalWidth);
+    final posSec = clampedX / _currentTotalWidth * widget.totalDuration;
 
-    var newStart = widget.start;
-    var newEnd = widget.end;
+    debugPrint('[TrimSlider] panUpdate x=$x posSec=$posSec '
+        'draggingStart=$_draggingStart draggingEnd=$_draggingEnd');
 
     if (_draggingStart) {
-      newStart = (widget.start + deltaSec).clamp(
-        0.0,
-        widget.end - widget.minSelectionSeconds,
-      );
-    } else if (_draggingEnd) {
-      newEnd = (widget.end + deltaSec).clamp(
-        widget.start + widget.minSelectionSeconds,
-        widget.totalDuration,
-      );
+      final maxStart = (widget.end - widget.minSelectionSeconds).clamp(0.0, widget.totalDuration);
+      final newStart = posSec.clamp(0.0, maxStart);
+      widget.onChanged((newStart, widget.end));
+    } else {
+      final minEnd = (widget.start + widget.minSelectionSeconds).clamp(0.0, widget.totalDuration);
+      final newEnd = posSec.clamp(minEnd, widget.totalDuration);
+      widget.onChanged((widget.start, newEnd));
     }
-
-    widget.onChanged((newStart, newEnd));
   }
 
   void _onPanEnd() {
-    setState(() {
-      _draggingStart = false;
-      _draggingEnd = false;
-    });
+    debugPrint('[TrimSlider] panEnd → cleared drag state');
+    setState(() { _draggingStart = false; _draggingEnd = false; });
   }
 
   static String _formatTime(double seconds) {

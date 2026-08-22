@@ -95,18 +95,10 @@ extension _HomeScreenJobs on _HomeScreenState {
 
       if (results.frames.isSuccess && results.frames.data != null) {
         appState.setPitchData(results.frames.data!);
-      } else {
-        appState.setError('Failed to fetch pitch data: ${results.frames.error ?? "No data available"}');
-        appState.setLoading(false);
-        return;
       }
 
       if (results.chords.isSuccess && results.chords.data != null) {
         appState.setChordData(results.chords.data!);
-      } else {
-        appState.setError('Failed to fetch chord data: ${results.chords.error ?? "No data available"}');
-        appState.setLoading(false);
-        return;
       }
 
       await Future.wait([
@@ -297,25 +289,15 @@ extension _HomeScreenJobs on _HomeScreenState {
     }
   }
 
-  /// Upload audio file to API for processing
-  Future<void> _uploadAudioFileToAPI() async {
-    final result = await FileService.pickAudioFile();
-
+  /// Upload audio bytes directly (used by file-with-trim and recording flows).
+  Future<void> _uploadAudioBytes(Uint8List bytes, String fileName) async {
     if (!mounted) return;
-
-    final appState = context.read<AppState>();
-
-    if (result.isSuccess) {
-      final jobId = await _uploadService.uploadAudioFile(
-        fileBytes: result.data!,
-        fileName: result.fileName!,
-      );
-
-      if (jobId != null && mounted) {
-        _pollingService.startPolling(jobId);
-      }
-    } else if (result.error != null) {
-      appState.setError(result.error);
+    final jobId = await _uploadService.uploadAudioFile(
+      fileBytes: bytes,
+      fileName: fileName,
+    );
+    if (jobId != null && mounted) {
+      _pollingService.startPolling(jobId);
     }
   }
 }
