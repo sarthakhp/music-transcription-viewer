@@ -2,6 +2,18 @@ part of 'home_screen.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
+final _digitKeyMap = {
+  LogicalKeyboardKey.digit1: 1, LogicalKeyboardKey.numpad1: 1,
+  LogicalKeyboardKey.digit2: 2, LogicalKeyboardKey.numpad2: 2,
+  LogicalKeyboardKey.digit3: 3, LogicalKeyboardKey.numpad3: 3,
+  LogicalKeyboardKey.digit4: 4, LogicalKeyboardKey.numpad4: 4,
+  LogicalKeyboardKey.digit5: 5, LogicalKeyboardKey.numpad5: 5,
+  LogicalKeyboardKey.digit6: 6, LogicalKeyboardKey.numpad6: 6,
+  LogicalKeyboardKey.digit7: 7, LogicalKeyboardKey.numpad7: 7,
+  LogicalKeyboardKey.digit8: 8, LogicalKeyboardKey.numpad8: 8,
+  LogicalKeyboardKey.digit9: 9, LogicalKeyboardKey.numpad9: 9,
+};
+
 extension _HomeScreenViewControls on _HomeScreenState {
 
   // --- Scroll animation (needs AnimationController from State) --------------
@@ -72,7 +84,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
   // --- Speed ----------------------------------------------------------------
 
-  static const _speedPresets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  static const _speedPresets = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
   void _stepSpeed(int direction) {
     final currentIndex = _speedPresets.indexOf(_playbackSpeed);
@@ -139,21 +151,35 @@ extension _HomeScreenViewControls on _HomeScreenState {
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.equal ||
-        event.logicalKey == LogicalKeyboardKey.add) {
-      _viewState.zoomY(ViewState.zoomFactor);
+    final isPlus = event.logicalKey == LogicalKeyboardKey.equal ||
+        event.logicalKey == LogicalKeyboardKey.add;
+    final isMinus = event.logicalKey == LogicalKeyboardKey.minus;
+    if (isPlus || isMinus) {
+      // Cmd held: let the browser handle page zoom (Cmd+Shift+= / Cmd+-)
+      if (HardwareKeyboard.instance.isMetaPressed ||
+          HardwareKeyboard.instance.isControlPressed) {
+        return KeyEventResult.ignored;
+      }
+      final factor = isPlus ? ViewState.zoomFactor : 1.0 / ViewState.zoomFactor;
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        // Shift+/- : horizontal zoom
+        _viewState.zoomXAtFocal(factor, 0.5, maxTime: maxTime);
+      } else {
+        // +/- : vertical zoom
+        _viewState.zoomY(factor);
+      }
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.minus) {
-      _viewState.zoomY(1.0 / ViewState.zoomFactor);
-      return KeyEventResult.handled;
-    }
-
-    // Top-row and numpad 0: seek audio + playhead to t=0 (keeps playing if already playing)
+    // Top-row and numpad 0–9: seek to 0%, 10%, 20%, … 90% of duration (YouTube-style)
     if (event.logicalKey == LogicalKeyboardKey.digit0 ||
         event.logicalKey == LogicalKeyboardKey.numpad0) {
       _seekTo(0);
+      return KeyEventResult.handled;
+    }
+    final digitN = _digitKeyMap[event.logicalKey];
+    if (digitN != null) {
+      _seekTo(maxTime * digitN / 10);
       return KeyEventResult.handled;
     }
 
