@@ -20,9 +20,48 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, child) {
-        // Don't show if not uploading or processing
-        if (!appState.isUploading && !appState.isProcessing) {
+        // Don't show if not uploading, processing, or failed
+        if (!appState.isUploading && !appState.isProcessing && !appState.isJobFailed) {
           return const SizedBox.shrink();
+        }
+
+        // Show error card when job has failed
+        if (appState.isJobFailed) {
+          return Card(
+            elevation: 4,
+            margin: const EdgeInsets.all(16),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Processing Failed',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.error)),
+                        if (appState.errorMessage != null &&
+                            appState.errorMessage!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(appState.errorMessage!,
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         return Card(

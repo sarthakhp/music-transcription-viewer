@@ -11,7 +11,6 @@ import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
 import '../services/user_settings.dart';
 import '../config/api_config.dart';
-import '../utils/file_service.dart';
 import '../utils/music_utils.dart';
 import '../utils/performance_monitor.dart';
 import '../models/view_state.dart';
@@ -224,8 +223,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // Only rebuild the outer shell when ready/loading state changes — NOT on
     // every currentTime tick. Fast-changing fields (currentTime, isPlaying,
     // duration) are consumed via Consumer/Selector inside specific widgets.
-    return Selector<AppState, ({bool isReady, bool isLoading, bool isPreparingAudio})>(
-      selector: (_, s) => (isReady: s.isReady, isLoading: s.isLoading, isPreparingAudio: s.isPreparingAudio),
+    return Selector<AppState, ({bool isReady, bool isLoading, bool isPreparingAudio, bool isJobFailed})>(
+      selector: (_, s) => (isReady: s.isReady, isLoading: s.isLoading, isPreparingAudio: s.isPreparingAudio, isJobFailed: s.isJobFailed),
       builder: (context, shell, _) {
         final appState = context.read<AppState>();
         final isNarrowAppBar = MediaQuery.sizeOf(context).width < 480;
@@ -345,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       onJobSelected: _onJobSelected,
       onJobDeleted: _onJobDeleted,
       onJobRetry: _onJobRetry,
-      onUploadPressed: _uploadAudioFileToAPI,
+      onFileUpload: _uploadAudioBytes,
       onUrlSubmitted: _submitUrlForTranscription,
       onCancel: _cancelCurrentJob,
       isLoadingJson: _isLoadingJson,
