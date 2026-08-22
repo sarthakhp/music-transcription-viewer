@@ -66,7 +66,7 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
 
         return Card(
           elevation: 4,
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -211,9 +211,10 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
     }
   }
 
-  /// Build stage indicator showing all 3 stages
+  /// Build stage indicator showing all stages
   Widget _buildStageIndicator(BuildContext context, AppState appState) {
     final currentStage = appState.processingStage;
+    final stageProgress = appState.stageProgress;
     // Show the download stage only when it's active or has been passed.
     final showDownload = currentStage == ProcessingStage.download ||
         (currentStage != null && currentStage.index > ProcessingStage.download.index);
@@ -226,6 +227,7 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
             'Download',
             ProcessingStage.download,
             currentStage,
+            stageProgress,
           ),
           const SizedBox(width: 8),
         ],
@@ -234,6 +236,7 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
           'Separation',
           ProcessingStage.separation,
           currentStage,
+          stageProgress,
         ),
         const SizedBox(width: 8),
         _buildStageChip(
@@ -241,6 +244,7 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
           'Transcription',
           ProcessingStage.transcription,
           currentStage,
+          stageProgress,
         ),
         const SizedBox(width: 8),
         _buildStageChip(
@@ -248,6 +252,7 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
           'Instruments',
           ProcessingStage.instruments,
           currentStage,
+          stageProgress,
         ),
         const SizedBox(width: 8),
         _buildStageChip(
@@ -255,6 +260,7 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
           'Chords',
           ProcessingStage.chords,
           currentStage,
+          stageProgress,
         ),
       ],
     );
@@ -266,61 +272,94 @@ class _ProcessingStatusCardState extends State<ProcessingStatusCard> {
     String label,
     ProcessingStage stage,
     ProcessingStage? currentStage,
+    int stageProgress,
   ) {
     final isActive = currentStage == stage;
-    final isPast = currentStage != null && 
+    final isPast = currentStage != null &&
         currentStage.index > stage.index;
 
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isActive
-              ? Theme.of(context).colorScheme.primaryContainer
-              : isPast
-                  ? Theme.of(context).colorScheme.secondaryContainer
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isPast)
-              Icon(
-                Icons.check_circle,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              )
-            else if (isActive)
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              )
-            else
-              Icon(
-                Icons.circle_outlined,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
+    final baseColor = isActive
+        ? Theme.of(context).colorScheme.primaryContainer
+        : isPast
+            ? Theme.of(context).colorScheme.secondaryContainer
+            : Theme.of(context).colorScheme.surfaceContainerHighest;
+
+    final contentColor = isActive
+        ? Theme.of(context).colorScheme.onPrimaryContainer
+        : isPast
+            ? Theme.of(context).colorScheme.onSecondaryContainer
+            : Theme.of(context).colorScheme.onSurfaceVariant;
+
+    Widget chipContent = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (isPast)
+          Icon(Icons.check_circle, size: 16, color: contentColor)
+        else if (isActive)
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: contentColor,
+            ),
+          )
+        else
+          Icon(Icons.circle_outlined, size: 16, color: contentColor),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
                 label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isActive
-                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                      : isPast
-                          ? Theme.of(context).colorScheme.onSecondaryContainer
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: contentColor,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
+              if (isActive)
+                Text(
+                  '$stageProgress%',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: contentColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    return Expanded(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            // Base background
+            Positioned.fill(child: Container(color: baseColor)),
+            // Fill overlay for active stage
+            if (isActive)
+              Positioned.fill(
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: stageProgress / 100,
+                  child: Container(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.25),
+                  ),
+                ),
+              ),
+            // Content rendered once on top
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+              child: chipContent,
             ),
           ],
         ),

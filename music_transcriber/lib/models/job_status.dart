@@ -104,6 +104,7 @@ class JobStatusResponse {
   final JobStatus status;
   final ProcessingStage? stage;
   final int progress;
+  final int stageProgress;
   final String? errorMessage;
   final String? message;
 
@@ -112,6 +113,7 @@ class JobStatusResponse {
     required this.status,
     this.stage,
     required this.progress,
+    this.stageProgress = 0,
     this.errorMessage,
     this.message,
   });
@@ -125,6 +127,7 @@ class JobStatusResponse {
             ? ProcessingStage.fromString(json['stage'] as String)
             : null,
         progress: (json['progress'] as num?)?.toInt() ?? 0,
+        stageProgress: (json['stage_progress'] as num?)?.toInt() ?? 0,
         errorMessage: json['error_message'] as String?,
         message: json['message'] as String?,
       );

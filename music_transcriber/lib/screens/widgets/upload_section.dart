@@ -87,6 +87,8 @@ class _UploadSectionState extends State<UploadSection> {
   web.HTMLAudioElement? _previewAudio;
   String? _previewBlobUrl;
   bool _previewPlaying = false;
+  double _previewPosition = 0;
+  Timer? _previewPositionTimer;
   JSFunction? _previewOnEnded;
 
   @override
@@ -319,6 +321,8 @@ class _UploadSectionState extends State<UploadSection> {
   }
 
   void _destroyPreviewAudio() {
+    _previewPositionTimer?.cancel();
+    _previewPositionTimer = null;
     if (_previewAudio != null) {
       _previewAudio!.pause();
       if (_previewOnEnded != null) {
@@ -345,8 +349,11 @@ class _UploadSectionState extends State<UploadSection> {
     _previewAudio = web.document.createElement('audio') as web.HTMLAudioElement;
     _previewAudio!.src = _previewBlobUrl!;
     _previewAudio!.preload = 'auto';
+    _previewPosition = 0;
     _previewOnEnded = ((web.Event _) {
-      if (mounted) setState(() => _previewPlaying = false);
+      _previewPositionTimer?.cancel();
+      _previewPositionTimer = null;
+      if (mounted) setState(() { _previewPlaying = false; _previewPosition = 0; });
     }).toJS;
     _previewAudio!.addEventListener('ended', _previewOnEnded!);
     web.document.body!.append(_previewAudio!);
@@ -356,12 +363,25 @@ class _UploadSectionState extends State<UploadSection> {
     if (_previewAudio == null) return;
     if (_previewPlaying) {
       _previewAudio!.pause();
+      _previewPositionTimer?.cancel();
+      _previewPositionTimer = null;
       setState(() => _previewPlaying = false);
     } else {
       if (_previewAudio!.ended) _previewAudio!.currentTime = 0;
       _previewAudio!.play();
+      _previewPositionTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        if (mounted && _previewAudio != null) {
+          setState(() => _previewPosition = _previewAudio!.currentTime);
+        }
+      });
       setState(() => _previewPlaying = true);
     }
+  }
+
+  void _seekPreviewTo(double seconds) {
+    if (_previewAudio == null) return;
+    _previewAudio!.currentTime = seconds;
+    setState(() => _previewPosition = seconds);
   }
 
   Future<void> _submitRecording() async {
@@ -369,7 +389,9 @@ class _UploadSectionState extends State<UploadSection> {
     setState(() => _isSubmittingRecord = true);
     try {
       final bytes = await _trimmedRecordingBytes();
-      await widget.onFileUpload!(bytes, 'recording.wav');
+      final now = DateTime.now();
+      final ts = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      await widget.onFileUpload!(bytes, 'recording_$ts.wav');
     } finally {
       if (mounted) setState(() => _isSubmittingRecord = false);
     }
@@ -514,7 +536,10 @@ class _UploadSectionState extends State<UploadSection> {
               : const SizedBox.shrink(),
         ),
 
-        ProcessingStatusCard(onCancel: widget.onCancel),
+        SizedBox(
+          width: double.infinity,
+          child: ProcessingStatusCard(onCancel: widget.onCancel),
+        ),
 
         if (!appState.isUploading && !appState.isProcessing) ...[
           const SizedBox(height: 24),
@@ -995,7 +1020,41 @@ class _UploadSectionState extends State<UploadSection> {
                 ),
 
                 if (_recordedDuration > 0) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                    ),
+                    child: Slider(
+                      min: 0,
+                      max: _recordedDuration,
+                      value: _previewPosition.clamp(0, _recordedDuration),
+                      onChanged: _isSubmittingRecord ? null : _seekPreviewTo,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(Duration(milliseconds: (_previewPosition * 1000).round())),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        Text(
+                          _formatDuration(Duration(seconds: _recordedDuration.round())),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TrimRangeSlider(
                     totalDuration: _recordedDuration,
                     start: _recordTrimStart,

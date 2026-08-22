@@ -75,7 +75,17 @@ class UploadLayout extends StatelessWidget {
         Padding(
           padding: EdgeInsets.all(outerPadding),
           child: isWide
-              ? Row(
+              ? (appState.isProcessing || appState.isUploading)
+                  // During processing: full-width left panel, no job list
+                  ? Center(
+                      child: SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 800),
+                          child: _leftPanel(context),
+                        ),
+                      ),
+                    )
+                  : Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Left side - Upload section
@@ -84,7 +94,7 @@ class UploadLayout extends StatelessWidget {
                       child: Center(
                         child: SingleChildScrollView(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 500),
+                            constraints: const BoxConstraints(maxWidth: 800),
                             child: _leftPanel(context),
                           ),
                         ),
@@ -128,7 +138,7 @@ class UploadLayout extends StatelessWidget {
                     children: [
                       // Upload section (or hosted-viewer note in remote mode)
                       ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 500),
+                        constraints: const BoxConstraints(maxWidth: 800),
                         child: _leftPanel(context),
                       ),
                       SizedBox(height: isMobile ? 20 : 32),

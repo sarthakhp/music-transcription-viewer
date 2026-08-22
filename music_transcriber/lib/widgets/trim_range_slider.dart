@@ -133,7 +133,6 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
     final x = details.localPosition.dx;
     final distToStart = (x - startX).abs();
     final distToEnd = (x - endX).abs();
-        'distToStart=$distToStart distToEnd=$distToEnd totalWidth=$_currentTotalWidth');
     if (distToStart <= distToEnd && distToStart < _hitTolerance) {
       setState(() => _draggingStart = true);
     } else if (distToEnd < _hitTolerance) {
@@ -151,8 +150,6 @@ class _TrimRangeSliderState extends State<TrimRangeSlider> {
     final x = details.localPosition.dx;
     final clampedX = (x - _handleRadius).clamp(0.0, _currentTotalWidth);
     final posSec = clampedX / _currentTotalWidth * widget.totalDuration;
-
-        'draggingStart=$_draggingStart draggingEnd=$_draggingEnd');
 
     if (_draggingStart) {
       final maxStart = (widget.end - widget.minSelectionSeconds).clamp(0.0, widget.totalDuration);

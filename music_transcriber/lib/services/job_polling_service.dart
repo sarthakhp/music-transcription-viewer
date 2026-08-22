@@ -70,10 +70,11 @@ class JobPollingService {
 
   /// Poll once
   Future<void> _pollOnce() async {
-    if (_currentJobId == null) return;
+    final jobId = _currentJobId;
+    if (jobId == null) return;
 
     try {
-      final response = await _apiService.getJobStatus(_currentJobId!);
+      final response = await _apiService.getJobStatus(jobId);
 
       if (!response.isSuccess) {
         // Handle error
@@ -83,7 +84,7 @@ class JobPollingService {
 
       if (response.data == null) {
         _appState.setError('Polling error: Received null data from server');
-        debugPrint('Job status response data is null for job: $_currentJobId');
+        debugPrint('Job status response data is null for job: $jobId');
         return;
       }
 
@@ -91,10 +92,11 @@ class JobPollingService {
 
       // Update app state
       _appState.updateJobState(
-        jobId: _currentJobId!,
+        jobId: jobId,
         status: status.status,
         stage: status.stage,
         progress: status.progress,
+        stageProgress: status.stageProgress,
         message: status.message,
       );
 
