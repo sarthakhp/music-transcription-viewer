@@ -46,3 +46,5 @@ app.*.map.json
 /android/app/release
 /.localdev/
 /music-transcription-6702c-firebase-adminsdk-fbsvc-c6fe8abbe2.json
+# Added by code-review-graph
+.code-review-graph/
