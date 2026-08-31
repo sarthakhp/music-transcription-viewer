@@ -12,10 +12,10 @@ import '../utils/download_helper.dart';
 import '../widgets/audio_controls/speed_control.dart';
 import '../widgets/audio_controls/transpose_control.dart';
 
-/// Fully client-side practice tool: upload any audio file, play it back with
-/// pitch transpose + speed control, and export the modified audio — no
-/// backend, no transcription. Deliberately independent of [AppState], which
-/// is shaped around the transcription job model this screen doesn't use.
+/// Fully client-side practice tool: upload any audio or video file, play it
+/// back with pitch transpose + speed control, and export the modified audio
+/// — no backend, no transcription. Deliberately independent of [AppState],
+/// which is shaped around the transcription job model this screen doesn't use.
 class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
 
@@ -98,7 +98,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
       _player = player;
     } catch (e, st) {
       debugPrint('[Practice] load failed for "$name": $e\n$st');
-      setState(() => _error = 'Could not load "$name" — is it a valid audio file?');
+      setState(() => _error = 'Could not load "$name" — is it a valid audio or video file?');
     } finally {
       if (mounted) setState(() => _isLoadingFile = false);
     }
@@ -231,9 +231,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
         Icon(Icons.graphic_eq_rounded, size: 48, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 16),
         Text(
-          'Upload any audio file to practice with — transpose the key, '
-          'change the speed, and export the result. Everything runs in your '
-          'browser; nothing is uploaded anywhere.',
+          'Upload any audio or video file to practice with — transpose the '
+          'key, change the speed, and export the audio. Everything runs in '
+          'your browser; nothing is uploaded anywhere.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
@@ -247,7 +247,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.upload_file_rounded),
-          label: Text(_isLoadingFile ? 'Loading…' : 'Choose audio file'),
+          label: Text(_isLoadingFile ? 'Loading…' : 'Choose file'),
         ),
         if (_error != null) ...[
           const SizedBox(height: 16),
@@ -271,6 +271,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
           style: theme.textTheme.titleMedium,
           overflow: TextOverflow.ellipsis,
         ),
+        if (_player?.videoViewType != null) ...[
+          const SizedBox(height: 16),
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: HtmlElementView(viewType: _player!.videoViewType!),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Slider(
           value: positionMs,

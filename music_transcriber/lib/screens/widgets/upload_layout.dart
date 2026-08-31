@@ -267,8 +267,8 @@ class UploadLayout extends StatelessWidget {
             Text('Just want to practice?', style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Upload any audio file to transpose its key or change its speed, '
-              'entirely in your browser — no transcription needed.',
+              'Upload any audio or video file to transpose its key or change '
+              'its speed, entirely in your browser — no transcription needed.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurface.withValues(alpha: 0.7),
               ),

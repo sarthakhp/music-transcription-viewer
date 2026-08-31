@@ -40,6 +40,11 @@ abstract class PlatformAudioPlayer {
   /// Current processing state.
   AudioPlayerState get state;
 
+  /// Web + video sources only: the platform view type to display this
+  /// video's frame via HtmlElementView, or null for audio sources and
+  /// non-web platforms.
+  String? get videoViewType => null;
+
   /// Load audio from raw bytes.
   Future<void> load(Uint8List bytes, String mimeType);
 
