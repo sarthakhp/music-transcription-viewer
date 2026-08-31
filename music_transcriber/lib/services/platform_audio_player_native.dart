@@ -78,7 +78,7 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
 
   @override
   Future<void> setSpeed(double speed) async {
-    await _player?.setSpeed(speed.clamp(0.5, 2.0));
+    await _player?.setSpeed(speed.clamp(0.25, 2.0));
   }
 
   @override

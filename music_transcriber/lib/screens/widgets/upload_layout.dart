@@ -4,6 +4,7 @@ import '../../providers/app_state.dart';
 import '../../models/job.dart';
 import '../../services/transcription_api_service.dart';
 import '../../widgets/job_list_card.dart';
+import '../practice_screen.dart';
 import 'upload_section.dart';
 
 /// Upload layout widget with responsive design
@@ -174,21 +175,86 @@ class UploadLayout extends StatelessWidget {
   }
 
   /// Left panel: the upload/URL controls locally, or a read-only note when
-  /// running as the hosted viewer (no processing backend available).
+  /// running as the hosted viewer (no processing backend available). Either
+  /// way, the fully client-side Practice Mode entry point is offered too.
   Widget _leftPanel(BuildContext context) {
     if (!isRemote) {
-      return UploadSection(
-        appState: appState,
-        apiService: apiService,
-        onFileUpload: onFileUpload,
-        onUrlSubmitted: onUrlSubmitted,
-        onCancel: onCancel,
-        isLoadingJson: isLoadingJson,
-        isLoadingAudio: isLoadingAudio,
-        loadingAudioStatus: loadingAudioStatus,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          UploadSection(
+            appState: appState,
+            apiService: apiService,
+            onFileUpload: onFileUpload,
+            onUrlSubmitted: onUrlSubmitted,
+            onCancel: onCancel,
+            isLoadingJson: isLoadingJson,
+            isLoadingAudio: isLoadingAudio,
+            loadingAudioStatus: loadingAudioStatus,
+          ),
+          const SizedBox(height: 20),
+          _practiceModeCard(context),
+        ],
       );
     }
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.graphic_eq_rounded, color: colorScheme.primary, size: 28),
+                    const SizedBox(width: 12),
+                    Text('Music Transcriber',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Browse your transcribed library. Select a track to view its pitch, '
+                  'chords, and instruments.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.cloud_done_rounded, size: 16,
+                        color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Hosted, read-only. Run the app locally to transcribe new audio.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _practiceModeCard(context),
+      ],
+    );
+  }
+
+  /// Entry point for the fully client-side, backend-free Practice Mode —
+  /// shown regardless of local/remote mode, since it needs neither.
+  Widget _practiceModeCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Card(
@@ -198,37 +264,22 @@ class UploadLayout extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.graphic_eq_rounded, color: colorScheme.primary, size: 28),
-                const SizedBox(width: 12),
-                Text('Music Transcriber',
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 12),
+            Text('Just want to practice?', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
             Text(
-              'Browse your transcribed library. Select a track to view its pitch, '
-              'chords, and instruments.',
-              style: theme.textTheme.bodyMedium?.copyWith(
+              'Upload any audio file to transpose its key or change its speed, '
+              'entirely in your browser — no transcription needed.',
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(Icons.cloud_done_rounded, size: 16,
-                    color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Hosted, read-only. Run the app locally to transcribe new audio.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PracticeScreen()),
+              ),
+              icon: const Icon(Icons.tune_rounded),
+              label: const Text('Open Practice Mode'),
             ),
           ],
         ),

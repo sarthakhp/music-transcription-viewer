@@ -7,10 +7,14 @@ import 'package:flutter/material.dart';
 class SpeedControl extends StatelessWidget {
   final double speed;
   final ValueChanged<double> onChanged;
+  final List<double> presets;
 
-  static const List<double> presets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-
-  const SpeedControl({super.key, required this.speed, required this.onChanged});
+  const SpeedControl({
+    super.key,
+    required this.speed,
+    required this.onChanged,
+    this.presets = const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+  });
 
   @override
   Widget build(BuildContext context) {

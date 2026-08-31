@@ -155,6 +155,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     try {
       await readyCompleter.future.timeout(const Duration(seconds: 15));
     } catch (e) {
+      debugPrint('[WebAudioPlayer] canplay/error wait failed: $e');
       _setState(AudioPlayerState.idle);
       rethrow;
     } finally {
@@ -162,11 +163,41 @@ class WebAudioPlayer implements PlatformAudioPlayer {
       _audio!.removeEventListener('error', onErr);
     }
 
+    await _fixInfiniteDuration();
+
     // Set up Web Audio graph.
     await _setupGraph();
 
     _setState(AudioPlayerState.ready);
     _durationController.add(duration);
+  }
+
+  /// Some mp3 elementary streams (e.g. extracted from a fragmented MP4/DASH
+  /// source, as with common yt-dlp-style rips) don't carry the header info
+  /// Chrome needs to report duration up front — `duration` reads Infinity
+  /// until the element is seeked near the end and back. This forces that.
+  Future<void> _fixInfiniteDuration() async {
+    final audio = _audio;
+    if (audio == null) return;
+    final d = audio.duration;
+    if (!d.isNaN && !d.isInfinite) return;
+
+    final completer = Completer<void>();
+    late JSFunction onTimeUpdate;
+    onTimeUpdate = ((web.Event _) {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.currentTime = 0;
+      if (!completer.isCompleted) completer.complete();
+    }).toJS;
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.currentTime = 1e101;
+
+    try {
+      await completer.future.timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('[WebAudioPlayer] _fixInfiniteDuration: timed out waiting for timeupdate: $e');
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+    }
   }
 
   // --- Web Audio Graph ------------------------------------------------------
@@ -352,7 +383,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   @override
   Future<void> setSpeed(double speed) async {
     if (_audio == null) return;
-    _audio!.playbackRate = speed.clamp(0.5, 2.0);
+    _audio!.playbackRate = speed.clamp(0.25, 2.0);
   }
 
   @override

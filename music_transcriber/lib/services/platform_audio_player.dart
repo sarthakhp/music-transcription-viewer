@@ -55,7 +55,7 @@ abstract class PlatformAudioPlayer {
   /// Seek to a position.
   Future<void> seek(Duration position);
 
-  /// Set playback speed (0.5 - 2.0).
+  /// Set playback speed (0.25 - 2.0).
   Future<void> setSpeed(double speed);
 
   /// Set pitch shift in semitones (-12 to +12). Speed is preserved.

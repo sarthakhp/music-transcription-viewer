@@ -39,6 +39,12 @@
     import { SoundTouchNode } from './SoundTouchNode.js';
     window.SoundTouchNode = SoundTouchNode;
   </script>
+  <!-- MP3 encoder used by audio_exporter.js for instant client-side export -->
+  <script src="lame.min.js"></script>
+  <script type="module">
+    import { exportMp3 } from './audio_exporter.js';
+    window.audioExporter = { exportMp3 };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
