@@ -22,6 +22,10 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
+          // Reading platform brightness here (rather than only themeMode)
+          // means this also re-syncs appPalette if the OS theme changes
+          // while themeMode is ThemeMode.system.
+          appPalette = themeProvider.getPalette(MediaQuery.platformBrightnessOf(context));
           return MaterialApp(
             title: 'Music Transcriber',
             debugShowCheckedModeBanner: false,
@@ -74,7 +78,7 @@ class MyApp extends StatelessWidget {
   }
 
   ThemeData _buildDarkTheme() {
-    const palette = indigoPalette; // Dark theme palette
+    const palette = darkPalette; // Dark theme palette
     final colorScheme = ColorScheme.fromSeed(
       seedColor: palette.seedColor,
       brightness: Brightness.dark,

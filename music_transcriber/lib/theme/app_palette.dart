@@ -54,23 +54,23 @@ class AppPalette {
 
 // --- Available palettes ------------------------------------------------
 
-const indigoPalette = AppPalette(
+const darkPalette = AppPalette(
   brightness:       Brightness.dark,
-  seedColor:        Color(0xFF6366F1),
-  scaffoldBg:       Color(0xFF0F0F14),
-  cardBg:           Color(0xFF1A1A24),
-  graphBg:          Color(0xFF12121A),
+  seedColor:        Color(0xFF14B8A6),
+  scaffoldBg:       Color(0xFF000000),
+  cardBg:           Color(0xFF000000),
+  graphBg:          Color(0xFF111413),
   tonicTint:        Color(0xFF6699CC),
-  tooltipBg:        Color(0xFF2A2A3A),
+  tooltipBg:        Color(0xFF262C2B),
   playheadColor:    Color(0xFFEF4444),
   bassColor:        Color(0xFFFF6B35),
   otherColor:       Color(0xFF48BFE3),
   bassHighlightColor: Color(0xFFFF3300),
   otherHighlightColor: Color(0xFF0066CC),
   vocalHighlightColor: Color(0xFFFF9800), // Bright orange for vocal highlights
-  hoverRowBg: Color(0x266366F1), // Indigo at 15% opacity (more visible)
-  hoverLabelColor: Color(0xFF8B8FF7), // Light indigo for dark theme
-  hoverLabelBg: Color(0x4D6366F1), // Indigo at 30% opacity (more visible)
+  hoverRowBg: Color(0x2614B8A6), // Teal at 15% opacity (more visible)
+  hoverLabelColor: Color(0xFF5EEAD4), // Light teal for dark theme
+  hoverLabelBg: Color(0x4D14B8A6), // Teal at 30% opacity (more visible)
   sargamShuddhColor: Color(0xFFE0E0E0),
   sargamShuddhBg:    Color(0x22FFFFFF),
   sargamKomalColor:  Color(0xFF90CAF9),
@@ -102,5 +102,8 @@ const minimalistPalette = AppPalette(
   trimHandleColor:  Color(0xFF334155),
 );
 
-// --- Active palette — change this one line to switch -------------------
-const appPalette = minimalistPalette;
+// --- Active palette ------------------------------------------------------
+// Kept in sync with the current theme mode / system brightness by MyApp's
+// build method in main.dart (CustomPainters and other non-widget code that
+// can't easily reach Theme.of(context) read this global directly).
+AppPalette appPalette = minimalistPalette;

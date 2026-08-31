@@ -193,7 +193,7 @@ class _PitchGraphState extends State<PitchGraph> {
 
     // Get the appropriate palette based on current theme brightness
     final palette = theme.brightness == Brightness.dark
-        ? indigoPalette
+        ? darkPalette
         : minimalistPalette;
 
     return LayoutBuilder(

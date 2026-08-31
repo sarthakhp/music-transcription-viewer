@@ -13,10 +13,10 @@ class ThemeProvider extends ChangeNotifier {
       case ThemeMode.light:
         return minimalistPalette;
       case ThemeMode.dark:
-        return indigoPalette;
+        return darkPalette;
       case ThemeMode.system:
         return systemBrightness == Brightness.dark 
-            ? indigoPalette 
+            ? darkPalette 
             : minimalistPalette;
     }
   }
