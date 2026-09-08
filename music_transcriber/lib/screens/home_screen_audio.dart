@@ -120,13 +120,16 @@ extension _HomeScreenAudio on _HomeScreenState {
             // seeked position, so the stream position is the ground truth here.
             _awaitingFirstStreamSync = false;
             _lastKnownPosition = time;
-          } else if (diff.abs() > 1.0) {
-            // Large jump = seek; snap directly to stream position
-            _lastKnownPosition = time;
           } else {
-            // Normal playback: advance baseline to max(stream, interpolated) to prevent
-            // backward visual jumps while still resyncing every ~200ms to avoid timer drift.
-            _lastKnownPosition = interpolated > time ? interpolated : time;
+            // Always reset baseline to the actual audio clock (ground truth).
+            // Previously this used max(interpolated, time) to "avoid backward
+            // visual jumps", but that caused compounding forward drift: the 16ms
+            // timer fires at ~17-18ms due to CPU jitter, so interpolated is always
+            // slightly ahead of time, and max() kept accumulating that overshoot.
+            // After 60s this produced ~300-500ms of visible desync.
+            // Resetting to time is safe — during normal monotonic playback time
+            // only moves forward, so the playhead never jumps back.
+            _lastKnownPosition = time;
           }
           _lastPositionUpdateTime = DateTime.now();
         } else {
@@ -228,12 +231,16 @@ extension _HomeScreenAudio on _HomeScreenState {
         return;
       }
 
+      // Don't advance the playhead while audio is stalled waiting for data —
+      // the wall clock keeps ticking but no audio is playing, which would cause
+      // the playhead to run ahead of the audio once buffering resumes.
+      if (_waitingForBuffer) return;
+
       if (_lastPositionUpdateTime != null) {
         final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
         final interpolatedPosition = _lastKnownPosition + elapsed.inMilliseconds / 1000.0 * _playbackSpeed;
         appState.setCurrentTime(interpolatedPosition);
         _viewState.updateViewWindowForPlayback(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
-
       }
     });
   }
