@@ -66,6 +66,17 @@ abstract class PlatformAudioPlayer {
   /// Set pitch shift in semitones (-12 to +12). Speed is preserved.
   void setPitchSemitones(int semitones);
 
+  /// Total audio pipeline output latency in seconds.
+  ///
+  /// This is the delay between audio data entering the pipeline (when the
+  /// `playing` event fires) and the sound actually reaching the speakers.
+  /// Used to offset the playhead start position so it stays in sync with
+  /// what the user hears rather than what the pipeline receives.
+  ///
+  /// Returns 0 on native (handled by just_audio internally) and when the
+  /// Web Audio API does not expose latency (e.g. some WKWebView versions).
+  double get audioLatencySeconds => 0.0;
+
   /// Release resources.
   Future<void> dispose();
 }

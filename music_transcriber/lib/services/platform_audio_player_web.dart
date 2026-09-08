@@ -433,6 +433,27 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     }
   }
 
+  /// Returns the total audio hardware output latency from the Web Audio API.
+  ///
+  /// `outputLatency`: time from when AudioContext hands data to the hardware
+  /// until it reaches the speakers (Chrome: typically 20-80ms; WKWebView may
+  /// return 0 or not expose this property).
+  /// `baseLatency`: minimum latency intrinsic to the AudioContext graph itself
+  /// (usually 10-20ms).
+  ///
+  /// Both are zero-safe — if the API is unavailable (old Safari / WKWebView)
+  /// we return 0 and the playhead runs without compensation.
+  @override
+  double get audioLatencySeconds {
+    final ctx = _ctx;
+    if (ctx == null) return 0.0;
+    try {
+      return ctx.outputLatency + ctx.baseLatency;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
   // --- Helpers --------------------------------------------------------------
 
   void _setState(AudioPlayerState newState) {

@@ -161,7 +161,12 @@ extension _HomeScreenAudio on _HomeScreenState {
       _processingStateSubscription = _audioService.stateStream.listen((state) {
         if (!mounted) return;
         debugPrint('[AudioPlayerState] $state  waitingForBuffer=$_waitingForBuffer');
-        if (state == AudioPlayerState.ready && _waitingForBuffer) {
+        if (state == AudioPlayerState.buffering) {
+          // Audio stalled mid-playback — freeze playhead so it doesn't race
+          // ahead while no audio is coming out of the speakers.
+          _waitingForBuffer = true;
+        } else if (state == AudioPlayerState.ready && _waitingForBuffer) {
+          // Buffer recovered — reseed from actual position so we don't jump.
           _waitingForBuffer = false;
           final actualPos = _audioService.position.inMilliseconds / 1000.0;
           debugPrint('[BufferReady] Reseeding from actual pos=$actualPos');
@@ -208,22 +213,33 @@ extension _HomeScreenAudio on _HomeScreenState {
   void _startPlayheadAnimation() {
     _playheadAnimationTimer?.cancel();
 
-    // Seed baseline from actual audio position to avoid stale interpolation on resume.
-    // Also arm the first-sync flag so the first positionStream event corrects any
-    // keyframe-snap offset introduced by the web audio engine after a seek.
     final audioPos = _audioService.position.inMilliseconds / 1000.0;
     final appState = context.read<AppState>();
-    // debugPrint('[StartAnim] audioPos=$audioPos, appCurrentTime=${appState.currentTime}, prev_lastKnown=$_lastKnownPosition');
-    _lastKnownPosition = audioPos;
+
+    // Offset the seed position backward by the audio hardware output latency.
+    //
+    // The 'playing' event (which triggers this call) fires when audio data
+    // enters the audio pipeline — but the sound doesn't reach speakers until
+    // outputLatency + baseLatency seconds later. If we start the playhead at
+    // audioPos, it visually runs ahead of what the user hears.
+    //
+    // By seeding at (audioPos - latency), the playhead starts slightly before
+    // the pipeline position. As the latency window passes, it catches up and
+    // sits in sync with the speakers.
+    //
+    // On WKWebView (DMG app) outputLatency may be 0 or unavailable — the
+    // Safari/WebKit audio engine reports latency differently from Chrome.
+    // In that case latency=0 and this is a no-op.
+    final latency = _audioService.audioLatencySeconds;
+    _lastKnownPosition = (audioPos - latency * _playbackSpeed).clamp(0.0, double.infinity);
     _lastPositionUpdateTime = DateTime.now();
     _awaitingFirstStreamSync = true;
-
-    // Arm _waitingForBuffer regardless of current processingState — buffering may fire
-    // either before or after this point (race with the audio engine). The listener will
-    // clear it when ready fires.
-    _waitingForBuffer = true;
+    // _waitingForBuffer is NOT set here — this method is always triggered by
+    // the 'playing' event, meaning audio is actively flowing. Mid-playback
+    // stalls are handled by the stateStream listener (AudioPlayerState.buffering).
+    _waitingForBuffer = false;
     final currentState = _audioService.playerState;
-    debugPrint('[StartAnim] seed=$audioPos  firstSync=ARMED  playerState=$currentState  waitingForBuffer=$_waitingForBuffer');
+    debugPrint('[StartAnim] seed=$audioPos  latency=${latency.toStringAsFixed(3)}s  firstSync=ARMED  playerState=$currentState');
 
     _playheadAnimationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       if (!mounted || !appState.isPlaying) {

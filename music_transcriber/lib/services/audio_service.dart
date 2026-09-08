@@ -39,6 +39,10 @@ class AudioService {
 
   PlatformAudioPlayer? get _player => _players[_activeTrack];
 
+  /// Total audio output latency in seconds (pipeline + hardware).
+  /// Used to offset playhead start so visual position matches heard audio.
+  double get audioLatencySeconds => _player?.audioLatencySeconds ?? 0.0;
+
   bool get isPlaying {
     final player = _player;
     if (player == null) return false;
