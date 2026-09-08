@@ -390,8 +390,24 @@ class _UploadSectionState extends State<UploadSection> {
     try {
       final bytes = await _trimmedRecordingBytes();
       final now = DateTime.now();
-      final ts = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-      await widget.onFileUpload!(bytes, 'recording_$ts.wav');
+
+      // Date-time stamp: YYYY-MM-DD HH:MM
+      final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+      // Actual submitted duration (respects trim handles)
+      final isFullRange = _recordTrimStart <= 0.5 && (_recordTrimEnd >= _recordedDuration - 0.5);
+      final submitDuration = isFullRange
+          ? _recordedDuration
+          : (_recordTrimEnd - _recordTrimStart);
+      final totalSecs = submitDuration.round();
+      final durStr = totalSecs >= 60
+          ? '${totalSecs ~/ 60}m${(totalSecs % 60).toString().padLeft(2, '0')}s'
+          : '${totalSecs}s';
+
+      // Filename uses underscores for filesystem safety; display title uses readable separators
+      final tsFile = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      await widget.onFileUpload!(bytes, 'Recording $date $time ($durStr)_$tsFile.wav');
     } finally {
       if (mounted) setState(() => _isSubmittingRecord = false);
     }
@@ -520,7 +536,7 @@ class _UploadSectionState extends State<UploadSection> {
                         Icon(Icons.error_outline, color: colorScheme.error),
                         const SizedBox(width: 12),
                         Flexible(
-                          child: Text(
+                          child: SelectableText(
                             appState.errorMessage!,
                             style: TextStyle(color: colorScheme.onErrorContainer),
                           ),

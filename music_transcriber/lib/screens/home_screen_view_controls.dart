@@ -185,7 +185,13 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
     // A: toggle auto-scroll during playback
     if (event.logicalKey == LogicalKeyboardKey.keyA) {
-      _viewState.setAutoScroll(!_viewState.autoScroll);
+      final turningOn = !_viewState.autoScroll;
+      final appState = context.read<AppState>();
+      _viewState.setAutoScroll(
+        turningOn,
+        snapToTime: turningOn ? appState.currentTime : null,
+        maxTime: appState.pitchData?.maxTime,
+      );
       return KeyEventResult.handled;
     }
 

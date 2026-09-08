@@ -458,7 +458,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     builder: (context, _) {
                       final isOn = _viewState.autoScroll;
                       return GestureDetector(
-                        onTap: () => _viewState.setAutoScroll(!isOn),
+                        onTap: () {
+                          final appState = context.read<AppState>();
+                          _viewState.setAutoScroll(
+                            !isOn,
+                            snapToTime: isOn ? null : appState.currentTime,
+                            maxTime: appState.pitchData?.maxTime,
+                          );
+                        },
                         child: Chip(
                           avatar: Icon(
                             isOn ? Icons.play_arrow_rounded : Icons.play_arrow_outlined,

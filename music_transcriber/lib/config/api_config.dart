@@ -14,10 +14,25 @@ class ApiConfig {
   static const String firebaseIndexUrl =
       String.fromEnvironment('FIREBASE_INDEX_URL');
 
-  // Base URL for the API - Switch between ngrok and localhost here
-  static const bool _useNgrok = false; // Change to false for localhost
+  // Base URL for the API.
+  // When running as a bundled desktop app the Flutter web UI is served by the
+  // same FastAPI server, so we use the current page's origin — this way the
+  // port is always correct regardless of which port the launcher chose.
+  // In development (flutter run / firebase hosting) fall back to localhost:8000.
+  static const bool _useNgrok = false;
   static const String _ngrokUrl = 'https://hypocotylous-krysten-abominably.ngrok-free.dev';
-  static const String _localhostUrl = 'http://localhost:8000';
+  static String get _localhostUrl {
+    // ignore: undefined_prefixed_name
+    try {
+      // On the web, Uri.base gives the page's origin (scheme+host+port).
+      // This works both in the bundled desktop app and in a browser.
+      final uri = Uri.base;
+      if (uri.host.isNotEmpty) {
+        return '${uri.scheme}://${uri.host}:${uri.port}';
+      }
+    } catch (_) {}
+    return 'http://localhost:8000';
+  }
   static String get baseUrl => _useNgrok ? _ngrokUrl : _localhostUrl;
   
   // API version

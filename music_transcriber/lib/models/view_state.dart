@@ -31,9 +31,16 @@ class ViewState extends ChangeNotifier {
   bool _autoScroll = true;
   bool get autoScroll => _autoScroll;
 
-  void setAutoScroll(bool value) {
+  void setAutoScroll(bool value, {double? snapToTime, double? maxTime}) {
     if (_autoScroll == value) return;
     _autoScroll = value;
+    if (value && snapToTime != null) {
+      // Immediately center view on playhead so the user doesn't have to press
+      // play first to see where they are.
+      final mt = maxTime ?? snapToTime + _viewWindowSize;
+      final maxStart = max(0.0, mt - _viewWindowSize);
+      _viewStartTime = (snapToTime - _viewWindowSize / 2.0).clamp(0.0, maxStart);
+    }
     notifyListeners();
   }
 
