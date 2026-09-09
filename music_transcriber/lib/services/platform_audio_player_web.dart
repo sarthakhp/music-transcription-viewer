@@ -81,13 +81,6 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   AudioPlayerState _state = AudioPlayerState.idle;
   int _currentSemitones = 0;
 
-  // When SoundTouch is active we keep media.playbackRate = 1.0 and drive
-  // speed via stNode.tempo. This avoids WKWebView's choppy native time-stretch.
-  // _stTempo tracks the current SoundTouch tempo (1.0 = normal speed).
-  // All position reads/seeks are scaled so callers still see song-position
-  // seconds rather than raw media-element seconds.
-  double _stTempo = 1.0;
-
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _playingController = StreamController<bool>.broadcast();
@@ -115,9 +108,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   @override
   Duration get position {
     if (_media == null) return Duration.zero;
-    // media.currentTime is in "raw" time (advances at 1.0x real-time when
-    // SoundTouch drives speed). Multiply by _stTempo to get song position.
-    return Duration(milliseconds: (_media!.currentTime * _stTempo * 1000).round());
+    return Duration(milliseconds: (_media!.currentTime * 1000).round());
   }
 
   @override
@@ -275,7 +266,6 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   Future<void> _teardownGraph() async {
     _removeEventListeners();
     _isPlaying = false;
-    _stTempo = 1.0;
 
     if (_media != null) {
       _media!.pause();
@@ -421,8 +411,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   Future<void> seek(Duration position) async {
     if (_media == null) return;
     final wasCompleted = _state == AudioPlayerState.completed;
-    // Convert song-position seconds to raw media-element seconds.
-    _media!.currentTime = position.inMilliseconds / 1000.0 / _stTempo;
+    _media!.currentTime = position.inMilliseconds / 1000.0;
     _positionController.add(position);
     if (wasCompleted) {
       _setState(AudioPlayerState.ready);
@@ -434,19 +423,7 @@ class WebAudioPlayer implements PlatformAudioPlayer {
   Future<void> setSpeed(double speed) async {
     if (_media == null) return;
     final clamped = speed.clamp(0.25, 2.0);
-    if (_stNode != null) {
-      // Use SoundTouch WSOLA time-stretching for smooth speed changes.
-      // This avoids WKWebView's (WebKit) choppy native playbackRate algorithm.
-      // Preserve heard position: heardPos = currentTime * oldTempo.
-      final heardPos = _media!.currentTime * _stTempo;
-      _stTempo = clamped;
-      _stNode!.tempo.value = clamped;
-      _media!.playbackRate = 1.0; // SoundTouch owns tempo; browser does nothing
-      // Reseed currentTime so position() returns the same song position.
-      _media!.currentTime = heardPos / _stTempo;
-    } else {
-      _media!.playbackRate = clamped;
-    }
+    _media!.playbackRate = clamped;
   }
 
   @override
