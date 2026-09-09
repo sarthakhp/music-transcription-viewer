@@ -106,36 +106,11 @@ extension _HomeScreenAudio on _HomeScreenState {
 
       _positionSubscription = _audioService.positionStream.listen((position) {
         if (!mounted) return;
-        final time = position.inMilliseconds / 1000.0;
-        final timerRunning = _playheadAnimationTimer != null && _lastPositionUpdateTime != null;
-
-        if (timerRunning) {
-          final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
-          final interpolated = _lastKnownPosition + elapsed.inMilliseconds / 1000.0 * _playbackSpeed;
-          final diff = time - interpolated;
-
-          if (_awaitingFirstStreamSync) {
-            // First stream event after pressing play: always snap to stream.
-            // On web, the audio engine may start from a keyframe slightly before the
-            // seeked position, so the stream position is the ground truth here.
-            _awaitingFirstStreamSync = false;
-            _lastKnownPosition = time;
-          } else {
-            // Always reset baseline to the actual audio clock (ground truth).
-            // Previously this used max(interpolated, time) to "avoid backward
-            // visual jumps", but that caused compounding forward drift: the 16ms
-            // timer fires at ~17-18ms due to CPU jitter, so interpolated is always
-            // slightly ahead of time, and max() kept accumulating that overshoot.
-            // After 60s this produced ~300-500ms of visible desync.
-            // Resetting to time is safe — during normal monotonic playback time
-            // only moves forward, so the playhead never jumps back.
-            _lastKnownPosition = time;
-          }
-          _lastPositionUpdateTime = DateTime.now();
-        } else {
-          // Paused — stream is authoritative
-          _lastKnownPosition = time;
-          _lastPositionUpdateTime = DateTime.now();
+        // When paused/stopped the Ticker is not running, so we update position
+        // here (e.g. after a seek while paused). During playback the Ticker
+        // reads media.currentTime directly each frame — no correction needed.
+        if (_playheadTicker == null || !_playheadTicker!.isActive) {
+          final time = position.inMilliseconds / 1000.0;
           appState.setCurrentTime(time);
           _viewState.updateViewWindowForPlayback(time, appState.pitchData?.maxTime ?? 120);
         }
@@ -160,19 +135,12 @@ extension _HomeScreenAudio on _HomeScreenState {
 
       _processingStateSubscription = _audioService.stateStream.listen((state) {
         if (!mounted) return;
-        debugPrint('[AudioPlayerState] $state  waitingForBuffer=$_waitingForBuffer');
         if (state == AudioPlayerState.buffering) {
-          // Audio stalled mid-playback — freeze playhead so it doesn't race
-          // ahead while no audio is coming out of the speakers.
+          // Audio stalled — freeze Ticker so playhead doesn't race ahead.
           _waitingForBuffer = true;
         } else if (state == AudioPlayerState.ready && _waitingForBuffer) {
-          // Buffer recovered — reseed from actual position so we don't jump.
+          // Buffer recovered — Ticker will pick up live currentTime next frame.
           _waitingForBuffer = false;
-          final actualPos = _audioService.position.inMilliseconds / 1000.0;
-          debugPrint('[BufferReady] Reseeding from actual pos=$actualPos');
-          _lastKnownPosition = actualPos;
-          _lastPositionUpdateTime = DateTime.now();
-          _awaitingFirstStreamSync = true;
         }
       });
     }
@@ -209,62 +177,31 @@ extension _HomeScreenAudio on _HomeScreenState {
     }
   }
 
-  /// Start smooth playhead animation at 60fps
+  /// Start vsync-synced playhead — reads media.currentTime directly each frame.
+  /// No dead-reckoning, no correction jumps.
   void _startPlayheadAnimation() {
-    _playheadAnimationTimer?.cancel();
-
-    final audioPos = _audioService.position.inMilliseconds / 1000.0;
+    _playheadTicker?.dispose();
+    _waitingForBuffer = false;
     final appState = context.read<AppState>();
 
-    // Offset the seed position backward by the audio hardware output latency.
-    //
-    // The 'playing' event (which triggers this call) fires when audio data
-    // enters the audio pipeline — but the sound doesn't reach speakers until
-    // outputLatency + baseLatency seconds later. If we start the playhead at
-    // audioPos, it visually runs ahead of what the user hears.
-    //
-    // By seeding at (audioPos - latency), the playhead starts slightly before
-    // the pipeline position. As the latency window passes, it catches up and
-    // sits in sync with the speakers.
-    //
-    // On WKWebView (DMG app) outputLatency may be 0 or unavailable — the
-    // Safari/WebKit audio engine reports latency differently from Chrome.
-    // In that case latency=0 and this is a no-op.
-    final latency = _audioService.audioLatencySeconds;
-    _lastKnownPosition = (audioPos - latency * _playbackSpeed).clamp(0.0, double.infinity);
-    _lastPositionUpdateTime = DateTime.now();
-    _awaitingFirstStreamSync = true;
-    // _waitingForBuffer is NOT set here — this method is always triggered by
-    // the 'playing' event, meaning audio is actively flowing. Mid-playback
-    // stalls are handled by the stateStream listener (AudioPlayerState.buffering).
-    _waitingForBuffer = false;
-    final currentState = _audioService.playerState;
-    debugPrint('[StartAnim] seed=$audioPos  latency=${latency.toStringAsFixed(3)}s  firstSync=ARMED  playerState=$currentState');
-
-    _playheadAnimationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+    _playheadTicker = createTicker((_) {
       if (!mounted || !appState.isPlaying) {
         _stopPlayheadAnimation();
         return;
       }
-
-      // Don't advance the playhead while audio is stalled waiting for data —
-      // the wall clock keeps ticking but no audio is playing, which would cause
-      // the playhead to run ahead of the audio once buffering resumes.
       if (_waitingForBuffer) return;
 
-      if (_lastPositionUpdateTime != null) {
-        final elapsed = DateTime.now().difference(_lastPositionUpdateTime!);
-        final interpolatedPosition = _lastKnownPosition + elapsed.inMilliseconds / 1000.0 * _playbackSpeed;
-        appState.setCurrentTime(interpolatedPosition);
-        _viewState.updateViewWindowForPlayback(interpolatedPosition, appState.pitchData?.maxTime ?? 120);
-      }
+      final pos = _audioService.position.inMilliseconds / 1000.0;
+      appState.setCurrentTime(pos);
+      _viewState.updateViewWindowForPlayback(pos, appState.pitchData?.maxTime ?? 120);
     });
+    _playheadTicker!.start();
   }
 
-  /// Stop smooth playhead animation
+  /// Stop playhead ticker.
   void _stopPlayheadAnimation() {
-    _playheadAnimationTimer?.cancel();
-    _playheadAnimationTimer = null;
+    _playheadTicker?.dispose();
+    _playheadTicker = null;
   }
 
   String _getMimeType(String fileName) {

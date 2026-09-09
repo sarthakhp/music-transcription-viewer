@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' show max;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
@@ -34,7 +35,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final bool _isLoadingJson = false;
   bool _isLoadingAudio = false; // Show loading indicator while audio files are being prepared
   String? _loadingAudioStatus; // Detailed loading status message
@@ -46,13 +47,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   StreamSubscription<bool>? _playingSubscription;
   StreamSubscription<AudioPlayerState>? _processingStateSubscription;
   bool _audioLoaded = false;
-  bool _waitingForBuffer = false; // true when play was pressed but audio is still buffering
+  bool _waitingForBuffer = false; // true while audio is mid-buffer stall
 
-  // Smooth playhead animation (60fps)
-  Timer? _playheadAnimationTimer;
-  double _lastKnownPosition = 0.0;
-  DateTime? _lastPositionUpdateTime;
-  bool _awaitingFirstStreamSync = false; // true until first positionStream event after play
+  // Playhead driven by a vsync Ticker that reads media.currentTime directly
+  // each frame — no dead-reckoning, no correction jumps.
+  Ticker? _playheadTicker;
 
   // Persisted user settings
   final UserSettings _userSettings = UserSettings();
