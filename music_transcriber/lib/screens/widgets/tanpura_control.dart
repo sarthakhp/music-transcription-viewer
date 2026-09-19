@@ -64,10 +64,9 @@ class _TanpuraButtonState extends State<TanpuraButton> {
       child: Tooltip(
         message: isOn ? 'Tanpura on — tap to adjust' : 'Start tanpura drone',
         child: IconButton(
-          icon: const Icon(Icons.music_note),
+          icon: _TanpuraIcon(color: isOn ? colorScheme.primary : colorScheme.onSurface.withValues(alpha: 0.7)),
           isSelected: isOn,
-          selectedIcon: const Icon(Icons.music_note),
-          color: isOn ? colorScheme.primary : null,
+          selectedIcon: _TanpuraIcon(color: colorScheme.primary),
           onPressed: () {
             if (!widget.tanpura.isPlaying) {
               widget.tanpura.start();
@@ -142,20 +141,20 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.music_note, size: 16, color: colorScheme.primary),
+                      _TanpuraIcon(color: colorScheme.primary, size: 16),
                       const SizedBox(width: 8),
                       Text('Tanpura', style: theme.textTheme.titleSmall),
                       const Spacer(),
-                      Switch(
-                        value: tanpura.isPlaying,
-                        onChanged: (v) {
-                          if (v) {
-                            tanpura.start();
-                          } else {
-                            tanpura.stop();
-                          }
-                        },
-                      ),
+                      if (tanpura.isLoading)
+                        const SizedBox(width: 24, height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                      else
+                        Switch(
+                          value: tanpura.isPlaying,
+                          onChanged: (v) {
+                            if (v) tanpura.start(); else tanpura.stop();
+                          },
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -189,4 +188,81 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
       ],
     );
   }
+}
+
+/// Tanpura silhouette icon drawn with CustomPaint.
+class _TanpuraIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _TanpuraIcon({required this.color, this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _TanpuraPainter(color)),
+    );
+  }
+}
+
+class _TanpuraPainter extends CustomPainter {
+  final Color color;
+  _TanpuraPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Resonator body (large teardrop at bottom)
+    final bodyPath = Path();
+    bodyPath.addOval(Rect.fromCenter(
+      center: Offset(w * 0.5, h * 0.72),
+      width: w * 0.72,
+      height: h * 0.50,
+    ));
+    canvas.drawPath(bodyPath, paint);
+
+    // Neck (thin rectangle)
+    final neckRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.42, h * 0.18, w * 0.16, h * 0.42),
+      Radius.circular(w * 0.04),
+    );
+    canvas.drawRRect(neckRect, paint);
+
+    // Head / peg box (small oval at top)
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(w * 0.5, h * 0.11), width: w * 0.28, height: h * 0.18),
+      paint,
+    );
+
+    // 4 tuning pegs (tiny circles on sides of head)
+    final pegR = w * 0.05;
+    for (var i = 0; i < 2; i++) {
+      canvas.drawCircle(Offset(w * 0.30, h * (0.07 + i * 0.08)), pegR, paint);
+      canvas.drawCircle(Offset(w * 0.70, h * (0.07 + i * 0.08)), pegR, paint);
+    }
+
+    // Strings (4 thin lines from head to body)
+    final stringPaint = Paint()
+      ..color = color.withValues(alpha: 0.5)
+      ..strokeWidth = w * 0.018
+      ..style = PaintingStyle.stroke;
+    final offsets = [-0.09, -0.03, 0.03, 0.09];
+    for (final dx in offsets) {
+      canvas.drawLine(
+        Offset(w * (0.5 + dx), h * 0.18),
+        Offset(w * (0.5 + dx * 0.5), h * 0.80),
+        stringPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TanpuraPainter old) => old.color != color;
 }

@@ -1,187 +1,107 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:js_interop';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:web/web.dart' as web;
 
-/// Synthesizes a tanpura drone via Web Audio API.
-///
-/// Each string pluck is built from additive sine harmonics (not sawtooth)
-/// with a natural pluck envelope — fast attack, long resonant decay — giving
-/// a warm, realistic tone instead of a harsh buzzing waveform.
-///
-/// String order: Pa (low), Sa (low), Sa (mid), Sa (high) — traditional tuning.
+/// Plays a real tanpura recording (G scale) as a seamless loop via Web Audio.
+/// Pitch is shifted to the current key by adjusting AudioBufferSourceNode.playbackRate.
+/// The base recording is in G (semitone 7 from C), so a semitone offset of N
+/// plays at rate = 2^((N - 7) / 12).
 class TanpuraService extends ChangeNotifier {
+  static const String _assetPath = 'assets/audio/tanpura_g.opus';
+  // Recording is in G = semitone 7 (relative to C=0 reference)
+  static const int _recordingBaseSemitone = 7;
+
   web.AudioContext? _ctx;
-  web.GainNode? _masterGain;
-  web.DynamicsCompressorNode? _compressor;
+  web.AudioBuffer? _buffer;
+  web.AudioBufferSourceNode? _source;
+  web.GainNode? _gainNode;
 
   bool _isPlaying = false;
+  bool _isLoading = false;
   double _volume = 0.5;
-  int _semitones = 0;
-
-  static const double _cycleSeconds = 6.0;
-  // Each string rings for most of the cycle
-  static const double _noteDuration = 5.0;
-  static const double _lookahead = 1.5;
-
-  // Harmonic series: [multiplier, relative_amplitude]
-  // Falls off naturally like a plucked string
-  static const List<(double, double)> _harmonics = [
-    (1.0, 1.00),
-    (2.0, 0.55),
-    (3.0, 0.28),
-    (4.0, 0.14),
-    (5.0, 0.08),
-    (6.0, 0.04),
-    (7.0, 0.02),
-  ];
-
-  Timer? _schedulerTimer;
-  double _nextCycleTime = 0;
+  int _semitones = 0; // root + transpose combined
 
   bool get isPlaying => _isPlaying;
+  bool get isLoading => _isLoading;
   double get volume => _volume;
 
   void setVolume(double vol) {
     _volume = vol.clamp(0.0, 1.0);
-    _masterGain?.gain.setTargetAtTime(_volume, _ctx?.currentTime ?? 0, 0.05);
+    _gainNode?.gain.setTargetAtTime(_volume, _ctx?.currentTime ?? 0, 0.05);
     notifyListeners();
   }
 
-  /// Update pitch — if already playing, restart immediately so the change
-  /// is heard right away instead of waiting for the next scheduled cycle.
   void setSemitones(int semitones) {
     if (_semitones == semitones) return;
     _semitones = semitones;
-    if (_isPlaying) {
-      _stopScheduler();
-      _startScheduler();
+    if (_isPlaying && _source != null) {
+      _source!.playbackRate.setTargetAtTime(
+        _pitchRate(), _ctx?.currentTime ?? 0, 0.05);
     }
   }
 
+  double _pitchRate() =>
+      math.pow(2, (_semitones - _recordingBaseSemitone) / 12.0).toDouble();
+
   Future<void> start() async {
-    if (_isPlaying) return;
+    if (_isPlaying || _isLoading) return;
 
-    _ctx ??= web.AudioContext();
-    final ctx = _ctx!;
-
-    if (_compressor == null) {
-      _compressor = ctx.createDynamicsCompressor();
-      _compressor!.threshold.value = -18;
-      _compressor!.knee.value = 10;
-      _compressor!.ratio.value = 3;
-      _compressor!.attack.value = 0.003;
-      _compressor!.release.value = 0.25;
-      _compressor!.connect(ctx.destination);
-    }
-
-    if (_masterGain == null) {
-      _masterGain = ctx.createGain();
-      _masterGain!.gain.value = _volume;
-      _masterGain!.connect(_compressor!);
-    }
-
-    if (ctx.state == 'suspended') {
-      await ctx.resume().toDart;
-    }
-
-    _isPlaying = true;
-    _startScheduler();
+    _isLoading = true;
     notifyListeners();
+
+    try {
+      _ctx ??= web.AudioContext();
+      final ctx = _ctx!;
+
+      if (ctx.state == 'suspended') {
+        await ctx.resume().toDart;
+      }
+
+      // Load and decode audio asset on first play
+      if (_buffer == null) {
+        final byteData = await rootBundle.load(_assetPath);
+        final bytes = byteData.buffer.asUint8List();
+        _buffer = await ctx.decodeAudioData(bytes.buffer.toJS).toDart;
+      }
+
+      _gainNode ??= ctx.createGain()..connect(ctx.destination);
+      _gainNode!.gain.value = _volume;
+
+      _source = ctx.createBufferSource();
+      _source!.buffer = _buffer;
+      _source!.loop = true;
+      _source!.playbackRate.value = _pitchRate();
+      _source!.connect(_gainNode!);
+      _source!.start(0);
+
+      _isPlaying = true;
+    } catch (e) {
+      debugPrint('TanpuraService start error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   void stop() {
     if (!_isPlaying) return;
+    try {
+      _source?.stop(0);
+    } catch (_) {}
+    _source = null;
     _isPlaying = false;
-    _stopScheduler();
-    _masterGain?.gain.setTargetAtTime(0, _ctx?.currentTime ?? 0, 0.4);
     notifyListeners();
   }
 
   @override
   void dispose() {
     stop();
-    try { _masterGain?.disconnect(); } catch (_) {}
-    try { _compressor?.disconnect(); } catch (_) {}
-    _masterGain = null;
-    _compressor = null;
+    try { _gainNode?.disconnect(); } catch (_) {}
+    _gainNode = null;
     super.dispose();
-  }
-
-  // --- Scheduling --------------------------------------------------------
-
-  void _startScheduler() {
-    if (_ctx == null) return;
-    _nextCycleTime = _ctx!.currentTime + 0.05;
-    _scheduleCycles();
-  }
-
-  void _stopScheduler() {
-    _schedulerTimer?.cancel();
-    _schedulerTimer = null;
-  }
-
-  void _scheduleCycles() {
-    if (!_isPlaying || _ctx == null) return;
-
-    final now = _ctx!.currentTime;
-    while (_nextCycleTime < now + _lookahead) {
-      _scheduleOneCycle(_nextCycleTime);
-      _nextCycleTime += _cycleSeconds;
-    }
-
-    _schedulerTimer = Timer(
-      Duration(milliseconds: (_lookahead * 500).round()),
-      _scheduleCycles,
-    );
-  }
-
-  // Pa (low), Sa (low), Sa (mid), Sa (high) — traditional tanpura order
-  static const List<int> _intervals = [7, 0, 12, 12];
-  static const List<double> _octaveOffsets = [-1.0, -1.0, 0.0, 0.0];
-  static const List<double> _timing = [0.0, 0.22, 0.44, 0.66];
-
-  // Slight per-string detuning in cents for natural warmth
-  static const List<double> _detunesCents = [0.0, 2.0, -1.5, 1.0];
-
-  void _scheduleOneCycle(double cycleStart) {
-    if (_ctx == null || _masterGain == null) return;
-    final saBase = 261.63 * math.pow(2, _semitones / 12.0);
-    for (int i = 0; i < 4; i++) {
-      final t = cycleStart + _timing[i] * _cycleSeconds;
-      final freq = saBase
-          * math.pow(2, _octaveOffsets[i])
-          * math.pow(2, _intervals[i] / 12.0)
-          * math.pow(2, _detunesCents[i] / 1200.0);
-      _schedulePluck(freq.toDouble(), t);
-    }
-  }
-
-  void _schedulePluck(double freq, double t) {
-    final ctx = _ctx!;
-    // Each harmonic is a pure sine — additive synthesis gives a warm,
-    // smooth timbre rather than the harsh buzz of a raw sawtooth.
-    for (final (mult, amp) in _harmonics) {
-      final osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = freq * mult;
-
-      final gain = ctx.createGain();
-
-      // Pluck envelope: sharp attack, long resonant decay
-      final peak = _volume * amp * 0.35;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(peak, t + 0.025);
-      // Higher harmonics decay faster (natural string behaviour)
-      final decayTau = 1.2 / mult;
-      gain.gain.setTargetAtTime(0.0001, t + 0.025, decayTau);
-
-      osc.connect(gain);
-      gain.connect(_masterGain!);
-
-      osc.start(t);
-      osc.stop(t + _noteDuration);
-    }
   }
 }
