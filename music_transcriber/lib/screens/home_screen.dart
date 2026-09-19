@@ -449,6 +449,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             setState(() => _vocalDetail = v);
             _userSettings.saveVocalDetail(v);
           },
+          currentJobId: _currentJobId,
+          onJobRenamed: (jobId, newName) async {
+            await _apiService.renameJob(jobId, newName);
+          },
         ),
 
         // Main content area — during pan/zoom, only the CustomPaint repaints

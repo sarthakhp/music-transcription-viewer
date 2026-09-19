@@ -271,6 +271,25 @@ class TranscriptionApiService {
     );
   }
 
+  // ========== Endpoint: Rename Job ==========
+
+  /// Rename a job's display label.
+  /// PATCH /api/v1/jobs/{job_id}/rename
+  Future<ApiResponse<void>> renameJob(String jobId, String displayName) async {
+    if (_remote != null) return _remoteUnsupported();
+    return ApiErrorHandler.executeApiCall(
+      () => _client.patch(
+        Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/rename')),
+        headers: {..._commonHeaders, 'Content-Type': 'application/json'},
+        body: '{"display_name":${_jsonEscape(displayName)}}',
+      ).timeout(ApiConfig.requestTimeout),
+      (_) {},
+    );
+  }
+
+  static String _jsonEscape(String s) =>
+      '"${s.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"';
+
   // ========== Endpoint 9b: Retry Job ==========
 
   /// Retry a failed (or cancelled) job, reusing already-downloaded audio.

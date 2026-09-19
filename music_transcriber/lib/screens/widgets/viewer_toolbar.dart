@@ -37,6 +37,10 @@ class ViewerToolbar extends StatelessWidget {
   final int vocalDetail;
   final ValueChanged<int> onVocalDetailChanged;
 
+  // Rename callback — null when no job is active (e.g. remote/Firebase mode)
+  final String? currentJobId;
+  final Future<void> Function(String jobId, String newName)? onJobRenamed;
+
   const ViewerToolbar({
     super.key,
     required this.appState,
@@ -59,6 +63,8 @@ class ViewerToolbar extends StatelessWidget {
     required this.onOtherConfidenceChanged,
     this.vocalDetail = 10,
     required this.onVocalDetailChanged,
+    this.currentJobId,
+    this.onJobRenamed,
   });
 
   @override
@@ -97,16 +103,14 @@ class ViewerToolbar extends StatelessWidget {
               children: [
                 Icon(Icons.audiotrack_rounded, size: 16, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 200),
-                  child: Tooltip(
-                    message: appState.audioFileName ?? 'Audio',
-                    child: Text(
-                      FilenameUtils.shortenFilename(appState.audioFileName ?? 'Audio'),
-                      style: theme.textTheme.bodySmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                _EditableFilename(
+                  filename: appState.audioFileName ?? 'Audio',
+                  onRenamed: (newName) {
+                    appState.renameAudioFile(newName);
+                    if (currentJobId != null && onJobRenamed != null) {
+                      onJobRenamed!(currentJobId!, newName);
+                    }
+                  },
                 ),
                 const SizedBox(width: 12),
                 Icon(Icons.timer_outlined, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
@@ -312,6 +316,112 @@ class _LayerChip extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline-editable filename label. Click/tap to edit; Enter or blur to confirm.
+/// Changes are local only — no backend or Firebase writes.
+class _EditableFilename extends StatefulWidget {
+  final String filename;
+  final ValueChanged<String> onRenamed;
+
+  const _EditableFilename({required this.filename, required this.onRenamed});
+
+  @override
+  State<_EditableFilename> createState() => _EditableFilenameState();
+}
+
+class _EditableFilenameState extends State<_EditableFilename> {
+  bool _editing = false;
+  late TextEditingController _ctrl;
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.filename);
+    _focus.addListener(() {
+      if (!_focus.hasFocus && _editing) _commit();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_EditableFilename old) {
+    super.didUpdateWidget(old);
+    if (!_editing && old.filename != widget.filename) {
+      _ctrl.text = widget.filename;
+    }
+  }
+
+  void _startEditing() {
+    setState(() {
+      _editing = true;
+      _ctrl.text = widget.filename;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focus.requestFocus();
+      _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
+    });
+  }
+
+  void _commit() {
+    final val = _ctrl.text.trim();
+    if (val.isNotEmpty) widget.onRenamed(val);
+    setState(() => _editing = false);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (_editing) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 80, maxWidth: 220),
+        child: IntrinsicWidth(
+          child: TextField(
+            controller: _ctrl,
+            focusNode: _focus,
+            style: theme.textTheme.bodySmall,
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              border: UnderlineInputBorder(),
+            ),
+            onSubmitted: (_) => _commit(),
+          ),
+        ),
+      );
+    }
+    return Tooltip(
+      message: '${widget.filename}\n(click to rename)',
+      child: GestureDetector(
+        onTap: _startEditing,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  FilenameUtils.shortenFilename(widget.filename),
+                  style: theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.edit_rounded, size: 11,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35)),
+            ],
+          ),
         ),
       ),
     );

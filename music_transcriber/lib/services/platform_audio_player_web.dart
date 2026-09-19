@@ -386,6 +386,11 @@ class WebAudioPlayer implements PlatformAudioPlayer {
     // Resume AudioContext if suspended (needs user gesture chain).
     if (_ctx != null && _ctx!.state == 'suspended') {
       await _ctx!.resume().toDart;
+      // Re-apply pitch after context resumes — SoundTouchNode initializes its
+      // DSP state lazily on first audio processing tick, resetting the param.
+      if (_stNode != null) {
+        _stNode!.pitchSemitones.value = _currentSemitones.toDouble();
+      }
     }
 
     try {

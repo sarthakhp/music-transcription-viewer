@@ -85,7 +85,10 @@ extension _HomeScreenJobs on _HomeScreenState {
       final resultsResponse = await _apiService.getJobResults(jobId);
       String? inputFilename;
       if (resultsResponse.isSuccess && resultsResponse.data != null) {
-        inputFilename = resultsResponse.data!.inputFilename;
+        // Prefer user-set display_name over the original input filename.
+        inputFilename = resultsResponse.data!.userDisplayName
+            ?? resultsResponse.data!.videoTitle
+            ?? resultsResponse.data!.inputFilename;
       }
 
       final results = await _apiService.getAllProcessedData(jobId);

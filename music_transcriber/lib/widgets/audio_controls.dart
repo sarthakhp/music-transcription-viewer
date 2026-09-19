@@ -9,7 +9,7 @@ import 'audio_controls/reference_frequency_control.dart';
 /// Audio playback controls widget.
 ///
 /// Composes [SeekSlider] + transport/secondary controls, switching between
-/// a single-row "wide" layout and a stacked "narrow" layout at <700px width.
+/// a single-row "wide" layout and a stacked "narrow" layout at <960px width.
 /// Sub-controls live in `audio_controls/` for maintainability.
 class AudioControls extends StatelessWidget {
   static const double seekStepSeconds = TransportButtons.seekStepSeconds;
@@ -59,7 +59,7 @@ class AudioControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isNarrow = MediaQuery.sizeOf(context).width < 700;
+    final isNarrow = MediaQuery.sizeOf(context).width < 960;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

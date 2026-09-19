@@ -38,6 +38,7 @@ class JobResultsSummary {
   final String? sourceType;
   final String? sourceUrl;
   final String? videoTitle;
+  final String? userDisplayName;
 
   const JobResultsSummary({
     required this.jobId,
@@ -55,10 +56,11 @@ class JobResultsSummary {
     this.sourceType,
     this.sourceUrl,
     this.videoTitle,
+    this.userDisplayName,
   });
 
-  /// Display name: video title for URL jobs, input filename for file uploads.
-  String get displayName => videoTitle ?? inputFilename;
+  /// Display name: user rename > video title > input filename.
+  String get displayName => userDisplayName ?? videoTitle ?? inputFilename;
 
   /// Whether this job was created from a URL.
   bool get isUrlSource => sourceType == 'url';
@@ -80,6 +82,7 @@ class JobResultsSummary {
       sourceType: json['source_type'] as String?,
       sourceUrl: json['source_url'] as String?,
       videoTitle: json['video_title'] as String?,
+      userDisplayName: json['display_name'] as String?,
     );
   }
 
@@ -210,6 +213,7 @@ class JobListItem {
   final String? sourceType;
   final String? sourceUrl;
   final String? videoTitle;
+  final String? userDisplayName;
 
   const JobListItem({
     required this.id,
@@ -229,10 +233,11 @@ class JobListItem {
     this.sourceType,
     this.sourceUrl,
     this.videoTitle,
+    this.userDisplayName,
   });
 
-  /// Display name: video title for URL jobs, input filename for file uploads.
-  String get displayName => videoTitle ?? inputFilename;
+  /// Display name: user rename > video title > input filename.
+  String get displayName => userDisplayName ?? videoTitle ?? inputFilename;
 
   /// Whether this job was created from a URL.
   bool get isUrlSource => sourceType == 'url';
@@ -261,6 +266,7 @@ class JobListItem {
       sourceType: json['source_type'] as String?,
       sourceUrl: json['source_url'] as String?,
       videoTitle: json['video_title'] as String?,
+      userDisplayName: json['display_name'] as String?,
     );
   }
 

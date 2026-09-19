@@ -21,7 +21,12 @@ class ApiConfig {
   // In development (flutter run / firebase hosting) fall back to localhost:8000.
   static const bool _useNgrok = false;
   static const String _ngrokUrl = 'https://hypocotylous-krysten-abominably.ngrok-free.dev';
+  // Override at build/run time: --dart-define=API_BASE_URL=http://localhost:47821
+  static const String _apiBaseUrlOverride =
+      String.fromEnvironment('API_BASE_URL');
+
   static String get _localhostUrl {
+    if (_apiBaseUrlOverride.isNotEmpty) return _apiBaseUrlOverride;
     // ignore: undefined_prefixed_name
     try {
       // On the web, Uri.base gives the page's origin (scheme+host+port).

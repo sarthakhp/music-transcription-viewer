@@ -105,6 +105,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void renameAudioFile(String newName) {
+    if (newName.trim().isEmpty) return;
+    _audioFileName = newName.trim();
+    notifyListeners();
+  }
+
   // Setters for audio stems (NEW)
   void setOriginalAudio(Uint8List? audio) {
     _originalAudio = audio;
