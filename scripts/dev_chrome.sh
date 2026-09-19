@@ -14,12 +14,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FLUTTER_APP="$REPO_ROOT/music_transcriber"
 API_PORT=47821
 
-echo "Starting Flutter dev server (Chrome, hot-reload)..."
+echo "Starting Flutter web server (open in your own browser)..."
 echo "API backend expected at: http://localhost:$API_PORT"
 echo "Press 'r' to hot-reload, 'R' to hot-restart, 'q' to quit."
 echo ""
 
 cd "$FLUTTER_APP"
 flutter run \
-  -d chrome \
+  --web-server-only \
+  --web-port=8080 \
   --dart-define=API_BASE_URL=http://localhost:$API_PORT

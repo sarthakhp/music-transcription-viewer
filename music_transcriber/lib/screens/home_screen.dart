@@ -159,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _playbackSpeed = _userSettings.playbackSpeed;
         _transposeAmount = _userSettings.transposeAmount;
         _scaleRoot = _userSettings.scaleRoot;
-        _tanpura.setSemitones(_userSettings.scaleRoot + _userSettings.transposeAmount);
+        _tanpura.setSemitones(_userSettings.scaleRoot);
         _sargamEnabled = _userSettings.sargamEnabled;
         _vocalDetail = _userSettings.vocalDetail;
       });
@@ -608,7 +608,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onTransposeChanged: (n) {
                 setState(() => _transposeAmount = n);
                 _audioService.setPitchSemitones(n);
-                _tanpura.setSemitones(_scaleRoot + n);
+                _tanpura.setSemitones(_scaleRoot);
                 _userSettings.saveTransposeAmount(n);
                 _saveCurrentJobSettings();
               },
@@ -623,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 setState(() => _scaleRoot = v);
                 _userSettings.saveScaleRoot(v);
                 _saveCurrentJobSettings();
-                _tanpura.setSemitones(v + _transposeAmount);
+                _tanpura.setSemitones(v);
               },
             ),
           ),
