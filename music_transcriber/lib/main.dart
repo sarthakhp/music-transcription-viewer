@@ -4,7 +4,7 @@ import 'theme/app_palette.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
 import 'providers/theme_provider.dart';
-import 'screens/home_screen.dart';
+import 'router.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,13 +26,13 @@ class MyApp extends StatelessWidget {
           // means this also re-syncs appPalette if the OS theme changes
           // while themeMode is ThemeMode.system.
           appPalette = themeProvider.getPalette(MediaQuery.platformBrightnessOf(context));
-          return MaterialApp(
+          return MaterialApp.router(
             title: 'Music Transcriber',
             debugShowCheckedModeBanner: false,
             theme: _buildLightTheme(),
             darkTheme: _buildDarkTheme(),
             themeMode: themeProvider.themeMode,
-            home: const HomeScreen(),
+            routerConfig: appRouter,
           );
         },
       ),

@@ -36,6 +36,10 @@ external JSObject? get _soundTouchNodeClass;
 web.AudioContext? _sharedContext;
 bool _workletRegistered = false;
 
+/// Returns the shared AudioContext if one has been created, otherwise null.
+/// Used by TanpuraService to share the same context as the main player.
+web.AudioContext? get sharedAudioContext => _sharedContext;
+
 Future<web.AudioContext> _getOrCreateContext() async {
   if (_sharedContext != null) return _sharedContext!;
   _sharedContext = web.AudioContext();

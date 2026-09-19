@@ -25,6 +25,9 @@ import 'widgets/loading_overlay.dart';
 import 'widgets/keyboard_shortcuts_dialog.dart';
 import 'widgets/upload_layout.dart';
 import 'widgets/viewer_toolbar.dart';
+import 'widgets/tanpura_control.dart';
+import '../services/tanpura_service.dart';
+import 'package:go_router/go_router.dart';
 
 part 'home_screen_audio.dart';
 part 'home_screen_jobs.dart';
@@ -32,7 +35,9 @@ part 'home_screen_view_controls.dart';
 
 /// Main home screen of the Music Transcriber app
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? initialJobId;
+
+  const HomeScreen({super.key, this.initialJobId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -51,6 +56,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<AudioPlayerState>? _processingStateSubscription;
   bool _audioLoaded = false;
   bool _waitingForBuffer = false; // true while audio is mid-buffer stall
+
+  // Tanpura drone synthesizer
+  final TanpuraService _tanpura = TanpuraService();
 
   // Download export state
   bool _isExporting = false;
@@ -150,6 +158,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       setState(() {
         _playbackSpeed = _userSettings.playbackSpeed;
         _transposeAmount = _userSettings.transposeAmount;
+        _tanpura.setSemitones(_userSettings.transposeAmount);
         _sargamEnabled = _userSettings.sargamEnabled;
         _scaleRoot = _userSettings.scaleRoot;
         _vocalDetail = _userSettings.vocalDetail;
@@ -161,10 +170,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final themeProvider = context.read<ThemeProvider>();
       themeProvider.setThemeMode(_userSettings.themeMode);
 
-      // Reopen whatever job was in the viewer before this reload, if any.
-      final lastJobId = _userSettings.lastJobId;
-      if (lastJobId != null) {
-        _restoreLastJob(lastJobId);
+      // If a job ID came from the URL, open that directly.
+      // Otherwise fall back to whatever was open before the last reload.
+      final jobToOpen = widget.initialJobId ?? _userSettings.lastJobId;
+      if (jobToOpen != null) {
+        _restoreLastJob(jobToOpen);
       }
     });
 
@@ -228,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _playingSubscription?.cancel();
     _processingStateSubscription?.cancel();
     _audioService.dispose();
+    _tanpura.dispose();
 
     PerformanceMonitor.instance.stop();
     _pollingService.dispose();
@@ -287,7 +298,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _viewState.resetZoom();
           appState.reset();
           _userSettings.saveLastJobId(null);
-          _currentJobId = null; // Clear current job for settings tracking
+          _currentJobId = null;
+          context.go('/');
         }
 
         return Focus(
@@ -334,6 +346,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       tooltip: themeProvider.themeModeTooltip,
                     ),
                   ),
+                  if (shell.isReady)
+                    TanpuraButton(tanpura: _tanpura),
                   if (shell.isReady)
                     _DownloadMenuButton(
                       appState: appState,
@@ -594,6 +608,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onTransposeChanged: (n) {
                 setState(() => _transposeAmount = n);
                 _audioService.setPitchSemitones(n);
+                _tanpura.setSemitones(n);
                 _userSettings.saveTransposeAmount(n);
                 _saveCurrentJobSettings();
               },

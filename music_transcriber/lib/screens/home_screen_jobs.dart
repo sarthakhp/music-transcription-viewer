@@ -114,6 +114,9 @@ extension _HomeScreenJobs on _HomeScreenState {
       // Set current job ID for auto-save tracking
       _currentJobId = jobId;
 
+      // Update URL so browser back/forward and direct links work.
+      if (mounted) context.go('/jobs/$jobId');
+
       // Restore saved settings for this job
       _restoreJobSettings(jobId);
     } catch (e) {
