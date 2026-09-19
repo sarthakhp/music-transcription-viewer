@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' show max;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
@@ -14,6 +15,8 @@ import '../services/user_settings.dart';
 import '../config/api_config.dart';
 import '../utils/music_utils.dart';
 import '../utils/performance_monitor.dart';
+import '../utils/download_helper.dart';
+import '../services/audio_export_service.dart';
 import '../models/view_state.dart';
 import '../widgets/pitch_graph.dart';
 import '../widgets/audio_controls.dart';
@@ -48,6 +51,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<AudioPlayerState>? _processingStateSubscription;
   bool _audioLoaded = false;
   bool _waitingForBuffer = false; // true while audio is mid-buffer stall
+
+  // Download export state
+  bool _isExporting = false;
+  double _exportProgress = 0.0;
+  String? _exportingStem;
 
   // Playhead driven by a vsync Ticker that reads media.currentTime directly
   // each frame — no dead-reckoning, no correction jumps.
@@ -164,6 +172,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCompletedJobs();
     });
+  }
+
+  Future<void> _downloadStem(String stemLabel, Uint8List sourceBytes) async {
+    if (_isExporting) return;
+    setState(() {
+      _isExporting = true;
+      _exportProgress = 0;
+      _exportingStem = stemLabel;
+    });
+    try {
+      final appState = context.read<AppState>();
+      final baseName = (appState.audioFileName ?? stemLabel)
+          .replaceAll(RegExp(r'\.[^.]+$'), ''); // strip extension
+      final suffix = StringBuffer(stemLabel == 'original' ? '' : '_$stemLabel');
+      if (_transposeAmount != 0) {
+        suffix.write(_transposeAmount > 0 ? '_+${_transposeAmount}st' : '_${_transposeAmount}st');
+      }
+      if (_playbackSpeed != 1.0) {
+        suffix.write('_${_playbackSpeed}x');
+      }
+      final filename = '$baseName$suffix.mp3';
+
+      final mp3Bytes = await AudioExportService.exportMp3(
+        sourceBytes,
+        semitones: _transposeAmount,
+        speed: _playbackSpeed,
+        onProgress: (p) {
+          if (mounted) setState(() => _exportProgress = p);
+        },
+      );
+      downloadBytes(mp3Bytes, filename, 'audio/mpeg');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { _isExporting = false; _exportingStem = null; });
+    }
   }
 
   @override
@@ -286,6 +334,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       tooltip: themeProvider.themeModeTooltip,
                     ),
                   ),
+                  if (shell.isReady)
+                    _DownloadMenuButton(
+                      appState: appState,
+                      isExporting: _isExporting,
+                      exportProgress: _exportProgress,
+                      exportingStem: _exportingStem,
+                      onDownload: _downloadStem,
+                    ),
                   // Hidden on narrow screens — a keyboard-shortcuts dialog
                   // isn't relevant without a physical keyboard, and it just
                   // steals space that "Load New" needs.
@@ -553,6 +609,86 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DownloadMenuButton extends StatelessWidget {
+  final AppState appState;
+  final bool isExporting;
+  final double exportProgress;
+  final String? exportingStem;
+  final Future<void> Function(String stemLabel, Uint8List bytes) onDownload;
+
+  const _DownloadMenuButton({
+    required this.appState,
+    required this.isExporting,
+    required this.exportProgress,
+    required this.exportingStem,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stems = <(String, String, Uint8List?)>[
+      ('original', 'Original', appState.originalAudio),
+      ('vocals', 'Vocals', appState.vocalsAudio),
+      ('instrumental', 'Instrumental', appState.instrumentalAudio),
+    ].where((s) => s.$3 != null).toList();
+
+    if (stems.isEmpty) return const SizedBox.shrink();
+
+    if (isExporting) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                value: exportProgress > 0 ? exportProgress : null,
+                strokeWidth: 2,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              exportingStem != null
+                  ? '${(exportProgress * 100).round()}%'
+                  : 'Exporting…',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Single stem available — just an icon button.
+    if (stems.length == 1) {
+      final stem = stems.first;
+      return IconButton(
+        icon: const Icon(Icons.download_rounded),
+        tooltip: 'Download ${stem.$2}',
+        onPressed: () => onDownload(stem.$1, stem.$3!),
+      );
+    }
+
+    // Multiple stems — dropdown menu.
+    return MenuAnchor(
+      builder: (context, controller, _) => IconButton(
+        icon: const Icon(Icons.download_rounded),
+        tooltip: 'Download audio',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+      menuChildren: stems.map((stem) {
+        return MenuItemButton(
+          leadingIcon: const Icon(Icons.audio_file_rounded, size: 18),
+          onPressed: () => onDownload(stem.$1, stem.$3!),
+          child: Text(stem.$2),
+        );
+      }).toList(),
     );
   }
 }
