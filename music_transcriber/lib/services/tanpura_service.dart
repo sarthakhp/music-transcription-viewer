@@ -11,7 +11,7 @@ import 'package:web/web.dart' as web;
 /// The base recording is in G (semitone 7 from C), so a semitone offset of N
 /// plays at rate = 2^((N - 7) / 12).
 class TanpuraService extends ChangeNotifier {
-  static const String _assetPath = 'assets/audio/tanpura_g.opus';
+  static const String _assetPath = 'assets/audio/tanpura_g.mp3';
   // Recording is in G = semitone 7 (relative to C=0 reference)
   static const int _recordingBaseSemitone = 7;
 
