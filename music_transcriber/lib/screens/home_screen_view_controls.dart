@@ -208,6 +208,15 @@ extension _HomeScreenViewControls on _HomeScreenState {
       return KeyEventResult.handled;
     }
 
+    if (event.logicalKey == LogicalKeyboardKey.keyT) {
+      if (_tanpura.isPlaying) {
+        _tanpura.stop();
+      } else {
+        _tanpura.start();
+      }
+      return KeyEventResult.handled;
+    }
+
     return KeyEventResult.ignored;
   }
 }
