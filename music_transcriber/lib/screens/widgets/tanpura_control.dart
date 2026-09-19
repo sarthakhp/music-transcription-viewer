@@ -52,7 +52,6 @@ class _TanpuraButtonState extends State<TanpuraButton> {
   void _closeOverlay() {
     _overlay?.remove();
     _overlay = null;
-    if (mounted) setState(() {});
   }
 
   @override
