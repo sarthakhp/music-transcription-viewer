@@ -1,33 +1,21 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:file_picker/file_picker.dart';
 import '../models/pitch_data.dart';
+import 'web_file_picker.dart';
 
 /// Service for handling file operations
 class FileService {
   /// Pick and parse a JSON pitch data file
   static Future<FilePickResult<ProcessedFramesData>> pickPitchDataFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: true,
-      );
+      final result = await pickFileWeb(accept: 'application/json,.json');
+      if (result == null) return FilePickResult.cancelled();
 
-      if (result == null || result.files.isEmpty) {
-        return FilePickResult.cancelled();
-      }
-
-      final file = result.files.first;
-      if (file.bytes == null) {
-        return FilePickResult.error('Could not read file data');
-      }
-
-      final jsonString = utf8.decode(file.bytes!);
+      final jsonString = utf8.decode(result.bytes);
       final jsonData = json.decode(jsonString) as Map<String, dynamic>;
       final pitchData = ProcessedFramesData.fromJson(jsonData);
 
-      return FilePickResult.success(pitchData, file.name);
+      return FilePickResult.success(pitchData, result.name);
     } catch (e) {
       return FilePickResult.error('Failed to parse JSON: ${e.toString()}');
     }
@@ -36,22 +24,13 @@ class FileService {
   /// Pick an audio file (MP3, WAV, etc.)
   static Future<FilePickResult<Uint8List>> pickAudioFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['mp3', 'wav', 'flac', 'm4a', 'ogg', 'webm'],
-        withData: true,
-      );
+      const accept =
+          'audio/mpeg,audio/wav,audio/flac,audio/mp4,audio/ogg,audio/webm,'
+          '.mp3,.wav,.flac,.m4a,.ogg,.webm';
+      final result = await pickFileWeb(accept: accept);
+      if (result == null) return FilePickResult.cancelled();
 
-      if (result == null || result.files.isEmpty) {
-        return FilePickResult.cancelled();
-      }
-
-      final file = result.files.first;
-      if (file.bytes == null) {
-        return FilePickResult.error('Could not read file data');
-      }
-
-      return FilePickResult.success(file.bytes!, file.name);
+      return FilePickResult.success(result.bytes, result.name);
     } catch (e) {
       return FilePickResult.error('Failed to load audio: ${e.toString()}');
     }

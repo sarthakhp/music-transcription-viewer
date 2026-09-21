@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
-import 'package:file_picker/file_picker.dart';
+import '../../utils/web_file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 import '../../models/job.dart';
@@ -186,14 +186,13 @@ class _UploadSectionState extends State<UploadSection> {
   // ══════════════════════════════════════════════════════════ File logic ══════
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['mp3', 'wav', 'flac', 'm4a', 'ogg', 'webm'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
-    final bytes = result.files.first.bytes!;
-    final name = result.files.first.name;
+    const accept =
+        'audio/mpeg,audio/wav,audio/flac,audio/mp4,audio/ogg,audio/webm,'
+        '.mp3,.wav,.flac,.m4a,.ogg,.webm';
+    final result = await pickFileWeb(accept: accept);
+    if (result == null) return;
+    final bytes = result.bytes;
+    final name = result.name;
 
     setState(() {
       _fileBytes = bytes;
