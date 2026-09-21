@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../utils/web_file_picker.dart';
 import '../services/audio_export_service.dart';
 import '../services/platform_audio_player.dart';
 import '../services/platform_audio_player.dart'
@@ -54,23 +54,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   Future<void> _pickFile() async {
-    // FileType.audio restricts the OS picker to audio/* — widen it to
-    // include common video containers too, since only the audio track is
-    // used (see _mimeTypeFor) and this is often how people practice with a
-    // downloaded music video.
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const [
-        'mp3', 'wav', 'ogg', 'm4a', 'flac', 'webm', 'aac',
-        'mp4', 'm4v', 'mov', 'mkv', 'avi',
-      ],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
-      return;
-    }
-    final bytes = result.files.first.bytes!;
-    final name = result.files.first.name;
+    const accept =
+        'audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/flac,audio/webm,'
+        'audio/aac,video/mp4,video/quicktime,video/x-matroska,video/x-msvideo,'
+        '.mp3,.wav,.ogg,.m4a,.flac,.webm,.aac,.mp4,.m4v,.mov,.mkv,.avi';
+    final result = await pickFileWeb(accept: accept);
+    if (result == null) return;
+    final bytes = result.bytes;
+    final name = result.name;
 
     setState(() {
       _error = null;
