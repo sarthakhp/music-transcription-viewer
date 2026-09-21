@@ -21,6 +21,6 @@ echo ""
 
 cd "$FLUTTER_APP"
 flutter run \
-  --web-server-only \
+  -d web-server \
   --web-port=8080 \
   --dart-define=API_BASE_URL=http://localhost:$API_PORT
