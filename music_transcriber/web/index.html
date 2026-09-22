@@ -36,26 +36,25 @@
 <body>
   <!-- pywebview bridge shim: exposes __pickFile and __inPywebview for Dart -->
   <script>
-    // pywebview injects window.pywebview via WKUserScript at document start,
-    // so it may already be present when this script runs. Also listen for
-    // pywebviewready as a fallback, AND Python sets it via evaluate_js in
-    // _on_loaded for guaranteed delivery.
-    window.__inPywebview = !!(window.pywebview && window.pywebview.api);
-    if (!window.__inPywebview) {
-      window.addEventListener('pywebviewready', function () {
-        window.__inPywebview = true;
-        console.log('[bridge] pywebviewready fired');
-      });
-    } else {
-      console.log('[bridge] pywebview already present at script time');
-    }
+    // __pickFile is always callable from Dart. Returns:
+    //   {name, data}           — file picked via pywebview native dialog
+    //   null                   — user cancelled in pywebview
+    //   {_unavailable: true}   — not in pywebview; Dart falls back to HTML input
+    //
+    // Using a return-value sentinel avoids relying on @JS boolean globals
+    // which dart2js release builds don't read reliably from window.*.
     window.__pickFile = function (hint) {
-      if (window.pywebview && window.pywebview.api && window.pywebview.api.pick_file) {
-        console.log('[bridge] __pickFile calling pywebview hint=', hint);
-        return window.pywebview.api.pick_file(hint);
+      var pw = window.pywebview;
+      if (pw && pw.api && pw.api.pick_file) {
+        console.log('[bridge] calling pywebview.api.pick_file hint=', hint);
+        return pw.api.pick_file(hint);
       }
-      console.warn('[bridge] __pickFile: pywebview not ready');
-      return Promise.resolve(null);
+      console.warn('[bridge] pywebview not available, signalling _unavailable');
+      return Promise.resolve({_unavailable: true});
+    };
+    // Also expose a synchronous check function (called once on first pick attempt)
+    window.__hasPywebview = function() {
+      return !!(window.pywebview && window.pywebview.api);
     };
   </script>
   <!-- Expose SoundTouchNode globally for Dart js_interop bindings -->

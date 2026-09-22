@@ -11,29 +11,24 @@ class WebFilePickerResult {
   WebFilePickerResult(this.bytes, this.name);
 }
 
-// ── pywebview detection ───────────────────────────────────────────────────────
-// index.html injects window.__inPywebview (bool) and window.__pickFile(hint)
-// so Dart doesn't need to traverse window.pywebview.api through extension
-// types, which fails in compiled Flutter JS because the global isn't resolved
-// the same way.
+// ── pywebview bridge ──────────────────────────────────────────────────────────
+// index.html defines window.__pickFile(hint) which returns:
+//   {name, data}           — file picked via pywebview native dialog
+//   null                   — user cancelled in pywebview
+//   {_unavailable: true}   — not running in pywebview; use HTML input fallback
+//
+// This sentinel approach avoids relying on @JS bool globals, which dart2js
+// release builds don't read reliably from window.* properties.
 
 extension type _PickResult._(JSObject _) implements JSObject {
-  external String get name;
-  external String get data;
+  external String? get name;
+  external String? get data;
+  // ignore: non_constant_identifier_names
+  external bool? get _unavailable;
 }
-
-@JS('__inPywebview')
-external bool get _inPywebview;
 
 @JS('__pickFile')
 external JSPromise<_PickResult?> _jsPickFile(String hint);
-
-Future<WebFilePickerResult?> _pickFilePywebview(String hint) async {
-  final result = await _jsPickFile(hint).toDart;
-  if (result == null) return null;
-  final bytes = base64Decode(result.data);
-  return WebFilePickerResult(bytes, result.name);
-}
 
 // ── HTML <input type="file"> fallback (browser / GitHub Pages) ────────────────
 
@@ -108,15 +103,27 @@ Future<WebFilePickerResult?> _pickFileHtmlInput(String accept) {
 /// Opens a native file-picker dialog and returns the selected file's bytes and
 /// name, or null if the user cancelled.
 ///
-/// [accept] is the HTML accept attribute string used in browser mode
-/// (e.g. "audio/*,video/*,.mp3").
+/// [accept] is the HTML accept attribute string used in browser mode.
 /// [hint] is passed to the pywebview native API: 'audio', 'json', or '*'.
 Future<WebFilePickerResult?> pickFileWeb({
   String accept = '*/*',
   String hint = 'audio',
-}) {
-  if (_inPywebview) {
-    return _pickFilePywebview(hint);
+}) async {
+  // Always call __pickFile first. It returns {_unavailable:true} when not in
+  // pywebview, signalling us to fall back to the HTML input approach.
+  final result = await _jsPickFile(hint).toDart;
+
+  if (result == null) {
+    // User cancelled in pywebview.
+    return null;
   }
-  return _pickFileHtmlInput(accept);
+
+  if (result._unavailable == true) {
+    // Not in pywebview — use HTML <input type="file">.
+    return _pickFileHtmlInput(accept);
+  }
+
+  // Got a file from pywebview native dialog.
+  final bytes = base64Decode(result.data!);
+  return WebFilePickerResult(bytes, result.name!);
 }
