@@ -36,13 +36,19 @@
 <body>
   <!-- pywebview bridge shim: exposes __pickFile and __inPywebview for Dart -->
   <script>
-    // Set synchronously so it's available before Flutter initialises.
-    // In a regular browser window.pywebview is undefined → __inPywebview stays false.
-    window.__inPywebview = false;
-    window.addEventListener('pywebviewready', function () {
-      window.__inPywebview = true;
-      console.log('[bridge] pywebviewready fired, api=', window.pywebview && window.pywebview.api);
-    });
+    // pywebview injects window.pywebview via WKUserScript at document start,
+    // so it may already be present when this script runs. Also listen for
+    // pywebviewready as a fallback, AND Python sets it via evaluate_js in
+    // _on_loaded for guaranteed delivery.
+    window.__inPywebview = !!(window.pywebview && window.pywebview.api);
+    if (!window.__inPywebview) {
+      window.addEventListener('pywebviewready', function () {
+        window.__inPywebview = true;
+        console.log('[bridge] pywebviewready fired');
+      });
+    } else {
+      console.log('[bridge] pywebview already present at script time');
+    }
     window.__pickFile = function (hint) {
       if (window.pywebview && window.pywebview.api && window.pywebview.api.pick_file) {
         console.log('[bridge] __pickFile calling pywebview hint=', hint);
