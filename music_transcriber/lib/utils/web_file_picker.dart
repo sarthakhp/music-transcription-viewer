@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:typed_data';
 import 'package:web/web.dart' as web;
@@ -10,11 +11,42 @@ class WebFilePickerResult {
   WebFilePickerResult(this.bytes, this.name);
 }
 
-/// Opens a native file-picker dialog in the browser and returns the selected
-/// file's bytes and name, or null if the user cancelled.
-///
-/// [accept] is the HTML accept attribute string (e.g. "audio/*,video/*").
-Future<WebFilePickerResult?> pickFileWeb({String accept = '*/*'}) {
+// ── pywebview detection ───────────────────────────────────────────────────────
+// When running inside the macOS DMG (pywebview/WKWebView), window.pywebview
+// is injected by pywebview. We use the native pick_file() API instead of an
+// HTML <input type="file"> because WKWebView blocks programmatic .click() on
+// file inputs (the browser user-gesture context is lost by the time Dart JS
+// interop runs).
+
+extension type _PickResult._(JSObject _) implements JSObject {
+  external String get name;
+  external String get data;
+}
+
+extension type _PyApi._(JSObject _) implements JSObject {
+  // ignore: non_constant_identifier_names
+  external JSPromise<_PickResult?> pick_file(String hint);
+}
+
+extension type _Pywebview._(JSObject _) implements JSObject {
+  external _PyApi get api;
+}
+
+@JS('pywebview')
+external _Pywebview? get _pywebview;
+
+bool get _inPywebview => _pywebview != null;
+
+Future<WebFilePickerResult?> _pickFilePywebview(String hint) async {
+  final result = await _pywebview!.api.pick_file(hint).toDart;
+  if (result == null) return null;
+  final bytes = base64Decode(result.data);
+  return WebFilePickerResult(bytes, result.name);
+}
+
+// ── HTML <input type="file"> fallback (browser / GitHub Pages) ────────────────
+
+Future<WebFilePickerResult?> _pickFileHtmlInput(String accept) {
   final completer = Completer<WebFilePickerResult?>();
 
   final input = web.document.createElement('input') as web.HTMLInputElement
@@ -42,7 +74,6 @@ Future<WebFilePickerResult?> pickFileWeb({String accept = '*/*'}) {
           if (result == null) {
             completer.complete(null);
           } else {
-            // result is a JSArrayBuffer
             final jsBuffer = result as JSArrayBuffer;
             final bytes = jsBuffer.toDart.asUint8List();
             completer.complete(WebFilePickerResult(bytes, file.name));
@@ -61,10 +92,6 @@ Future<WebFilePickerResult?> pickFileWeb({String accept = '*/*'}) {
     }.toJS,
   );
 
-  // If the user closes the dialog without picking, fire a cancel after a
-  // short focus-return window (the window regains focus after the dialog
-  // closes). We listen for the next window-focus or document-click event,
-  // whichever comes first, and resolve null if no change fired yet.
   void onFocusBack(web.Event _) {
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!completer.isCompleted) {
@@ -75,14 +102,30 @@ Future<WebFilePickerResult?> pickFileWeb({String accept = '*/*'}) {
   }
 
   web.window.addEventListener('focus', onFocusBack.toJS);
-
   input.click();
 
   return completer.future.then((result) {
-    // Listener is single-use; attempt removal (safe even if already gone).
     try {
       web.window.removeEventListener('focus', onFocusBack.toJS);
     } catch (_) {}
     return result;
   });
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/// Opens a native file-picker dialog and returns the selected file's bytes and
+/// name, or null if the user cancelled.
+///
+/// [accept] is the HTML accept attribute string used in browser mode
+/// (e.g. "audio/*,video/*,.mp3").
+/// [hint] is passed to the pywebview native API: 'audio', 'json', or '*'.
+Future<WebFilePickerResult?> pickFileWeb({
+  String accept = '*/*',
+  String hint = 'audio',
+}) {
+  if (_inPywebview) {
+    return _pickFilePywebview(hint);
+  }
+  return _pickFileHtmlInput(accept);
 }

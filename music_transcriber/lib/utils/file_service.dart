@@ -8,7 +8,7 @@ class FileService {
   /// Pick and parse a JSON pitch data file
   static Future<FilePickResult<ProcessedFramesData>> pickPitchDataFile() async {
     try {
-      final result = await pickFileWeb(accept: 'application/json,.json');
+      final result = await pickFileWeb(accept: 'application/json,.json', hint: 'json');
       if (result == null) return FilePickResult.cancelled();
 
       final jsonString = utf8.decode(result.bytes);
