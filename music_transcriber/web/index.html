@@ -34,6 +34,24 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- pywebview bridge shim: exposes __pickFile and __inPywebview for Dart -->
+  <script>
+    // Set synchronously so it's available before Flutter initialises.
+    // In a regular browser window.pywebview is undefined → __inPywebview stays false.
+    window.__inPywebview = false;
+    window.addEventListener('pywebviewready', function () {
+      window.__inPywebview = true;
+      console.log('[bridge] pywebviewready fired, api=', window.pywebview && window.pywebview.api);
+    });
+    window.__pickFile = function (hint) {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.pick_file) {
+        console.log('[bridge] __pickFile calling pywebview hint=', hint);
+        return window.pywebview.api.pick_file(hint);
+      }
+      console.warn('[bridge] __pickFile: pywebview not ready');
+      return Promise.resolve(null);
+    };
+  </script>
   <!-- Expose SoundTouchNode globally for Dart js_interop bindings -->
   <script type="module">
     import { SoundTouchNode } from './SoundTouchNode.js';

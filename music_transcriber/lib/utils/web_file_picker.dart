@@ -12,33 +12,24 @@ class WebFilePickerResult {
 }
 
 // ── pywebview detection ───────────────────────────────────────────────────────
-// When running inside the macOS DMG (pywebview/WKWebView), window.pywebview
-// is injected by pywebview. We use the native pick_file() API instead of an
-// HTML <input type="file"> because WKWebView blocks programmatic .click() on
-// file inputs (the browser user-gesture context is lost by the time Dart JS
-// interop runs).
+// index.html injects window.__inPywebview (bool) and window.__pickFile(hint)
+// so Dart doesn't need to traverse window.pywebview.api through extension
+// types, which fails in compiled Flutter JS because the global isn't resolved
+// the same way.
 
 extension type _PickResult._(JSObject _) implements JSObject {
   external String get name;
   external String get data;
 }
 
-extension type _PyApi._(JSObject _) implements JSObject {
-  // ignore: non_constant_identifier_names
-  external JSPromise<_PickResult?> pick_file(String hint);
-}
+@JS('__inPywebview')
+external bool get _inPywebview;
 
-extension type _Pywebview._(JSObject _) implements JSObject {
-  external _PyApi get api;
-}
-
-@JS('pywebview')
-external _Pywebview? get _pywebview;
-
-bool get _inPywebview => _pywebview != null;
+@JS('__pickFile')
+external JSPromise<_PickResult?> _jsPickFile(String hint);
 
 Future<WebFilePickerResult?> _pickFilePywebview(String hint) async {
-  final result = await _pywebview!.api.pick_file(hint).toDart;
+  final result = await _jsPickFile(hint).toDart;
   if (result == null) return null;
   final bytes = base64Decode(result.data);
   return WebFilePickerResult(bytes, result.name);
