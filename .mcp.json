@@ -1,9 +1,8 @@
 {
   "mcpServers": {
     "code-review-graph": {
-      "command": "uvx",
+      "command": "/Users/psarthak/.local/bin/code-review-graph",
       "args": [
-        "code-review-graph",
         "serve"
       ],
       "cwd": "/Users/psarthak/personal/projects/music-transcription-viewer",

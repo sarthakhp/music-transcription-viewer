@@ -85,65 +85,84 @@ extension _HomeScreenAudio on _HomeScreenState {
 
     debugPrint('🎵 Audio loading complete. Success: $success');
 
-    if (success && mounted) {
-      debugPrint('✅ Setting audio as loaded and clearing preparing flag');
-      setState(() {
-        _audioLoaded = true;
-        _isLoadingAudio = false;
-      });
+    if (!mounted) return;
+
+    if (!success) {
+      debugPrint('❌ Audio loading failed — clearing loading flags');
+      setState(() => _isLoadingAudio = false);
       appState.setPreparingAudio(false);
-
-      // Apply current settings to the audio engine so persisted
-      // values (speed, transpose) take effect immediately.
-      _audioService.setSpeed(_playbackSpeed);
-      _audioService.setPitchSemitones(_transposeAmount);
-
-      // Cancel any previous subscriptions before creating new ones
-      _positionSubscription?.cancel();
-      _durationSubscription?.cancel();
-      _playingSubscription?.cancel();
-      _processingStateSubscription?.cancel();
-
-      _positionSubscription = _audioService.positionStream.listen((position) {
-        if (!mounted) return;
-        // When paused/stopped the Ticker is not running, so we update position
-        // here (e.g. after a seek while paused). During playback the Ticker
-        // reads media.currentTime directly each frame — no correction needed.
-        if (_playheadTicker == null || !_playheadTicker!.isActive) {
-          final time = position.inMilliseconds / 1000.0;
-          appState.setCurrentTime(time);
-          _viewState.updateViewWindowForPlayback(time, appState.pitchData?.maxTime ?? 120);
-        }
-      });
-
-      _durationSubscription = _audioService.durationStream.listen((duration) {
-        if (mounted && duration != null) {
-          appState.setDuration(duration.inMilliseconds / 1000.0);
-        }
-      });
-
-      _playingSubscription = _audioService.playingStream.listen((playing) {
-        if (mounted) {
-          appState.setPlaying(playing);
-          if (playing) {
-            _startPlayheadAnimation();
-          } else {
-            _stopPlayheadAnimation();
-          }
-        }
-      });
-
-      _processingStateSubscription = _audioService.stateStream.listen((state) {
-        if (!mounted) return;
-        if (state == AudioPlayerState.buffering) {
-          // Audio stalled — freeze Ticker so playhead doesn't race ahead.
-          _waitingForBuffer = true;
-        } else if (state == AudioPlayerState.ready && _waitingForBuffer) {
-          // Buffer recovered — Ticker will pick up live currentTime next frame.
-          _waitingForBuffer = false;
-        }
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Audio could not be loaded. Playback is unavailable.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            textColor: Theme.of(context).colorScheme.onError,
+            onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+          ),
+        ),
+      );
+      return;
     }
+
+    debugPrint('✅ Setting audio as loaded and clearing preparing flag');
+    setState(() {
+      _audioLoaded = true;
+      _isLoadingAudio = false;
+    });
+    appState.setPreparingAudio(false);
+
+    // Apply current settings to the audio engine so persisted
+    // values (speed, transpose) take effect immediately.
+    _audioService.setSpeed(_playbackSpeed);
+    _audioService.setPitchSemitones(_transposeAmount);
+
+    // Cancel any previous subscriptions before creating new ones
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _playingSubscription?.cancel();
+    _processingStateSubscription?.cancel();
+
+    _positionSubscription = _audioService.positionStream.listen((position) {
+      if (!mounted) return;
+      // When paused/stopped the Ticker is not running, so we update position
+      // here (e.g. after a seek while paused). During playback the Ticker
+      // reads media.currentTime directly each frame — no correction needed.
+      if (_playheadTicker == null || !_playheadTicker!.isActive) {
+        final time = position.inMilliseconds / 1000.0;
+        appState.setCurrentTime(time);
+        _viewState.updateViewWindowForPlayback(time, appState.pitchData?.maxTime ?? 120);
+      }
+    });
+
+    _durationSubscription = _audioService.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        appState.setDuration(duration.inMilliseconds / 1000.0);
+      }
+    });
+
+    _playingSubscription = _audioService.playingStream.listen((playing) {
+      if (mounted) {
+        appState.setPlaying(playing);
+        if (playing) {
+          _startPlayheadAnimation();
+        } else {
+          _stopPlayheadAnimation();
+        }
+      }
+    });
+
+    _processingStateSubscription = _audioService.stateStream.listen((state) {
+      if (!mounted) return;
+      if (state == AudioPlayerState.buffering) {
+        // Audio stalled — freeze Ticker so playhead doesn't race ahead.
+        _waitingForBuffer = true;
+      } else if (state == AudioPlayerState.ready && _waitingForBuffer) {
+        // Buffer recovered — Ticker will pick up live currentTime next frame.
+        _waitingForBuffer = false;
+      }
+    });
   }
 
   /// Download audio stems for a job
