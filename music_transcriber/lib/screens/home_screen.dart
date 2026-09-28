@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../providers/theme_provider.dart';
 import '../services/audio_service.dart';
+import '../services/audio_stems.dart';
 import '../services/transcription_api_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
@@ -55,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<bool>? _playingSubscription;
   StreamSubscription<AudioPlayerState>? _processingStateSubscription;
   bool _audioLoaded = false;
+  String? _preparingAudioForJobId; // guards _prepareAudioForJob against re-entry, per job
   bool _waitingForBuffer = false; // true while audio is mid-buffer stall
 
   // Tanpura drone synthesizer
@@ -149,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pollingService = JobPollingService(
       apiService: _apiService,
       appState: appState,
+      prepareAudio: _prepareAudioForJob,
     );
 
     // Load persisted user settings, then apply to state
@@ -428,13 +431,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final isNarrow = screenWidth < 800;
-
-    // Load audio when entering viewer (only once)
-    if (!_audioLoaded && !_isLoadingAudio && appState.audioBytes != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _loadAudio(appState);
-      });
-    }
 
     return Column(
       children: [

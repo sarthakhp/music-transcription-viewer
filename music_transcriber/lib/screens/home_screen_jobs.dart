@@ -102,7 +102,7 @@ extension _HomeScreenJobs on _HomeScreenState {
       }
 
       await Future.wait([
-        _downloadAudioStems(jobId, inputFilename),
+        _prepareAudioForJob(jobId, inputFilename),
         _fetchInstrumentData(jobId),
       ]);
 

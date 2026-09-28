@@ -14,6 +14,11 @@ class JobPollingService {
   /// caller can persist it (e.g. to survive a page reload).
   final void Function(String jobId)? onJobReady;
 
+  /// Downloads and loads this job's audio into the player. Owned by the
+  /// widget (it needs the audio engine), so polling hands off to it instead
+  /// of duplicating that logic here.
+  final Future<void> Function(String jobId, String? inputFilename) prepareAudio;
+
   Timer? _pollingTimer;
   bool _isPolling = false;
   String? _currentJobId;
@@ -21,6 +26,7 @@ class JobPollingService {
   JobPollingService({
     required TranscriptionApiService apiService,
     required AppState appState,
+    required this.prepareAudio,
     this.onJobReady,
   })  : _apiService = apiService,
         _appState = appState;
@@ -154,7 +160,7 @@ class JobPollingService {
 
       // Download audio stems + instrument data in parallel
       await Future.wait([
-        _downloadAudioStems(jobId, inputFilename),
+        prepareAudio(jobId, inputFilename),
         _fetchInstrumentData(jobId),
       ]);
 
@@ -163,36 +169,6 @@ class JobPollingService {
     } catch (e) {
       _appState.setError('Failed to fetch job data: ${e.toString()}');
       _appState.setLoading(false);
-    }
-  }
-
-  /// Download audio stems
-  Future<void> _downloadAudioStems(String jobId, String? inputFilename) async {
-    try {
-      // Set preparing flag BEFORE downloading to show loading indicator immediately
-      _appState.setPreparingAudio(true);
-
-      // Download all three stems in parallel
-      final results = await Future.wait([
-        _apiService.downloadStem(jobId: jobId, stemName: 'original'),
-        _apiService.downloadStem(jobId: jobId, stemName: 'vocals'),
-        _apiService.downloadStem(jobId: jobId, stemName: 'instrumental'),
-      ]);
-
-      // Store in AppState
-      _appState.setAllAudioStems(
-        original: results[0].isSuccess ? results[0].data : null,
-        vocals: results[1].isSuccess ? results[1].data : null,
-        instrumental: results[2].isSuccess ? results[2].data : null,
-      );
-
-      // Also set the vocals as the default audio with the original filename
-      if (results[1].isSuccess && results[1].data != null) {
-        _appState.setAudioData(results[1].data!, inputFilename ?? 'vocals.mp3');
-      }
-    } catch (e) {
-      debugPrint('Failed to download audio stems: $e');
-      _appState.setPreparingAudio(false);
     }
   }
 

@@ -27,91 +27,128 @@ extension _HomeScreenAudio on _HomeScreenState {
     }
   }
 
-  Future<void> _loadAudio(AppState appState) async {
-    if (appState.audioBytes == null || _audioLoaded) {
-      debugPrint('⏭️ Skipping _loadAudio: audioBytes=${appState.audioBytes != null}, _audioLoaded=$_audioLoaded');
-      return;
-    }
+  // ===========================================================================
+  // Orchestrator — the only entry point for getting a job's audio into the
+  // player. Single owner of AppState.isPreparingAudio: the try/finally below
+  // guarantees the "Preparing audio files…" overlay clears no matter which
+  // stage fails, throws, or is only partially successful.
+  // ===========================================================================
 
-    debugPrint('🎵 Starting _loadAudio');
-    setState(() => _isLoadingAudio = true);
+  Future<void> _prepareAudioForJob(String jobId, String? inputFilename) async {
+    if (!mounted) return;
+    if (_audioLoaded) return; // already loaded — nothing left to do
+    if (_preparingAudioForJobId == jobId) return; // already fetching this exact job
+
+    _preparingAudioForJobId = jobId;
+    final appState = context.read<AppState>();
     appState.setPreparingAudio(true);
 
-    final mimeType = _getMimeType(appState.audioFileName ?? '');
-    debugPrint('🎵 MIME type: $mimeType');
+    try {
+      final stems = await _fetchStemsForJob(jobId);
+      if (!mounted) return;
+
+      // Store whatever downloaded successfully before deciding if it's
+      // enough to play — a job with only an instrumental stem (main tracks
+      // failed) should still keep that stem rather than lose it.
+      appState.setAllAudioStems(
+        original: stems.original,
+        vocals: stems.vocals,
+        instrumental: stems.instrumental,
+      );
+
+      final primaryBytes = stems.primaryBytes;
+      if (primaryBytes == null) {
+        appState.setError('Failed to download audio for this job.');
+        return;
+      }
+      appState.setAudioData(primaryBytes, stems.primaryFileName(inputFilename));
+
+      await _loadAudioIntoPlayer(appState);
+    } finally {
+      if (_preparingAudioForJobId == jobId) _preparingAudioForJobId = null;
+      appState.setPreparingAudio(false);
+    }
+  }
+
+  // ===========================================================================
+  // Stage 1 — FETCH. Pure network I/O; no AppState/UI side effects, no
+  // exceptions escape (a failed stem just comes back null on that field).
+  // ===========================================================================
+
+  Future<AudioStemsResult> _fetchStemsForJob(String jobId) {
+    return fetchAudioStems(_apiService, jobId);
+  }
+
+  // ===========================================================================
+  // Stage 2 — LOAD INTO PLAYER. Feeds the stems already stored in AppState
+  // into the audio engine and wires up playback listeners. Assumes the
+  // caller (_prepareAudioForJob) owns the "preparing" flag's lifecycle.
+  // ===========================================================================
+
+  Future<void> _loadAudioIntoPlayer(AppState appState) async {
+    setState(() => _isLoadingAudio = true);
 
     bool success = false;
+    try {
+      if (appState.originalAudio != null) {
+        success = await _audioService.loadTrack(
+          AudioTrackType.original,
+          appState.originalAudio!,
+          'audio/mpeg',
+          setActive: true,
+        );
+      }
 
-    if (appState.originalAudio != null) {
-      debugPrint('🎵 Loading original audio (${appState.originalAudio!.length} bytes)');
-      final result = await _audioService.loadTrack(
-        AudioTrackType.original,
-        appState.originalAudio!,
-        'audio/mpeg',
-        setActive: true,
-      );
-      debugPrint('🎵 Original audio load result: $result');
-      success = result;
+      if (appState.vocalsAudio != null) {
+        final result = await _audioService.loadTrack(
+          AudioTrackType.vocal,
+          appState.vocalsAudio!,
+          'audio/mpeg',
+          setActive: !success,
+        );
+        if (!success) success = result;
+      }
+
+      if (appState.instrumentalAudio != null) {
+        await _audioService.loadTrack(
+          AudioTrackType.instrumental,
+          appState.instrumentalAudio!,
+          'audio/mpeg',
+          setActive: false,
+        );
+      }
+
+      if (!success) {
+        final mimeType = _getMimeType(appState.audioFileName ?? '');
+        success = await _audioService.loadFromBytes(appState.audioBytes!, mimeType);
+      }
+    } catch (e) {
+      debugPrint('❌ Loading audio into player threw: $e');
+      success = false;
     }
-
-    if (appState.vocalsAudio != null) {
-      debugPrint('🎵 Loading vocals audio (${appState.vocalsAudio!.length} bytes)');
-      final result = await _audioService.loadTrack(
-        AudioTrackType.vocal,
-        appState.vocalsAudio!,
-        'audio/mpeg',
-        setActive: !success,
-      );
-      debugPrint('🎵 Vocals audio load result: $result');
-      if (!success) success = result;
-    }
-
-    if (appState.instrumentalAudio != null) {
-      debugPrint('🎵 Loading instrumental audio (${appState.instrumentalAudio!.length} bytes)');
-      final result = await _audioService.loadTrack(
-        AudioTrackType.instrumental,
-        appState.instrumentalAudio!,
-        'audio/mpeg',
-        setActive: false,
-      );
-      debugPrint('🎵 Instrumental audio load result: $result');
-    }
-
-    if (!success) {
-      debugPrint('🎵 Loading fallback audio from audioBytes (${appState.audioBytes!.length} bytes)');
-      success = await _audioService.loadFromBytes(appState.audioBytes!, mimeType);
-      debugPrint('🎵 Fallback audio load result: $success');
-    }
-
-    debugPrint('🎵 Audio loading complete. Success: $success');
 
     if (!mounted) return;
 
     if (!success) {
-      debugPrint('❌ Audio loading failed — clearing loading flags');
       setState(() => _isLoadingAudio = false);
-      appState.setPreparingAudio(false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Audio could not be loaded. Playback is unavailable.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 6),
-          action: SnackBarAction(
-            label: 'Dismiss',
-            textColor: Theme.of(context).colorScheme.onError,
-            onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
-          ),
-        ),
-      );
+      _showAudioLoadFailedSnackBar();
       return;
     }
 
-    debugPrint('✅ Setting audio as loaded and clearing preparing flag');
+    _onAudioReady(appState);
+  }
+
+  // ===========================================================================
+  // Stage 3 — AFTER LOADING. Runs once, exactly when playback is actually
+  // ready: applies persisted settings and starts the position/duration/
+  // playing/buffering listeners.
+  // ===========================================================================
+
+  void _onAudioReady(AppState appState) {
     setState(() {
       _audioLoaded = true;
       _isLoadingAudio = false;
     });
-    appState.setPreparingAudio(false);
 
     // Apply current settings to the audio engine so persisted
     // values (speed, transpose) take effect immediately.
@@ -165,35 +202,19 @@ extension _HomeScreenAudio on _HomeScreenState {
     });
   }
 
-  /// Download audio stems for a job
-  Future<void> _downloadAudioStems(String jobId, String? inputFilename) async {
-    final appState = context.read<AppState>();
-
-    try {
-      appState.setPreparingAudio(true);
-
-      final results = await Future.wait([
-        _apiService.downloadStem(jobId: jobId, stemName: 'original'),
-        _apiService.downloadStem(jobId: jobId, stemName: 'vocals'),
-        _apiService.downloadStem(jobId: jobId, stemName: 'instrumental'),
-      ]);
-
-      appState.setAllAudioStems(
-        original: results[0].isSuccess ? results[0].data : null,
-        vocals: results[1].isSuccess ? results[1].data : null,
-        instrumental: results[2].isSuccess ? results[2].data : null,
-      );
-
-      if (results[1].isSuccess && results[1].data != null) {
-        appState.setAudioData(results[1].data!, inputFilename ?? 'vocals.mp3');
-      } else if (results[0].isSuccess && results[0].data != null) {
-        appState.setAudioData(results[0].data!, inputFilename ?? 'original.mp3');
-      }
-    } catch (e) {
-      debugPrint('Error downloading audio stems: $e');
-      appState.setError('Failed to download audio: ${e.toString()}');
-      appState.setPreparingAudio(false);
-    }
+  void _showAudioLoadFailedSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Audio could not be loaded. Playback is unavailable.'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Theme.of(context).colorScheme.onError,
+          onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+        ),
+      ),
+    );
   }
 
   /// Start vsync-synced playhead — reads media.currentTime directly each frame.
