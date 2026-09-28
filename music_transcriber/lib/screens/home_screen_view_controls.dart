@@ -57,6 +57,8 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
   // --- Seek -----------------------------------------------------------------
 
+  static const double _fastSeekStepSeconds = 5;
+
   void _seekTo(double time) {
     PerformanceMonitor.instance.reportAction(UserAction.seek);
     _audioService.seekToSeconds(time);
@@ -141,13 +143,13 @@ extension _HomeScreenViewControls on _HomeScreenState {
       }
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      _seekTo((currentTime - AudioControls.seekStepSeconds).clamp(0, maxTime));
-      return KeyEventResult.handled;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      _seekTo((currentTime + AudioControls.seekStepSeconds).clamp(0, maxTime));
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      final step = HardwareKeyboard.instance.isMetaPressed
+          ? _fastSeekStepSeconds
+          : AudioControls.seekStepSeconds;
+      final direction = event.logicalKey == LogicalKeyboardKey.arrowLeft ? -1 : 1;
+      _seekTo((currentTime + direction * step).clamp(0, maxTime));
       return KeyEventResult.handled;
     }
 

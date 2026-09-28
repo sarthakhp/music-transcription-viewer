@@ -23,6 +23,8 @@ class KeyboardShortcutsDialog extends StatelessWidget {
           _buildShortcutRow(context, 'Space', 'Play / Pause'),
           _buildShortcutRow(context, '←', 'Seek back 1s'),
           _buildShortcutRow(context, '→', 'Seek forward 1s'),
+          _buildShortcutRow(context, '⌘←', 'Seek back 5s'),
+          _buildShortcutRow(context, '⌘→', 'Seek forward 5s'),
           _buildShortcutRow(context, '+', 'Zoom in (vertical)'),
           _buildShortcutRow(context, '-', 'Zoom out (vertical)'),
           _buildShortcutRow(context, '⇧+', 'Zoom in (horizontal)'),
