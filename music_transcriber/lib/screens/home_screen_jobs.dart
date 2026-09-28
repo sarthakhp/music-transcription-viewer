@@ -107,9 +107,6 @@ extension _HomeScreenJobs on _HomeScreenState {
       ]);
 
       appState.setLoading(false);
-      // Remember this job so a page reload reopens it instead of dropping
-      // back to the home screen.
-      _userSettings.saveLastJobId(jobId);
 
       // Set current job ID for auto-save tracking
       _currentJobId = jobId;
@@ -144,18 +141,16 @@ extension _HomeScreenJobs on _HomeScreenState {
     _audioService.setPitchSemitones(settings.transposeAmount);
   }
 
-  /// Reopen the job that was in the viewer before a page reload. Runs once
-  /// at startup when a persisted job id exists. If the job can no longer be
-  /// loaded (deleted, server unreachable, etc.), silently clears the stale
-  /// pointer and falls back to the home screen instead of surfacing an error
-  /// for something the user didn't just click.
+  /// Open the job referenced by the URL on startup (e.g. a direct link to
+  /// `/jobs/:id`). If the job can no longer be loaded (deleted, server
+  /// unreachable, etc.), silently falls back to the home screen instead of
+  /// surfacing an error for something the user didn't just click.
   Future<void> _restoreLastJob(String jobId) async {
     await _onJobSelected(jobId);
 
     if (!mounted) return;
     final appState = context.read<AppState>();
     if (!appState.isReady) {
-      _userSettings.saveLastJobId(null);
       appState.setError(null);
     }
   }

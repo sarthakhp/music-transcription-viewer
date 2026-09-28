@@ -149,7 +149,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pollingService = JobPollingService(
       apiService: _apiService,
       appState: appState,
-      onJobReady: (jobId) => _userSettings.saveLastJobId(jobId),
     );
 
     // Load persisted user settings, then apply to state
@@ -170,11 +169,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final themeProvider = context.read<ThemeProvider>();
       themeProvider.setThemeMode(_userSettings.themeMode);
 
-      // If a job ID came from the URL, open that directly.
-      // Otherwise fall back to whatever was open before the last reload.
-      final jobToOpen = widget.initialJobId ?? _userSettings.lastJobId;
-      if (jobToOpen != null) {
-        _restoreLastJob(jobToOpen);
+      // Only auto-open a job when the URL explicitly points at one.
+      // Visiting the plain root always shows the home/library screen.
+      if (widget.initialJobId != null) {
+        _restoreLastJob(widget.initialJobId!);
       }
     });
 
@@ -297,7 +295,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _processingStateSubscription?.cancel();
           _viewState.resetZoom();
           appState.reset();
-          _userSettings.saveLastJobId(null);
           _currentJobId = null;
           context.go('/');
         }
@@ -347,7 +344,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   if (shell.isReady)
-                    TanpuraButton(tanpura: _tanpura),
+                    TanpuraButton(
+                      tanpura: _tanpura,
+                      onBeforeStart: () => _tanpura.setSemitones(_scaleRoot),
+                    ),
                   if (shell.isReady)
                     _DownloadMenuButton(
                       appState: appState,

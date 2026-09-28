@@ -22,7 +22,7 @@ class TanpuraService extends ChangeNotifier {
 
   bool _isPlaying = false;
   bool _isLoading = false;
-  double _volume = 0.5;
+  double _volume = 0.1;
   int _semitones = 0; // root + transpose combined
 
   bool get isPlaying => _isPlaying;

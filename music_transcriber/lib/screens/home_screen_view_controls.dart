@@ -212,6 +212,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
       if (_tanpura.isPlaying) {
         _tanpura.stop();
       } else {
+        _tanpura.setSemitones(_scaleRoot);
         _tanpura.start();
       }
       return KeyEventResult.handled;

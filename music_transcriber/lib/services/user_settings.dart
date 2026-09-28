@@ -10,7 +10,6 @@ class UserSettings {
   static const _keyScaleRoot = 'scaleRoot';
   static const _keyReferenceFrequency = 'referenceFrequency';
   static const _keyVocalDetail = 'vocalDetail';
-  static const _keyLastJobId = 'lastJobId';
   static const _keyJobSettings = 'jobSettings'; // Map of jobId -> settings JSON
   static const _keyThemeMode = 'themeMode';
 
@@ -32,10 +31,6 @@ class UserSettings {
   int vocalDetail = defaultVocalDetail;
   ThemeMode themeMode = defaultThemeMode;
 
-  /// The job that was open in the viewer, so a page reload can restore it
-  /// instead of dropping back to the home screen. Null when no job is open.
-  String? lastJobId;
-
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     playbackSpeed = _prefs.getDouble(_keyPlaybackSpeed) ?? defaultPlaybackSpeed;
@@ -44,7 +39,6 @@ class UserSettings {
     scaleRoot = _prefs.getInt(_keyScaleRoot) ?? defaultScaleRoot;
     referenceFrequency = _prefs.getDouble(_keyReferenceFrequency) ?? defaultReferenceFrequency;
     vocalDetail = _prefs.getInt(_keyVocalDetail) ?? defaultVocalDetail;
-    lastJobId = _prefs.getString(_keyLastJobId);
 
     // Load theme mode
     final themeModeIndex = _prefs.getInt(_keyThemeMode);
@@ -86,15 +80,6 @@ class UserSettings {
   void saveThemeMode(ThemeMode value) {
     themeMode = value;
     _prefs.setInt(_keyThemeMode, value.index);
-  }
-
-  void saveLastJobId(String? jobId) {
-    lastJobId = jobId;
-    if (jobId == null) {
-      _prefs.remove(_keyLastJobId);
-    } else {
-      _prefs.setString(_keyLastJobId, jobId);
-    }
   }
 
   // --- Per-job settings ----------------------------------------------------

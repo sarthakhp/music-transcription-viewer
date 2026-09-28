@@ -5,7 +5,11 @@ import '../../services/tanpura_service.dart';
 class TanpuraButton extends StatefulWidget {
   final TanpuraService tanpura;
 
-  const TanpuraButton({super.key, required this.tanpura});
+  /// Called right before the drone starts, so it can be tuned to whatever
+  /// the current scale root is at that moment rather than a stale value.
+  final VoidCallback? onBeforeStart;
+
+  const TanpuraButton({super.key, required this.tanpura, this.onBeforeStart});
 
   @override
   State<TanpuraButton> createState() => _TanpuraButtonState();
@@ -44,6 +48,7 @@ class _TanpuraButtonState extends State<TanpuraButton> {
       layerLink: _layerLink,
       tanpura: widget.tanpura,
       onClose: _closeOverlay,
+      onBeforeStart: widget.onBeforeStart,
     ));
     overlay.insert(_overlay!);
     setState(() {});
@@ -57,17 +62,17 @@ class _TanpuraButtonState extends State<TanpuraButton> {
   @override
   Widget build(BuildContext context) {
     final isOn = widget.tanpura.isPlaying;
-    final colorScheme = Theme.of(context).colorScheme;
     return CompositedTransformTarget(
       link: _layerLink,
       child: Tooltip(
         message: isOn ? 'Tanpura on — tap to adjust' : 'Start tanpura drone',
         child: IconButton(
-          icon: _TanpuraIcon(color: isOn ? colorScheme.primary : colorScheme.onSurface.withValues(alpha: 0.7)),
+          icon: _TanpuraIcon(opacity: isOn ? 1.0 : 0.6),
           isSelected: isOn,
-          selectedIcon: _TanpuraIcon(color: colorScheme.primary),
+          selectedIcon: const _TanpuraIcon(),
           onPressed: () {
             if (!widget.tanpura.isPlaying) {
+              widget.onBeforeStart?.call();
               widget.tanpura.start();
             }
             _toggleOverlay();
@@ -82,11 +87,13 @@ class _TanpuraPopover extends StatefulWidget {
   final LayerLink layerLink;
   final TanpuraService tanpura;
   final VoidCallback onClose;
+  final VoidCallback? onBeforeStart;
 
   const _TanpuraPopover({
     required this.layerLink,
     required this.tanpura,
     required this.onClose,
+    this.onBeforeStart,
   });
 
   @override
@@ -140,7 +147,7 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
                 children: [
                   Row(
                     children: [
-                      _TanpuraIcon(color: colorScheme.primary, size: 16),
+                      const _TanpuraIcon(size: 14),
                       const SizedBox(width: 8),
                       Text('Tanpura', style: theme.textTheme.titleSmall),
                       const Spacer(),
@@ -151,7 +158,12 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
                         Switch(
                           value: tanpura.isPlaying,
                           onChanged: (v) {
-                            if (v) tanpura.start(); else tanpura.stop();
+                            if (v) {
+                              widget.onBeforeStart?.call();
+                              tanpura.start();
+                            } else {
+                              tanpura.stop();
+                            }
                           },
                         ),
                     ],
@@ -190,78 +202,23 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
 }
 
 /// Tanpura silhouette icon drawn with CustomPaint.
+/// Tanpura glyph rendered from a transparent-background PNG. `opacity` is
+/// used instead of a color tint (the source image has its own fixed colors)
+/// to distinguish the on/off state.
 class _TanpuraIcon extends StatelessWidget {
-  final Color color;
+  final double opacity;
   final double size;
-  const _TanpuraIcon({required this.color, this.size = 24});
+  const _TanpuraIcon({this.opacity = 1.0, this.size = 18});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _TanpuraPainter(color)),
+    return Opacity(
+      opacity: opacity,
+      child: Image.asset(
+        'assets/images/tanpura.png',
+        width: size,
+        height: size,
+      ),
     );
   }
-}
-
-class _TanpuraPainter extends CustomPainter {
-  final Color color;
-  _TanpuraPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    // Resonator body (large teardrop at bottom)
-    final bodyPath = Path();
-    bodyPath.addOval(Rect.fromCenter(
-      center: Offset(w * 0.5, h * 0.72),
-      width: w * 0.72,
-      height: h * 0.50,
-    ));
-    canvas.drawPath(bodyPath, paint);
-
-    // Neck (thin rectangle)
-    final neckRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.42, h * 0.18, w * 0.16, h * 0.42),
-      Radius.circular(w * 0.04),
-    );
-    canvas.drawRRect(neckRect, paint);
-
-    // Head / peg box (small oval at top)
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(w * 0.5, h * 0.11), width: w * 0.28, height: h * 0.18),
-      paint,
-    );
-
-    // 4 tuning pegs (tiny circles on sides of head)
-    final pegR = w * 0.05;
-    for (var i = 0; i < 2; i++) {
-      canvas.drawCircle(Offset(w * 0.30, h * (0.07 + i * 0.08)), pegR, paint);
-      canvas.drawCircle(Offset(w * 0.70, h * (0.07 + i * 0.08)), pegR, paint);
-    }
-
-    // Strings (4 thin lines from head to body)
-    final stringPaint = Paint()
-      ..color = color.withValues(alpha: 0.5)
-      ..strokeWidth = w * 0.018
-      ..style = PaintingStyle.stroke;
-    final offsets = [-0.09, -0.03, 0.03, 0.09];
-    for (final dx in offsets) {
-      canvas.drawLine(
-        Offset(w * (0.5 + dx), h * 0.18),
-        Offset(w * (0.5 + dx * 0.5), h * 0.80),
-        stringPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_TanpuraPainter old) => old.color != color;
 }
