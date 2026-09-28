@@ -50,6 +50,10 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _viewState.panY(scrollDeltaY);
   }
 
+  // Roughly matches one mouse-wheel notch, so an arrow-key press moves the
+  // view a comparable amount to a single wheel tick over the graph.
+  static const double _yPanKeyStep = 60;
+
   void _handlePan(double panDelta) {
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
     _viewState.panX(panDelta, maxTime: maxTime);
@@ -141,6 +145,17 @@ extension _HomeScreenViewControls on _HomeScreenState {
         }
         return KeyEventResult.handled;
       }
+    }
+
+    // Plain Up/Down: pan the pitch view vertically (Cmd+Shift+Up/Down above
+    // takes priority for transpose).
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _handleYPan(-_yPanKeyStep);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _handleYPan(_yPanKeyStep);
+      return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
