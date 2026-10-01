@@ -18,7 +18,12 @@ fi
 
 echo "Building Flutter web (release)..."
 cd "$FLUTTER_APP"
-flutter build web --release
+# --pwa-strategy=none: this build only ever runs inside the DMG's embedded
+# WKWebView against a local server — there's no offline/installable-PWA use
+# case. The default service worker was serving stale main.dart.js out of
+# WKWebView's persistent cache across app restarts, making every deploy look
+# like it silently failed.
+flutter build web --release --pwa-strategy=none
 
 echo "Deploying web build to Launchpad..."
 rsync -a --delete "$FLUTTER_APP/build/web/" "$LAUNCHPAD_WEB/"
