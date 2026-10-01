@@ -240,7 +240,8 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
                     instrumentData: widget.instrumentData,
                     primaryColor: colorScheme.primary,
                     onSurfaceColor: colorScheme.onSurface,
-                    gridColor: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    gridColor: colorScheme.outlineVariant.withValues(
+                      alpha: theme.brightness == Brightness.light ? 0.7 : 0.3),
                     graphBgColor: palette.graphBg,
                     tonicTintColor: palette.tonicTint,
                     unvoicedColor: colorScheme.onSurface.withValues(alpha: 0.2),

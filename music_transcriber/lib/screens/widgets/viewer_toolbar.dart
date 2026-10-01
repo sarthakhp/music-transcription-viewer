@@ -122,7 +122,7 @@ class ViewerToolbar extends StatelessWidget {
   }
 
   Widget _buildTitleBlock(ThemeData theme, ColorScheme colorScheme) {
-    final muted = colorScheme.onSurface.withValues(alpha: 0.6);
+    final muted = colorScheme.onSurface.withValues(alpha: 0.72);
     Widget stat(IconData icon, String text) => Row(
           mainAxisSize: MainAxisSize.min,
           children: [

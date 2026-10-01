@@ -110,6 +110,7 @@ class PitchGraphPainter extends CustomPainter {
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
       maxLabelFontSize: insets.maxLabelFontSize,
+      brightness: brightness,
     );
 
     final pitchRenderer = PitchRenderer(

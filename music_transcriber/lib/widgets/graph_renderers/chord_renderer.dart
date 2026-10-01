@@ -54,10 +54,12 @@ class ChordRenderer {
     final opacity = (chord.confidence * 0.5 + 0.3).clamp(0.3, 0.8);
     final t = currentTime;
     final isActive = t != null && t >= chord.startTime && t < chord.endTime;
+    // Light backgrounds need a stronger fill/border for the same legibility.
+    final isLight = brightness == Brightness.light;
 
     // Draw chord block background
     final blockPaint = Paint()
-      ..color = chordColor.withValues(alpha: isActive ? 0.6 : opacity * 0.3)
+      ..color = chordColor.withValues(alpha: isActive ? (isLight ? 0.75 : 0.6) : opacity * (isLight ? 0.55 : 0.3))
       ..style = PaintingStyle.fill;
 
     final blockRect = Rect.fromLTRB(
@@ -76,7 +78,7 @@ class ChordRenderer {
     final borderPaint = Paint()
       ..color = chordColor.withValues(alpha: isActive ? 1.0 : opacity)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isActive ? 2.5 : 1.5;
+      ..strokeWidth = isActive ? 2.5 : (isLight ? 2.0 : 1.5);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(blockRect, const Radius.circular(4)),

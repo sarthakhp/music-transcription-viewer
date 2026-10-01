@@ -8,6 +8,9 @@ class AppPalette {
   final Brightness brightness;
   final Color seedColor;
   final Color scaffoldBg;
+
+  /// App bar background (the "Music Transcriber" header strip).
+  final Color appBarBg;
   final Color cardBg;
   final Color graphBg;
   final Color tonicTint;
@@ -31,6 +34,7 @@ class AppPalette {
     required this.brightness,
     required this.seedColor,
     required this.scaffoldBg,
+    required this.appBarBg,
     required this.cardBg,
     required this.graphBg,
     required this.tonicTint,
@@ -58,6 +62,7 @@ const darkPalette = AppPalette(
   brightness:       Brightness.dark,
   seedColor:        Color(0xFF14B8A6),
   scaffoldBg:       Color(0xFF000000),
+  appBarBg:         Color(0xFF000000),
   cardBg:           Color(0xFF000000),
   graphBg:          Color(0xFF111413),
   tonicTint:        Color(0xFF6699CC),
@@ -82,23 +87,24 @@ const minimalistPalette = AppPalette(
   brightness:       Brightness.light,
   seedColor:        Color(0xFF64748B),
   scaffoldBg:       Color(0xFFF8FAFC),
+  appBarBg:         Color(0xFFDDE5EE), // slate tint so the header isn't white
   cardBg:           Color(0xFFFFFFFF),
-  graphBg:          Color(0xFFF1F5F9),
-  tonicTint:        Color(0xFF94A3B8),
+  graphBg:          Color(0xFFE9EEF4),
+  tonicTint:        Color(0xFF64748B),
   tooltipBg:        Color(0xFFFFFFFF),
   playheadColor:    Color(0xFFE11D48),
-  bassColor:        Color(0xFFD97756),
-  otherColor:       Color(0xFF5B9E8F),
+  bassColor:        Color(0xFFC2410C),
+  otherColor:       Color(0xFF2B7A69),
   bassHighlightColor: Color(0xFFDD3300),
   otherHighlightColor: Color(0xFF0055AA),
   vocalHighlightColor: Color(0xFFFF9800), // Bright orange for vocal highlights
   hoverRowBg: Color(0x3364748B), // Slate at 20% opacity (more visible)
   hoverLabelColor: Color(0xFFFFFFFF), // White text for light theme
   hoverLabelBg: Color(0xFF3B82F6), // Bright blue background (solid)
-  sargamShuddhColor: Color(0xFF334155),
-  sargamShuddhBg:    Color(0x15000000),
-  sargamKomalColor:  Color(0xFF6482A6),
-  sargamTivraColor:  Color(0xFFC25B64),
+  sargamShuddhColor: Color(0xFF0F172A),
+  sargamShuddhBg:    Color(0x22000000),
+  sargamKomalColor:  Color(0xFF1D4F91),
+  sargamTivraColor:  Color(0xFFB4232F),
   trimHandleColor:  Color(0xFF334155),
 );
 

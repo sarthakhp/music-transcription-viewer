@@ -55,7 +55,8 @@ class MyApp extends StatelessWidget {
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: palette.scaffoldBg,
+        backgroundColor: palette.appBarBg,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
@@ -93,7 +94,8 @@ class MyApp extends StatelessWidget {
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: palette.scaffoldBg,
+        backgroundColor: palette.appBarBg,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(

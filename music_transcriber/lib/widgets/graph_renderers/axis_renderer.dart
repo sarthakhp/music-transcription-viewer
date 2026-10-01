@@ -15,6 +15,7 @@ class AxisRenderer {
   final bool sargamEnabled;
   final int scaleRoot;
   final double maxLabelFontSize;
+  final Brightness brightness;
 
   AxisRenderer({
     required this.data,
@@ -27,11 +28,12 @@ class AxisRenderer {
     this.sargamEnabled = false,
     this.scaleRoot = 0,
     this.maxLabelFontSize = 14,
+    this.brightness = Brightness.dark,
   });
 
   void drawAxes(Canvas canvas, Size size, Rect rect) {
     final textStyle = TextStyle(
-      color: textColor.withValues(alpha: 0.7),
+      color: textColor.withValues(alpha: brightness == Brightness.light ? 0.9 : 0.7),
       fontSize: 10,
     );
 
