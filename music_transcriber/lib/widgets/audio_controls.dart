@@ -17,6 +17,7 @@ import 'audio_controls/reference_frequency_control.dart';
 /// Sub-controls live in `audio_controls/` for maintainability.
 class AudioControls extends StatelessWidget {
   static const double seekStepSeconds = TransportButtons.seekStepSeconds;
+
   final bool isPlaying;
   final double currentTime;
   final double duration;
@@ -67,10 +68,11 @@ class AudioControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isNarrow = MediaQuery.sizeOf(context).width < 960;
 
     final layout = ViewerLayout.of(context);
     final vs = viewState;
+    // Narrow windows get the compact pill panel (settings open in sheets);
+    // wider ones fit all five labelled controls on one line.
     if (layout.isPhone && vs != null) {
       return MobilePlayerPanel(
         layout: layout,
@@ -121,8 +123,8 @@ class AudioControls extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          // Row 2: labelled settings.
-          if (isNarrow) _buildNarrowControls() else _buildWideControls(),
+          // Row 2: labelled settings, always on a single line.
+          _buildWideControls(),
         ],
       ),
     );
@@ -242,18 +244,6 @@ class AudioControls extends StatelessWidget {
           tooltip: 'Forward ${seekStepSeconds.toInt()}s',
         ),
       ],
-    );
-  }
-
-  /// Mid-width layout (tablets, narrow windows): transport centred, the
-  /// labelled groups wrapping underneath.
-  Widget _buildNarrowControls() {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.end,
-      spacing: 12,
-      runSpacing: 8,
-      children: _buildGroups(),
     );
   }
 }

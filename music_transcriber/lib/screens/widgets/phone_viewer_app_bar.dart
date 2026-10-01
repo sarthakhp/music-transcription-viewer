@@ -124,6 +124,8 @@ class PhoneViewerAppBar extends StatelessWidget implements PreferredSizeWidget {
           PopupMenuButton<VoidCallback>(
             icon: const Icon(Icons.more_vert_rounded),
             tooltip: 'More',
+            // Drop down from the button instead of covering it.
+            position: PopupMenuPosition.under,
             onSelected: (action) => action(),
             itemBuilder: (menuContext) => [
               PopupMenuItem(

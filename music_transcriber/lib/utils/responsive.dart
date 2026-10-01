@@ -13,7 +13,10 @@ enum ViewerLayout {
 
   bool get isPhone => this != regular;
 
-  static const double _phoneMaxWidth = 600;
+  /// Below this width the touch-first layout is used everywhere (app bar,
+  /// layer row, player panel); above it the labelled single-row desktop bars
+  /// fit without wrapping.
+  static const double _phoneMaxWidth = 760;
   static const double _landscapeMaxHeight = 500;
 
   static ViewerLayout of(BuildContext context) {

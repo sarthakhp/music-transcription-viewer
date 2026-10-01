@@ -85,6 +85,9 @@ class ViewerToolbar extends StatelessWidget {
     if (isPhone) return _buildPhoneToolbar(context, colorScheme);
 
     return Container(
+      // Fill the width: without this the box shrinks to its content in the
+      // wrapping (narrow) layout and leaves bars at the sides.
+      width: double.infinity,
       padding: EdgeInsets.symmetric(
         horizontal: isNarrow ? 12 : 16,
         vertical: 8,
@@ -97,20 +100,12 @@ class ViewerToolbar extends StatelessWidget {
           ),
         ),
       ),
-      child: isNarrow
-          ? _buildNarrowToolbar(context, theme, colorScheme)
-          : _buildWideToolbar(context, theme, colorScheme),
+      child: _buildWideToolbar(context, theme, colorScheme),
     );
   }
 
   Widget _buildWideToolbar(BuildContext context, ThemeData theme, ColorScheme colorScheme) {
-    final hasLayers = appState.instrumentData != null;
-    final trackCount = [
-      AudioTrackType.original,
-      AudioTrackType.vocal,
-      AudioTrackType.instrumental,
-    ].where(audioService.isTrackLoaded).length;
-
+    final groups = _buildToolbarGroups(colorScheme);
     return Row(
       // Centred: the captioned groups are taller than the title block.
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -118,26 +113,10 @@ class ViewerToolbar extends StatelessWidget {
         // Title block: full file name, stats underneath.
         Expanded(child: _buildTitleBlock(theme, colorScheme)),
         const SizedBox(width: 24),
-        if (hasLayers) ...[
-          ControlGroup(
-            label: 'Layers',
-            filled: false,
-            child: _buildLayerToggles(colorScheme),
-          ),
-          const SizedBox(width: 20),
+        for (var i = 0; i < groups.length; i++) ...[
+          if (i > 0) const SizedBox(width: 20),
+          groups[i],
         ],
-        if (trackCount > 1)
-          ControlGroup(
-            label: 'Listening to',
-            filled: false,
-            child: TrackSwitcher(
-              audioService: audioService,
-              currentTrack: currentTrack,
-              isSwitching: isSwitchingTrack,
-              onTrackChanged: onTrackChanged,
-              compact: true,
-            ),
-          ),
       ],
     );
   }
@@ -197,41 +176,34 @@ class ViewerToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildNarrowToolbar(BuildContext context, ThemeData theme, ColorScheme colorScheme) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // Metadata chips row
-        Wrap(
-          spacing: 12,
-          runSpacing: 4,
-          children: [
-            if (appState.pitchData != null)
-              _buildMetaChip(Icons.timer_outlined, appState.pitchData!.durationFormatted, colorScheme),
-            if (appState.pitchData?.metadata.bpm != null)
-              _buildMetaChip(Icons.speed_rounded, '${appState.pitchData!.metadata.bpm!.toStringAsFixed(0)} BPM', colorScheme),
-            if (appState.chordData != null)
-              _buildMetaChip(Icons.music_note_rounded, '${appState.chordData!.uniqueChordsCount} chords', colorScheme),
-            if (appState.instrumentData != null)
-              _buildMetaChip(Icons.piano_rounded, '${appState.instrumentData!.totalNotes} notes', colorScheme),
-          ],
+  /// Labelled Layers / Listening-to groups, shared by the wide and narrow bars.
+  List<Widget> _buildToolbarGroups(ColorScheme colorScheme) {
+    final trackCount = [
+      AudioTrackType.original,
+      AudioTrackType.vocal,
+      AudioTrackType.instrumental,
+    ].where(audioService.isTrackLoaded).length;
+
+    return [
+      if (appState.instrumentData != null)
+        ControlGroup(
+          label: 'Layers',
+          filled: false,
+          child: _buildLayerToggles(colorScheme),
         ),
-        // Layer toggles
-        _buildLayerToggles(colorScheme),
-        // Track switcher row — compact (icon-only) so segment labels don't
-        // wrap mid-word when squeezed into a narrow width.
-        TrackSwitcher(
-          audioService: audioService,
-          currentTrack: currentTrack,
-          isSwitching: isSwitchingTrack,
-          onTrackChanged: onTrackChanged,
-          compact: true,
+      if (trackCount > 1)
+        ControlGroup(
+          label: 'Listening to',
+          filled: false,
+          child: TrackSwitcher(
+            audioService: audioService,
+            currentTrack: currentTrack,
+            isSwitching: isSwitchingTrack,
+            onTrackChanged: onTrackChanged,
+            compact: true,
+          ),
         ),
-      ],
-    );
+    ];
   }
 
   /// Track switcher + layer chips + display settings in one row that scrolls
@@ -389,17 +361,6 @@ class ViewerToolbar extends StatelessWidget {
           vocalDetail: vocalDetail,
           onVocalDetailChanged: onVocalDetailChanged,
         ),
-      ],
-    );
-  }
-
-  Widget _buildMetaChip(IconData icon, String text, ColorScheme colorScheme) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-        const SizedBox(width: 4),
-        Text(text, style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.7))),
       ],
     );
   }
