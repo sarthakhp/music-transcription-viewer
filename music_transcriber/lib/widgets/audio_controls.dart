@@ -18,6 +18,9 @@ import 'audio_controls/reference_frequency_control.dart';
 class AudioControls extends StatelessWidget {
   static const double seekStepSeconds = TransportButtons.seekStepSeconds;
 
+  /// From this width, transport joins the settings on a single line.
+  static const double wideBreakpoint = 1200;
+
   final bool isPlaying;
   final double currentTime;
   final double duration;
@@ -96,6 +99,9 @@ class AudioControls extends StatelessWidget {
       );
     }
 
+    // Enough width for transport and all five setting groups on one line.
+    final wide = MediaQuery.sizeOf(context).width >= wideBreakpoint;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -104,31 +110,55 @@ class AudioControls extends StatelessWidget {
           top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Row 1: transport and the seek bar share a line to save height.
-          Row(
-            children: [
-              _buildWideTransport(),
-              const SizedBox(width: 16),
-              Expanded(
-                child: SeekSlider(
-                  currentTime: currentTime,
-                  duration: duration,
-                  onSeek: onSeek,
-                  touchFriendly: true,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Row 2: labelled settings, always on a single line.
-          _buildWideControls(),
-        ],
-      ),
+      child: wide ? _buildWideLayout() : _buildMediumLayout(),
     );
   }
+
+  /// Plenty of width: the seek bar gets its own line, and transport sits on
+  /// the same line as the settings, so no horizontal space goes unused.
+  Widget _buildWideLayout() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildSeekBar(),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _buildWideTransport(),
+            const SizedBox(width: 24),
+            Expanded(child: _buildWideControls()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Medium width: transport shares a line with the seek bar, settings go on
+  /// one line below.
+  Widget _buildMediumLayout() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            _buildWideTransport(),
+            const SizedBox(width: 16),
+            Expanded(child: _buildSeekBar()),
+          ],
+        ),
+        const SizedBox(height: 4),
+        _buildWideControls(),
+      ],
+    );
+  }
+
+  Widget _buildSeekBar() => SeekSlider(
+        currentTime: currentTime,
+        duration: duration,
+        onSeek: onSeek,
+        touchFriendly: true,
+      );
 
   /// The labelled setting groups, shared by the wide and mid-width layouts.
   /// A group lights up (teal caption + outline) when its value is not the default.
