@@ -164,12 +164,35 @@ class AudioControls extends StatelessWidget {
   /// A group lights up (teal caption + outline) when its value is not the default.
   List<Widget> _buildGroups() {
     return [
+      if (viewState != null)
+        ControlGroup(
+          label: 'Time zoom',
+          modified: viewState!.viewWindowSize != ViewState.defaultWindowSize,
+          onReset: () => viewState!.resetTimeZoom(maxTime: duration),
+          child: ZoomControl(
+            axisName: 'time',
+            value: '${viewState!.viewWindowSize.round()}s',
+            onZoomIn: viewState!.viewWindowSize > ViewState.minWindowSize
+                ? () => viewState!.zoomIn(maxTime: duration)
+                : null,
+            onZoomOut: viewState!.viewWindowSize < ViewState.maxWindowSize
+                ? () => viewState!.zoomOut(maxTime: duration)
+                : null,
+          ),
+        ),
       ControlGroup(
-        label: 'Zoom',
+        label: 'Pitch zoom',
+        modified: viewState != null && viewState!.yZoomScale != 1.0,
+        onReset: () => viewState?.resetPitchZoom(),
         child: ZoomControl(
-          onZoomIn: onZoomIn,
-          onZoomOut: onZoomOut,
-          viewWindowSize: viewWindowSize,
+          axisName: 'pitch',
+          // Semitones (notes) visible at once; fewer = more zoomed in.
+          value: viewState == null
+              ? '-'
+              : '${(viewState!.effectiveMaxMidi - viewState!.effectiveMinMidi).round()} notes',
+          valueWidth: 72,
+          onZoomIn: (viewState?.yZoomScale ?? 1.0) < ViewState.maxYZoomScale ? onZoomIn : null,
+          onZoomOut: (viewState?.yZoomScale ?? 1.0) > ViewState.minYZoomScale ? onZoomOut : null,
         ),
       ),
       ControlGroup(
@@ -187,7 +210,6 @@ class AudioControls extends StatelessWidget {
       ControlGroup(
         label: 'Root / notation',
         modified: sargamEnabled,
-        onReset: () => onSargamToggled(false),
         child: SargamControl(
           enabled: sargamEnabled,
           onToggled: onSargamToggled,

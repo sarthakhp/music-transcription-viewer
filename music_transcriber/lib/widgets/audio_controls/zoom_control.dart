@@ -1,47 +1,56 @@
 import 'package:flutter/material.dart';
 
-/// Zoom in/out control card showing the current view window size in seconds.
+/// Zoom out / value / zoom in for one axis. Used twice in the player bar:
+/// "Time zoom" (seconds visible) and "Pitch zoom" (vertical magnification),
+/// so each readout matches exactly what its buttons change.
 class ZoomControl extends StatelessWidget {
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final double viewWindowSize;
+  final String value;
+  final String axisName;
+
+  /// Width reserved for the value so the buttons don't move as it changes.
+  final double valueWidth;
+  final VoidCallback? onZoomIn;
+  final VoidCallback? onZoomOut;
 
   const ZoomControl({
     super.key,
+    required this.value,
+    required this.axisName,
+    this.valueWidth = 48,
     required this.onZoomIn,
     required this.onZoomOut,
-    required this.viewWindowSize,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    Widget button(IconData icon, String tooltip, VoidCallback? onPressed) => IconButton(
+          icon: Icon(icon, size: 20),
+          onPressed: onPressed,
+          tooltip: tooltip,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        );
+
     return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.zoom_in_rounded, size: 20),
-              onPressed: onZoomIn,
-              tooltip: 'Zoom In',
-              visualDensity: VisualDensity.compact,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        button(Icons.zoom_out_rounded, 'Zoom $axisName out', onZoomOut),
+        SizedBox(
+          width: valueWidth,
+          child: Text(
+            value,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
-            IconButton(
-              icon: const Icon(Icons.zoom_out_rounded, size: 20),
-              onPressed: onZoomOut,
-              tooltip: 'Zoom Out',
-              visualDensity: VisualDensity.compact,
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                '${viewWindowSize.toStringAsFixed(0)}s',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
+          ),
+        ),
+        button(Icons.zoom_in_rounded, 'Zoom $axisName in', onZoomIn),
+      ],
     );
   }
 }

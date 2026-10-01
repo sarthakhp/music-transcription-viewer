@@ -176,6 +176,22 @@ class ViewState extends ChangeNotifier {
   bool get isDefaultView =>
       _viewWindowSize == defaultWindowSize && _yZoomScale == 1.0 && _yPanOffset == 0.0;
 
+  /// Back to the default time window, keeping the current centre in view.
+  void resetTimeZoom({required double maxTime}) {
+    final centerTime = _viewStartTime + _viewWindowSize / 2;
+    _viewWindowSize = defaultWindowSize;
+    _viewStartTime = (centerTime - _viewWindowSize / 2)
+        .clamp(0.0, max(0.0, maxTime - _viewWindowSize).toDouble());
+    _markDirty();
+  }
+
+  /// Back to the default pitch zoom and vertical position.
+  void resetPitchZoom() {
+    _yZoomScale = 1.0;
+    _yPanOffset = 0.0;
+    _markDirty();
+  }
+
   void resetZoom() {
     _viewWindowSize = defaultWindowSize;
     _viewStartTime = 0;

@@ -25,6 +25,8 @@ class KeyboardShortcutsDialog extends StatelessWidget {
           _buildShortcutRow(context, '→', 'Seek forward 1s'),
           _buildShortcutRow(context, '⌘←', 'Seek back 5s'),
           _buildShortcutRow(context, '⌘→', 'Seek forward 5s'),
+          _buildShortcutRow(context, 'Pinch', 'Zoom time (trackpad)'),
+          _buildShortcutRow(context, '⇧ + Pinch', 'Zoom pitch (trackpad)'),
           _buildShortcutRow(context, '↑', 'Pan view up'),
           _buildShortcutRow(context, '↓', 'Pan view down'),
           _buildShortcutRow(context, '+', 'Zoom in (vertical)'),

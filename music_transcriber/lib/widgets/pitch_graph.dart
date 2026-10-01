@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HardwareKeyboard;
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
@@ -185,8 +186,19 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
           onPointerCancel: _handlePointerUp,
           onPointerSignal: (event) {
             if (event is PointerScaleEvent && widget.onZoom != null) {
+              // Trackpad pinch zooms time; hold Shift to zoom pitch instead.
+              final zoomPitch = HardwareKeyboard.instance.isShiftPressed;
               GestureBinding.instance.pointerSignalResolver.register(event, (event) {
-                final scale = (event as PointerScaleEvent).scale;
+                final scaleEvent = event as PointerScaleEvent;
+                final scale = scaleEvent.scale;
+                if (zoomPitch) {
+                  final rect = _insets.rectFor(_size);
+                  final focal = rect.height > 0
+                      ? ((scaleEvent.localPosition.dy - rect.top) / rect.height).clamp(0.0, 1.0)
+                      : 0.5;
+                  _vs.zoomYAtFocal(scale, focal);
+                  return;
+                }
                 final zoomDelta = scale > 1.0 ? (scale - 1.0) : -(1.0 / scale - 1.0);
                 widget.onZoom!(zoomDelta, 0.5);
               });

@@ -41,6 +41,9 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 # Music Transcription Viewer — Frontend (Flutter Web)
 
+## Targets (always consider all three)
+Every feature must work on **desktop browser**, the **macOS DMG** (pywebview/WKWebView: codec, audio, file-picker and cache quirks), and **phone** (touch, portrait + landscape). When changing a control or readout, update both its desktop bar and its `mobile_player/` equivalent.
+
 ## Architecture
 - **Flutter web app** at `music_transcriber/` — served inside macOS pywebview app and as standalone website
 - **State**: `Provider` — `AppState` (job/audio state), `ThemeProvider`
@@ -92,6 +95,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `[` / `]` | Speed down/up |
 | `\` | Reset speed to 1× |
 | `A` | Toggle auto-scroll |
+| Trackpad pinch / `Shift` + pinch | Zoom time / zoom pitch |
 | `T` | Toggle tanpura drone |
 
 ## Gotchas

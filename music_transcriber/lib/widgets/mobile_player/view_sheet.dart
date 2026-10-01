@@ -20,7 +20,11 @@ void showViewSheet({
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Time', style: theme.textTheme.labelLarge),
+            _AxisHeader(
+              label: 'Time',
+              showReset: viewState.viewWindowSize != ViewState.defaultWindowSize,
+              onReset: () => viewState.resetTimeZoom(maxTime: maxTime),
+            ),
             const SizedBox(height: 8),
             BigStepper(
               value: '${viewState.viewWindowSize.round()}s',
@@ -35,11 +39,15 @@ void showViewSheet({
                   : null,
             ),
             const SizedBox(height: 20),
-            Text('Pitch', style: theme.textTheme.labelLarge),
+            _AxisHeader(
+              label: 'Pitch',
+              showReset: viewState.yZoomScale != 1.0 || viewState.yPanOffset != 0.0,
+              onReset: viewState.resetPitchZoom,
+            ),
             const SizedBox(height: 8),
             BigStepper(
-              value: '${viewState.yZoomScale.toStringAsFixed(1)}x',
-              caption: 'vertical zoom',
+              value: '${(viewState.effectiveMaxMidi - viewState.effectiveMinMidi).round()}',
+              caption: 'notes visible at once',
               decrementLabel: 'Zoom pitch out',
               incrementLabel: 'Zoom pitch in',
               onDecrement: viewState.yZoomScale > ViewState.minYZoomScale
@@ -67,4 +75,36 @@ void showViewSheet({
       },
     ),
   );
+}
+
+/// Axis title with a reset button that is hidden (but keeps its space) while
+/// the axis is at its default, so the sheet never changes height.
+class _AxisHeader extends StatelessWidget {
+  final String label;
+  final bool showReset;
+  final VoidCallback onReset;
+
+  const _AxisHeader({required this.label, required this.showReset, required this.onReset});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        Visibility(
+          visible: showReset,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: TextButton.icon(
+            onPressed: onReset,
+            icon: const Icon(Icons.restart_alt_rounded, size: 18),
+            label: const Text('Reset'),
+            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          ),
+        ),
+      ],
+    );
+  }
 }

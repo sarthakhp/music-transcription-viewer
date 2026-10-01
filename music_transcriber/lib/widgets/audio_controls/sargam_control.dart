@@ -61,29 +61,89 @@ class _ScaleRootPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 28,
-          child: DropdownButton<int>(
-            value: scaleRoot,
-            isDense: true,
-            underline: const SizedBox.shrink(),
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
+    // A 4x3 grid of notes in a small popup under the button; a long vertical
+    // dropdown would cover the graph.
+    return PopupMenuButton<int>(
+      tooltip: 'Root note',
+      position: PopupMenuPosition.under,
+      padding: EdgeInsets.zero,
+      onSelected: onChanged,
+      itemBuilder: (_) => [
+        PopupMenuItem<int>(
+          enabled: false,
+          padding: const EdgeInsets.all(8),
+          child: SizedBox(
+            width: 4 * 44.0 + 3 * 6,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var i = 0; i < 12; i++)
+                  _RootNoteChip(
+                    label: noteNames[i],
+                    selected: i == scaleRoot,
+                    colorScheme: colorScheme,
+                    onTap: () => Navigator.pop(context, i),
+                  ),
+              ],
             ),
-            items: List.generate(
-              12,
-              (i) => DropdownMenuItem(value: i, child: Text(noteNames[i])),
-            ),
-            onChanged: (v) {
-              if (v != null) onChanged(v);
-            },
           ),
         ),
       ],
+      child: Container(
+        height: 32,
+        padding: const EdgeInsets.only(left: 8, right: 2),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              noteNames[scaleRoot % 12],
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            Icon(Icons.arrow_drop_down_rounded, color: colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RootNoteChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+
+  const _RootNoteChip({
+    required this.label,
+    required this.selected,
+    required this.colorScheme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: SizedBox(
+          width: 44,
+          height: 36,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
