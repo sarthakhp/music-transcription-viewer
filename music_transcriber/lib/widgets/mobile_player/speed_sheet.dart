@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../audio_controls/speed_control.dart';
 import 'sheet_scaffold.dart';
 
 /// Bottom sheet with large playback-speed choices.
@@ -6,7 +7,7 @@ void showSpeedSheet({
   required BuildContext context,
   required double speed,
   required ValueChanged<double> onChanged,
-  List<double> presets = const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+  List<double> presets = const [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
 }) {
   showControlSheet(
     context: context,
@@ -46,7 +47,7 @@ class _SpeedOptionsState extends State<_SpeedOptions> {
             label: SizedBox(
               width: 56,
               height: 40,
-              child: Center(child: Text('${p}x', style: const TextStyle(fontSize: 16))),
+              child: Center(child: Text(SpeedControl.format(p), style: const TextStyle(fontSize: 16))),
             ),
             selected: p == _speed,
             showCheckmark: false,

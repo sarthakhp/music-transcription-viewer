@@ -110,8 +110,8 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
 
   void _handleTap(TapUpDetails details, double width) {
     if (widget.onSeek == null) return;
-    // A tap that is really the end of a two-finger gesture must not seek.
-    if (_touch.multiTouchSeen) return;
+    // A tap that is really the end of a drag or pinch must not seek.
+    if (_touch.suppressTap) return;
     final x = details.localPosition.dx;
     if (x < _leftPadding || x > width - _rightPadding) return;
     widget.onSeek!(_xToTime(x, width).clamp(0, widget.data.maxTime));

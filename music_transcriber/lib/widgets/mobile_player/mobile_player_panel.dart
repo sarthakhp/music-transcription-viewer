@@ -3,6 +3,7 @@ import '../../models/view_state.dart';
 import '../../utils/music_utils.dart';
 import '../../utils/responsive.dart';
 import '../audio_controls/playback_controls.dart';
+import '../audio_controls/speed_control.dart';
 import 'control_pill.dart';
 import 'key_sheet.dart';
 import 'notation_sheet.dart';
@@ -179,7 +180,7 @@ class MobilePlayerPanel extends StatelessWidget {
     return [
       ControlPill(
         label: 'Speed',
-        value: '${playbackSpeed}x',
+        value: SpeedControl.format(playbackSpeed),
         isActive: playbackSpeed != 1.0,
         semanticsHint: 'Opens speed options',
         onTap: () => showSpeedSheet(

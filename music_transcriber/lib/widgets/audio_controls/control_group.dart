@@ -91,7 +91,7 @@ class ControlGroup extends StatelessWidget {
         ),
         Container(
           height: bodyHeight,
-          padding: filled ? const EdgeInsets.symmetric(horizontal: 4) : null,
+          padding: filled ? const EdgeInsets.symmetric(horizontal: 10) : null,
           decoration: filled
               ? BoxDecoration(
                   color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),

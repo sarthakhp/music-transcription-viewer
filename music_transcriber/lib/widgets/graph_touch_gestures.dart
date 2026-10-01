@@ -100,10 +100,10 @@ class TouchGraphGestures {
   double _flingLastX = 0;
   double _flingLastY = 0;
 
-  /// True once a second finger touched during the current gesture. The tap
-  /// recognizer can still fire when the last finger lifts; callers use this to
-  /// ignore that tap instead of seeking.
-  bool multiTouchSeen = false;
+  /// True once this gesture became a drag or pinch. The tap recognizer's slop
+  /// (18px) is bigger than our drag slop (6px), so a short drag can still end
+  /// in a tap callback; callers use this to ignore that tap instead of seeking.
+  bool suppressTap = false;
 
   static bool _isTouch(PointerEvent e) =>
       e.kind == PointerDeviceKind.touch || e.kind == PointerDeviceKind.stylus;
@@ -112,14 +112,13 @@ class TouchGraphGestures {
     if (!_isTouch(e)) return;
     _stopFling();
     if (_pointers.isEmpty) {
-      multiTouchSeen = false;
+      suppressTap = false;
       _velocity.addPosition(e.timeStamp, e.localPosition);
     }
     _pointers[e.pointer] = e.localPosition;
     if (_pointers.length == 1) {
       _beginDrag(e.localPosition);
     } else if (_pointers.length == 2) {
-      multiTouchSeen = true;
       _beginPinch();
     }
   }
@@ -143,7 +142,11 @@ class TouchGraphGestures {
       _startFling(_velocity.getVelocity().pixelsPerSecond);
     }
     _pointers.remove(e.pointer);
-    if (_pointers.length == 1) {
+    if (_pointers.length == 2) {
+      // Back from three fingers to two: restart the pinch from the current
+      // positions so the stale span can't cause a jump.
+      _beginPinch();
+    } else if (_pointers.length == 1) {
       // Pinch -> drag handover: continue panning from the remaining finger
       // without a jump.
       _resolver.reset();
@@ -178,6 +181,7 @@ class TouchGraphGestures {
     if (!_dragging) {
       if (_dragTravel.distance < _dragSlop) return;
       _dragging = true;
+      suppressTap = true;
       // Straight-ish drags stick to one axis so a horizontal scrub doesn't
       // wobble vertically (and vice versa); diagonal drags stay free.
       final ax = _dragTravel.dx.abs();
@@ -253,7 +257,8 @@ class TouchGraphGestures {
 
   void _beginPinch() {
     _resolver.reset();
-    _dragging = true; // never treat the lift as a tap
+    _dragging = true;
+    suppressTap = true; // never treat the lift as a tap
     _pinchStartSpan = _span;
     _lastPinchSpan = _pinchStartSpan;
     _lastPinchMid = _midpoint;
