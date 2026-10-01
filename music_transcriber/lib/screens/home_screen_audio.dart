@@ -161,6 +161,8 @@ extension _HomeScreenAudio on _HomeScreenState {
     _playingSubscription?.cancel();
     _processingStateSubscription?.cancel();
 
+    _attachMediaSession(appState);
+
     _positionSubscription = _audioService.positionStream.listen((position) {
       if (!mounted) return;
       // When paused/stopped the Ticker is not running, so we update position
@@ -176,12 +178,14 @@ extension _HomeScreenAudio on _HomeScreenState {
     _durationSubscription = _audioService.durationStream.listen((duration) {
       if (mounted && duration != null) {
         appState.setDuration(duration.inMilliseconds / 1000.0);
+        _syncMediaSession();
       }
     });
 
     _playingSubscription = _audioService.playingStream.listen((playing) {
       if (mounted) {
         appState.setPlaying(playing);
+        _syncMediaSession();
         if (playing) {
           _startPlayheadAnimation();
         } else {

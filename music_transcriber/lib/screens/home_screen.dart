@@ -32,6 +32,7 @@ import 'widgets/phone_viewer_app_bar.dart';
 import 'widgets/viewer_toolbar.dart';
 import 'widgets/tanpura_control.dart';
 import '../services/tanpura_service.dart';
+import '../services/media_session/media_session.dart';
 import 'package:go_router/go_router.dart';
 
 part 'home_screen_audio.dart';
@@ -127,6 +128,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Per-job settings auto-save debouncing
   Timer? _saveSettingsTimer;
+
+  /// OS media UI (notification / lock screen / media keys) on web.
+  final MediaSessionController _mediaSession = MediaSessionController();
   String? _currentJobId;
 
   @override
@@ -242,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
     _processingStateSubscription?.cancel();
+    _mediaSession.detach();
     _audioService.dispose();
     _tanpura.dispose();
 
@@ -296,6 +301,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         void handleLoadNew() {
           _stopPlayheadAnimation();
+          _mediaSession.detach();
           _audioService.stop();
           _audioLoaded = false;
           _positionSubscription?.cancel();
@@ -330,6 +336,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       onBack: handleLoadNew,
                       onRename: (newName) {
                         appState.renameAudioFile(newName);
+                        _mediaSession.updateMetadata(newName);
                         final jobId = _currentJobId;
                         if (jobId != null) _apiService.renameJob(jobId, newName);
                       },
@@ -611,6 +618,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onSpeedChanged: (speed) {
                 setState(() => _playbackSpeed = speed);
                 _audioService.setSpeed(speed);
+                _syncMediaSession();
                 _userSettings.savePlaybackSpeed(speed);
                 _saveCurrentJobSettings();
               },

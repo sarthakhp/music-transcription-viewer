@@ -55,6 +55,39 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _viewState.panX(panDelta, maxTime: maxTime);
   }
 
+  // --- OS media controls (notification / lock screen / media keys) ----------
+
+  void _attachMediaSession(AppState appState) {
+    _mediaSession.attach(
+      title: appState.audioFileName ?? 'Audio',
+      onPlay: () => _audioService.play(),
+      onPause: () => _audioService.pause(),
+      onSeekTo: _seekTo,
+      onSeekBy: (delta) {
+        final duration = context.read<AppState>().duration;
+        _seekTo((_audioService.position.inMilliseconds / 1000.0 + delta)
+            .clamp(0.0, duration > 0 ? duration : double.infinity)
+            .toDouble());
+      },
+      onRestart: () => _seekTo(0),
+    );
+    _syncMediaSession();
+  }
+
+  /// Pushes play state, position, duration and speed to the OS media UI.
+  ///
+  /// [position] overrides the player's position right after a seek, because
+  /// the player reports the old position until the seek has completed.
+  void _syncMediaSession({double? position}) {
+    final appState = context.read<AppState>();
+    _mediaSession.updateState(
+      playing: _audioService.isPlaying,
+      position: position ?? _audioService.position.inMilliseconds / 1000.0,
+      duration: appState.duration,
+      speed: _playbackSpeed,
+    );
+  }
+
   // --- Seek -----------------------------------------------------------------
 
   static const double _fastSeekStepSeconds = 5;
@@ -62,6 +95,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   void _seekTo(double time) {
     PerformanceMonitor.instance.reportAction(UserAction.seek);
     _audioService.seekToSeconds(time);
+    _syncMediaSession(position: time);
 
     final maxTime = context.read<AppState>().pitchData?.maxTime ?? 120;
     final maxStart = max(0.0, maxTime - _viewState.viewWindowSize).toDouble();
@@ -98,6 +132,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
   void _setSpeed(double speed) {
     setState(() => _playbackSpeed = speed);
     _audioService.setSpeed(speed);
+    _syncMediaSession();
   }
 
   // --- Keyboard shortcuts ---------------------------------------------------
