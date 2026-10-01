@@ -87,6 +87,17 @@ class ViewState extends ChangeNotifier {
     _markDirty();
   }
 
+  /// Pans the visible pitch range by [fraction] of its current height.
+  /// Matches a finger drag: dragging the content down (positive [fraction])
+  /// reveals higher pitches.
+  void panYByFraction(double fraction) {
+    PerformanceMonitor.instance.reportAction(UserAction.panY);
+    final baseSpan = _baseMaxMidi - _baseMinMidi;
+    final currentSpan = baseSpan / _yZoomScale;
+    _yPanOffset = (_yPanOffset + fraction * currentSpan).clamp(-baseSpan, baseSpan);
+    _markDirty();
+  }
+
   // --- Zoom -----------------------------------------------------------------
 
   void zoomIn({required double maxTime}) {
@@ -124,6 +135,34 @@ class ViewState extends ChangeNotifier {
     _markDirty();
   }
 
+  /// Zooms the time axis by an exact [factor] (>1 zooms in) keeping the time
+  /// under [focalPointRatio] (0 = left edge, 1 = right edge) fixed on screen.
+  void zoomXByFactor(double factor, double focalPointRatio, {required double maxTime}) {
+    PerformanceMonitor.instance.reportAction(UserAction.zoomX);
+    final focalTime = _viewStartTime + _viewWindowSize * focalPointRatio;
+    final newWindowSize = (_viewWindowSize / factor).clamp(minWindowSize, maxWindowSize);
+    _viewStartTime = (focalTime - newWindowSize * focalPointRatio)
+        .clamp(0.0, max(0.0, maxTime - newWindowSize).toDouble());
+    _viewWindowSize = newWindowSize;
+    _autoScroll = false;
+    _markDirty();
+  }
+
+  /// Zooms the pitch axis by an exact [factor] (>1 zooms in) keeping the pitch
+  /// under [focalPointRatio] (0 = top edge, 1 = bottom edge) fixed on screen.
+  void zoomYAtFocal(double factor, double focalPointRatio) {
+    PerformanceMonitor.instance.reportAction(UserAction.zoomY);
+    final baseSpan = _baseMaxMidi - _baseMinMidi;
+    final oldSpan = baseSpan / _yZoomScale;
+    final focalMidi = effectiveMaxMidi - focalPointRatio * oldSpan;
+    _yZoomScale = (_yZoomScale * factor).clamp(minYZoomScale, maxYZoomScale);
+    final newSpan = baseSpan / _yZoomScale;
+    final newCenter = focalMidi + (focalPointRatio - 0.5) * newSpan;
+    _yPanOffset = (newCenter - (_baseMinMidi + _baseMaxMidi) / 2.0)
+        .clamp(-baseSpan, baseSpan);
+    _markDirty();
+  }
+
   void zoomY(double scaleFactor) {
     PerformanceMonitor.instance.reportAction(UserAction.zoomY);
     _yZoomScale = (_yZoomScale * scaleFactor)
@@ -131,8 +170,14 @@ class ViewState extends ChangeNotifier {
     _markDirty();
   }
 
+  static const double defaultWindowSize = 30;
+
+  /// True when zoom and pan are at their defaults (nothing to reset).
+  bool get isDefaultView =>
+      _viewWindowSize == defaultWindowSize && _yZoomScale == 1.0 && _yPanOffset == 0.0;
+
   void resetZoom() {
-    _viewWindowSize = 30;
+    _viewWindowSize = defaultWindowSize;
     _viewStartTime = 0;
     _yZoomScale = 1.0;
     _yPanOffset = 0.0;

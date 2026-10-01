@@ -15,16 +15,20 @@ import '../services/job_polling_service.dart';
 import '../services/user_settings.dart';
 import '../config/api_config.dart';
 import '../utils/music_utils.dart';
+import '../utils/responsive.dart';
 import '../utils/performance_monitor.dart';
 import '../utils/download_helper.dart';
 import '../services/audio_export_service.dart';
 import '../models/view_state.dart';
+import '../widgets/graph_constants.dart';
+import '../widgets/graph_overlay_controls.dart';
 import '../widgets/pitch_graph.dart';
 import '../widgets/audio_controls.dart';
 import '../models/job.dart';
 import 'widgets/loading_overlay.dart';
 import 'widgets/keyboard_shortcuts_dialog.dart';
 import 'widgets/upload_layout.dart';
+import 'widgets/phone_viewer_app_bar.dart';
 import 'widgets/viewer_toolbar.dart';
 import 'widgets/tanpura_control.dart';
 import '../services/tanpura_service.dart';
@@ -287,6 +291,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (context, shell, _) {
         final appState = context.read<AppState>();
         final isNarrowAppBar = MediaQuery.sizeOf(context).width < 480;
+        final layout = ViewerLayout.of(context);
+        final isPhoneViewer = shell.isReady && layout.isPhone;
 
         void handleLoadNew() {
           _stopPlayheadAnimation();
@@ -309,7 +315,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: GestureDetector(
             onTap: () => _focusNode.requestFocus(),
             child: Scaffold(
-              appBar: AppBar(
+              appBar: isPhoneViewer
+                  ? PhoneViewerAppBar(
+                      appState: appState,
+                      compactHeight: layout == ViewerLayout.phoneLandscape,
+                      inlineControls: layout == ViewerLayout.phoneLandscape
+                          ? _buildViewerToolbar(appState,
+                              isNarrow: true, isPhone: true, inline: true)
+                          : null,
+                      tanpuraButton: TanpuraButton(
+                        tanpura: _tanpura,
+                        onBeforeStart: () => _tanpura.setSemitones(_scaleRoot),
+                      ),
+                      onBack: handleLoadNew,
+                      onRename: (newName) {
+                        appState.renameAudioFile(newName);
+                        final jobId = _currentJobId;
+                        if (jobId != null) _apiService.renameJob(jobId, newName);
+                      },
+                      isExporting: _isExporting,
+                      exportProgress: _exportProgress,
+                      onDownload: _downloadStem,
+                      onThemeToggle: () {
+                        final themeProvider = context.read<ThemeProvider>();
+                        themeProvider.cycleThemeMode();
+                        _userSettings.saveThemeMode(themeProvider.themeMode);
+                      },
+                    )
+                  : AppBar(
                 title: InkWell(
                   onTap: shell.isReady ? handleLoadNew : null,
                   borderRadius: BorderRadius.circular(8),
@@ -426,22 +459,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildViewerLayout(BuildContext context, AppState appState) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isNarrow = screenWidth < 800;
-
-    return Column(
-      children: [
-        // Top bar with metadata summary and view controls
-        ViewerToolbar(
+  ViewerToolbar _buildViewerToolbar(
+    AppState appState, {
+    required bool isNarrow,
+    required bool isPhone,
+    bool inline = false,
+  }) {
+    return ViewerToolbar(
           appState: appState,
           audioService: _audioService,
           currentTrack: _currentTrack,
           isSwitchingTrack: _isSwitchingTrack,
           onTrackChanged: _switchTrack,
           isNarrow: isNarrow,
+          isPhone: isPhone,
+          inline: inline,
           showVocals: _showVocals,
           showBass: _showBass,
           showOther: _showOther,
@@ -463,7 +495,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           onJobRenamed: (jobId, newName) async {
             await _apiService.renameJob(jobId, newName);
           },
-        ),
+        );
+  }
+
+  Widget _buildViewerLayout(BuildContext context, AppState appState) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 800;
+    final layout = ViewerLayout.of(context);
+    final isPhone = layout.isPhone;
+
+    return Column(
+      children: [
+        // Top bar with metadata summary and view controls. On a landscape
+        // phone the controls move into the app bar to save height.
+        if (layout != ViewerLayout.phoneLandscape)
+          _buildViewerToolbar(appState, isNarrow: isNarrow, isPhone: isPhone),
 
         // Main content area — during pan/zoom, only the CustomPaint repaints
         // via ViewState's repaint listenable. No widget rebuild at all.
@@ -511,7 +557,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         vocalDetail: _vocalDetail,
                         onSeek: _seekTo,
                         onZoom: _handleZoom,
-                        onYZoom: _handleYZoom,
                         onYPan: _handleYPan,
                         onPan: _handlePan,
                       );
@@ -520,46 +565,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
 
                 Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: ListenableBuilder(
-                    listenable: _viewState,
-                    builder: (context, _) {
-                      final isOn = _viewState.autoScroll;
-                      return GestureDetector(
-                        onTap: () {
-                          final appState = context.read<AppState>();
-                          _viewState.setAutoScroll(
-                            !isOn,
-                            snapToTime: isOn ? null : appState.currentTime,
-                            maxTime: appState.pitchData?.maxTime,
-                          );
-                        },
-                        child: Chip(
-                          avatar: Icon(
-                            isOn ? Icons.play_arrow_rounded : Icons.play_arrow_outlined,
-                            size: 16,
-                            color: isOn
-                                ? colorScheme.onSecondaryContainer
-                                : colorScheme.onSurface.withValues(alpha: 0.5),
-                          ),
-                          label: Text(
-                            'Auto-scroll',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isOn
-                                  ? colorScheme.onSecondaryContainer
-                                  : colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          backgroundColor: isOn
-                              ? colorScheme.secondaryContainer.withValues(alpha: 0.8)
-                              : colorScheme.surface.withValues(alpha: 0.6),
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      );
-                    },
+                  // Sit above the time-axis labels.
+                  bottom: (isPhone ? GraphInsets.compact.bottom : GraphInsets.regular.bottom) + 8,
+                  right: isPhone ? 12 : 8,
+                  child: GraphOverlayControls(
+                    viewState: _viewState,
+                    touchFriendly: isPhone,
+                    currentTime: () => context.read<AppState>().currentTime,
+                    maxTime: () => context.read<AppState>().pitchData?.maxTime,
                   ),
                 ),
               ],
@@ -590,6 +603,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 appState.setReferenceFrequency(frequency);
                 _userSettings.saveReferenceFrequency(frequency);
               },
+              viewState: _viewState,
               onZoomIn: () => _viewState.zoomY(ViewState.zoomFactor),
               onZoomOut: () => _viewState.zoomY(1.0 / ViewState.zoomFactor),
               viewWindowSize: _viewState.viewWindowSize,

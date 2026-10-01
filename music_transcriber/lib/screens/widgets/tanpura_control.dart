@@ -147,7 +147,7 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
                 children: [
                   Row(
                     children: [
-                      const _TanpuraIcon(size: 14),
+                      const _TanpuraIcon(size: 22),
                       const SizedBox(width: 8),
                       Text('Tanpura', style: theme.textTheme.titleSmall),
                       const Spacer(),
@@ -208,7 +208,7 @@ class _TanpuraPopoverState extends State<_TanpuraPopover> {
 class _TanpuraIcon extends StatelessWidget {
   final double opacity;
   final double size;
-  const _TanpuraIcon({this.opacity = 1.0, this.size = 18});
+  const _TanpuraIcon({this.opacity = 1.0, this.size = 28});
 
   @override
   Widget build(BuildContext context) {

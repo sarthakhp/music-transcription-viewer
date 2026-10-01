@@ -43,6 +43,7 @@ class PitchGraphPainter extends CustomPainter {
   final int vocalDetail;
   final double currentTime;
   final ActiveNotesHolder? activeNotesHolder;
+  final GraphInsets insets;
 
   PitchGraphPainter({
     required this.viewState,
@@ -69,6 +70,7 @@ class PitchGraphPainter extends CustomPainter {
     this.scaleRoot = 0,
     this.vocalDetail = 10,
     required this.currentTime,
+    this.insets = GraphInsets.regular,
     this.activeNotesHolder,
   }) : super(repaint: viewState);
 
@@ -80,12 +82,7 @@ class PitchGraphPainter extends CustomPainter {
     final minMidi = viewState.effectiveMinMidi;
     final maxMidi = viewState.effectiveMaxMidi;
 
-    final graphRect = Rect.fromLTRB(
-      GraphConstants.leftPadding,
-      GraphConstants.topPadding,
-      size.width - GraphConstants.rightPadding,
-      size.height - GraphConstants.bottomPadding,
-    );
+    final graphRect = insets.rectFor(size);
 
     final gridRenderer = GridRenderer(
       data: data,
@@ -112,6 +109,7 @@ class PitchGraphPainter extends CustomPainter {
       maxMidi: maxMidi,
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
+      maxLabelFontSize: insets.maxLabelFontSize,
     );
 
     final pitchRenderer = PitchRenderer(
@@ -141,6 +139,7 @@ class PitchGraphPainter extends CustomPainter {
       textColor: onSurfaceColor,
       brightness: brightness,
       transposeAmount: transposeAmount,
+      currentTime: currentTime,
     );
 
     gridRenderer.drawBackground(canvas, graphRect);
@@ -186,7 +185,8 @@ class PitchGraphPainter extends CustomPainter {
   bool shouldRepaint(covariant PitchGraphPainter oldDelegate) {
     // ViewState changes are handled by the repaint listenable — no need to
     // check viewStartTime/viewEndTime/minMidi/maxMidi here.
-    return oldDelegate.chordData != chordData ||
+    return oldDelegate.insets != insets ||
+        oldDelegate.chordData != chordData ||
         oldDelegate.instrumentData != instrumentData ||
         oldDelegate.referenceFrequency != referenceFrequency ||
         oldDelegate.data != data ||

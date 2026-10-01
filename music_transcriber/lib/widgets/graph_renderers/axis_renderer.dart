@@ -14,6 +14,7 @@ class AxisRenderer {
   final double maxMidi;
   final bool sargamEnabled;
   final int scaleRoot;
+  final double maxLabelFontSize;
 
   AxisRenderer({
     required this.data,
@@ -25,6 +26,7 @@ class AxisRenderer {
     required this.maxMidi,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.maxLabelFontSize = 14,
   });
 
   void drawAxes(Canvas canvas, Size size, Rect rect) {
@@ -59,7 +61,7 @@ class AxisRenderer {
     final rowHeight = rect.height / midiRange;
 
     // Adaptive font size: scale with row height, clamped to 8–14px.
-    final fontSize = rowHeight.clamp(8.0, 14.0);
+    final fontSize = rowHeight.clamp(8.0, maxLabelFontSize);
 
     // Skip labels when rows are too small to fit text.
     // At minimum font (8px), we need ~12px row height to avoid overlap.

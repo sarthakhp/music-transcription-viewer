@@ -42,10 +42,6 @@ extension _HomeScreenViewControls on _HomeScreenState {
     _viewState.zoomXAtFocal(zoomDelta, focalPointRatio, maxTime: maxTime);
   }
 
-  void _handleYZoom(double scaleFactor) {
-    _viewState.zoomY(scaleFactor);
-  }
-
   void _handleYPan(double scrollDeltaY) {
     _viewState.panY(scrollDeltaY);
   }

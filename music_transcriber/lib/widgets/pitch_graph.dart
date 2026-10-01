@@ -5,6 +5,7 @@ import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
 import '../models/view_state.dart';
 import 'graph_constants.dart';
+import 'graph_touch_gestures.dart';
 import 'pitch_graph_painter.dart';
 import 'playhead_painter.dart';
 import '../theme/app_palette.dart';
@@ -39,7 +40,6 @@ class PitchGraph extends StatefulWidget {
   final int vocalDetail;
   final Function(double time)? onSeek;
   final Function(double zoomDelta, double focalPointRatio)? onZoom;
-  final Function(double scaleFactor)? onYZoom;
   final Function(double scrollDeltaY)? onYPan;
   final Function(double panDelta)? onPan;
 
@@ -63,7 +63,6 @@ class PitchGraph extends StatefulWidget {
     this.vocalDetail = 10,
     this.onSeek,
     this.onZoom,
-    this.onYZoom,
     this.onYPan,
     this.onPan,
   });
@@ -72,23 +71,34 @@ class PitchGraph extends StatefulWidget {
   State<PitchGraph> createState() => _PitchGraphState();
 }
 
-class _PitchGraphState extends State<PitchGraph> {
-  static const double _leftPadding = GraphConstants.leftPadding;
-  static const double _rightPadding = GraphConstants.rightPadding;
+class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateMixin {
+  GraphInsets _insets = GraphInsets.regular;
+  double get _leftPadding => _insets.left;
+  double get _rightPadding => _insets.right;
 
   double? _hoverTime;
   double? _hoverY;
-  double? _initialScale;
   bool _isDragging = false;
   double? _dragStartX;
-  bool _isPinching = false;
-  double _lastHorizontalScale = 1.0;
-  double _lastVerticalScale = 1.0;
+  Size _size = Size.zero;
+
+  late final TouchGraphGestures _touch = TouchGraphGestures(
+    vsync: this,
+    viewState: widget.viewState,
+    maxTime: () => widget.data.maxTime,
+    graphRect: () => _insets.rectFor(_size),
+  );
 
   // Shared mutable state for active notes - both painters reference this
   final ActiveNotesHolder _activeNotesHolder = ActiveNotesHolder();
 
   ViewState get _vs => widget.viewState;
+
+  @override
+  void dispose() {
+    _touch.dispose();
+    super.dispose();
+  }
 
   double _xToTime(double x, double width) {
     final graphWidth = width - _leftPadding - _rightPadding;
@@ -100,6 +110,8 @@ class _PitchGraphState extends State<PitchGraph> {
 
   void _handleTap(TapUpDetails details, double width) {
     if (widget.onSeek == null) return;
+    // A tap that is really the end of a two-finger gesture must not seek.
+    if (_touch.multiTouchSeen) return;
     final x = details.localPosition.dx;
     if (x < _leftPadding || x > width - _rightPadding) return;
     widget.onSeek!(_xToTime(x, width).clamp(0, widget.data.maxTime));
@@ -119,57 +131,19 @@ class _PitchGraphState extends State<PitchGraph> {
     });
   }
 
-  void _handleScaleStart(ScaleStartDetails details) {
-    _initialScale = 1.0;
-    _lastHorizontalScale = 1.0;
-    _lastVerticalScale = 1.0;
-    _isPinching = details.pointerCount >= 2;
-  }
-
-  // A two-finger touch pinch reports independent horizontal/vertical scale
-  // factors (unlike a trackpad pinch, which is a single uniform PointerScaleEvent
-  // handled separately below). Spreading fingers left-right zooms the time
-  // (X) axis; spreading them up-down zooms the pitch (Y) axis — most graph/
-  // chart apps use this mapping, and it's what lets touch users reach Y-zoom
-  // without hunting for the toolbar buttons.
-  void _handleScaleUpdate(ScaleUpdateDetails details, double width) {
-    if (_initialScale == null) return;
-    if (details.pointerCount >= 2) _isPinching = true;
-    if (!_isPinching) return;
-
-    if (details.horizontalScale != 1.0 && widget.onZoom != null) {
-      final scaleFactor = details.horizontalScale / _lastHorizontalScale;
-      _lastHorizontalScale = details.horizontalScale;
-      if (scaleFactor != 1.0) {
-        final zoomDelta = scaleFactor > 1.0 ? (scaleFactor - 1.0) : -(1.0 / scaleFactor - 1.0);
-        widget.onZoom!(zoomDelta, 0.5);
-      }
-    }
-
-    if (details.verticalScale != 1.0 && widget.onYZoom != null) {
-      final scaleFactorY = details.verticalScale / _lastVerticalScale;
-      _lastVerticalScale = details.verticalScale;
-      if (scaleFactorY != 1.0) {
-        widget.onYZoom!(scaleFactorY);
-      }
-    }
-  }
-
-  void _handleScaleEnd(ScaleEndDetails details) {
-    _initialScale = null;
-    _lastHorizontalScale = 1.0;
-    _lastVerticalScale = 1.0;
-    _isPinching = false;
-  }
-
+  // Touch pan / pinch / fling live in [TouchGraphGestures]. Mouse drag-to-pan
+  // stays here; trackpad pinch and wheel scrolling are PointerSignal events
+  // handled in build().
   void _handlePointerDown(PointerDownEvent event, double width) {
-    if (event.buttons == 1) {
+    _touch.onPointerDown(event);
+    if (event.kind == PointerDeviceKind.mouse && event.buttons == 1) {
       _isDragging = true;
       _dragStartX = event.localPosition.dx;
     }
   }
 
   void _handlePointerMove(PointerMoveEvent event, double width) {
+    _touch.onPointerMove(event);
     if (_isDragging && _dragStartX != null && widget.onPan != null) {
       final dx = event.localPosition.dx - _dragStartX!;
       final graphWidth = width - _leftPadding - _rightPadding;
@@ -181,7 +155,8 @@ class _PitchGraphState extends State<PitchGraph> {
     }
   }
 
-  void _handlePointerUp(PointerUpEvent event) {
+  void _handlePointerUp(PointerEvent event) {
+    _touch.onPointerUp(event);
     _isDragging = false;
     _dragStartX = null;
   }
@@ -200,11 +175,14 @@ class _PitchGraphState extends State<PitchGraph> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
+        _size = Size(width, height);
+        _insets = GraphInsets.forWidth(width);
 
         return Listener(
           onPointerDown: (event) => _handlePointerDown(event, width),
           onPointerMove: (event) => _handlePointerMove(event, width),
           onPointerUp: _handlePointerUp,
+          onPointerCancel: _handlePointerUp,
           onPointerSignal: (event) {
             if (event is PointerScaleEvent && widget.onZoom != null) {
               GestureBinding.instance.pointerSignalResolver.register(event, (event) {
@@ -239,9 +217,6 @@ class _PitchGraphState extends State<PitchGraph> {
             cursor: widget.onSeek != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
             child: GestureDetector(
               onTapUp: (details) => _handleTap(details, width),
-              onScaleStart: _handleScaleStart,
-              onScaleUpdate: (details) => _handleScaleUpdate(details, width),
-              onScaleEnd: _handleScaleEnd,
               child: Container(
                 color: colorScheme.surface,
                 child: CustomPaint(
@@ -272,6 +247,7 @@ class _PitchGraphState extends State<PitchGraph> {
                     vocalDetail: widget.vocalDetail,
                     currentTime: widget.currentTime,
                     activeNotesHolder: _activeNotesHolder,
+                    insets: _insets,
                   ),
                   foregroundPainter: PlayheadPainter(
                     viewState: _vs,
@@ -288,6 +264,7 @@ class _PitchGraphState extends State<PitchGraph> {
                     sargamEnabled: widget.sargamEnabled,
                     scaleRoot: widget.scaleRoot,
                     activeNotesHolder: _activeNotesHolder,
+                    insets: _insets,
                   ),
                 ),
               ),

@@ -16,6 +16,9 @@ class DisplaySettingsButton extends StatefulWidget {
   final int vocalDetail;
   final ValueChanged<int> onVocalDetailChanged;
 
+  /// Larger icon and hit area for touch screens.
+  final bool touchFriendly;
+
   const DisplaySettingsButton({
     super.key,
     required this.hasInstruments,
@@ -29,6 +32,7 @@ class DisplaySettingsButton extends StatefulWidget {
     required this.onOtherConfidenceChanged,
     this.vocalDetail = 10,
     required this.onVocalDetailChanged,
+    this.touchFriendly = false,
   });
 
   @override
@@ -94,11 +98,13 @@ class _DisplaySettingsButtonState extends State<DisplaySettingsButton> {
           borderRadius: BorderRadius.circular(8),
           onTap: _togglePanel,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            padding: widget.touchFriendly
+                ? const EdgeInsets.all(12)
+                : const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(Icons.tune_rounded, size: 16, color: activeColor),
+                Icon(Icons.tune_rounded, size: widget.touchFriendly ? 22 : 16, color: activeColor),
                 // Small dot when confidence filtering is active
                 if (_isFiltering)
                   Positioned(

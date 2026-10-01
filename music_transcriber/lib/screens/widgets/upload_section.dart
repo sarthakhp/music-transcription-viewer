@@ -430,6 +430,9 @@ class _UploadSectionState extends State<UploadSection> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final appState = widget.appState;
+    // Phones: shrink the hero so the upload controls and library are in
+    // reach without scrolling past a screenful of decoration.
+    final compact = MediaQuery.sizeOf(context).width < 600;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -444,7 +447,7 @@ class _UploadSectionState extends State<UploadSection> {
             child: Opacity(opacity: value, child: child),
           ),
           child: Container(
-            padding: const EdgeInsets.all(28),
+            padding: EdgeInsets.all(compact ? 16 : 28),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
@@ -461,10 +464,10 @@ class _UploadSectionState extends State<UploadSection> {
                 ),
               ],
             ),
-            child: Icon(Icons.graphic_eq_rounded, size: 64, color: colorScheme.primary),
+            child: Icon(Icons.graphic_eq_rounded, size: compact ? 40 : 64, color: colorScheme.primary),
           ),
         ),
-        const SizedBox(height: 40),
+        SizedBox(height: compact ? 16 : 40),
 
         TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: 1),
@@ -473,13 +476,13 @@ class _UploadSectionState extends State<UploadSection> {
           builder: (context, value, child) => Opacity(opacity: value, child: child),
           child: Text(
             'Music Transcriber',
-            style: theme.textTheme.headlineMedium?.copyWith(
+            style: (compact ? theme.textTheme.titleLarge : theme.textTheme.headlineMedium)?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: compact ? 6 : 12),
 
         TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: 1),
@@ -494,7 +497,7 @@ class _UploadSectionState extends State<UploadSection> {
             textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: 48),
+        SizedBox(height: compact ? 20 : 48),
 
         // Loading
         if (widget.isLoadingJson || widget.isLoadingAudio)

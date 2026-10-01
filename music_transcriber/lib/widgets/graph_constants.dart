@@ -1,3 +1,5 @@
+import 'dart:ui' show Rect, Size;
+
 /// Shared constants for the pitch graph components
 class GraphConstants {
   // Layout constants
@@ -37,3 +39,53 @@ class GraphConstants {
   }
 }
 
+
+/// Padding around the plotted area (room for axis labels).
+///
+/// Phones get tighter insets so the graph keeps most of the screen width;
+/// [forWidth] picks between them.
+class GraphInsets {
+  final double left;
+  final double right;
+  final double top;
+  final double bottom;
+
+  /// Largest axis-label font that still fits inside [left].
+  final double maxLabelFontSize;
+
+  const GraphInsets({
+    required this.left,
+    required this.right,
+    required this.top,
+    required this.bottom,
+    this.maxLabelFontSize = 14,
+  });
+
+  static const regular = GraphInsets(
+    left: GraphConstants.leftPadding,
+    right: GraphConstants.rightPadding,
+    top: GraphConstants.topPadding,
+    bottom: GraphConstants.bottomPadding,
+  );
+
+  static const compact = GraphInsets(
+    left: 46,
+    right: 10,
+    top: 22,
+    bottom: 28,
+    maxLabelFontSize: 11,
+  );
+
+  static const double compactBreakpoint = 600;
+
+  static GraphInsets forWidth(double width) =>
+      width < compactBreakpoint ? compact : regular;
+
+  /// The plot rectangle inside a canvas of [size].
+  Rect rectFor(Size size) => Rect.fromLTRB(
+        left,
+        top,
+        size.width - right,
+        size.height - bottom,
+      );
+}

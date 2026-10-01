@@ -64,14 +64,6 @@ class _ScaleRootPicker extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Root',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurface.withValues(alpha: 0.6),
-            fontSize: 10,
-          ),
-        ),
-        const SizedBox(height: 2),
         SizedBox(
           height: 28,
           child: DropdownButton<int>(

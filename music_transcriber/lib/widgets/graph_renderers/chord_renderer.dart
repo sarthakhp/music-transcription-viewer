@@ -12,6 +12,9 @@ class ChordRenderer {
   final Brightness brightness;
   final int transposeAmount;
 
+  /// Playhead position; the chord it falls inside is drawn highlighted.
+  final double? currentTime;
+
   ChordRenderer({
     required this.chordData,
     required this.viewStartTime,
@@ -20,6 +23,7 @@ class ChordRenderer {
     required this.textColor,
     required this.brightness,
     this.transposeAmount = 0,
+    this.currentTime,
   });
 
   void drawChords(Canvas canvas, Rect rect) {
@@ -48,10 +52,12 @@ class ChordRenderer {
 
     // Calculate opacity based on confidence
     final opacity = (chord.confidence * 0.5 + 0.3).clamp(0.3, 0.8);
+    final t = currentTime;
+    final isActive = t != null && t >= chord.startTime && t < chord.endTime;
 
     // Draw chord block background
     final blockPaint = Paint()
-      ..color = chordColor.withValues(alpha: opacity * 0.3)
+      ..color = chordColor.withValues(alpha: isActive ? 0.6 : opacity * 0.3)
       ..style = PaintingStyle.fill;
 
     final blockRect = Rect.fromLTRB(
@@ -68,9 +74,9 @@ class ChordRenderer {
 
     // Draw border
     final borderPaint = Paint()
-      ..color = chordColor.withValues(alpha: opacity)
+      ..color = chordColor.withValues(alpha: isActive ? 1.0 : opacity)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+      ..strokeWidth = isActive ? 2.5 : 1.5;
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(blockRect, const Radius.circular(4)),
@@ -82,7 +88,7 @@ class ChordRenderer {
       final textStyle = TextStyle(
         color: textColor,
         fontSize: width > 40 ? 11 : 9,
-        fontWeight: FontWeight.w600,
+        fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
       );
 
       final tp = TextPainter(

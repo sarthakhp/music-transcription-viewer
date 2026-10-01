@@ -22,7 +22,6 @@ class ReferenceFrequencyControl extends StatefulWidget {
 class _ReferenceFrequencyControlState extends State<ReferenceFrequencyControl> {
   static const double _minHz = 400.0;
   static const double _maxHz = 480.0;
-  static const double _defaultHz = 440.0;
 
   late TextEditingController _controller;
   late FocusNode _focusNode;
@@ -51,7 +50,6 @@ class _ReferenceFrequencyControlState extends State<ReferenceFrequencyControl> {
 
   void _increment() => widget.onChanged((widget.frequency + 1.0).clamp(_minHz, _maxHz));
   void _decrement() => widget.onChanged((widget.frequency - 1.0).clamp(_minHz, _maxHz));
-  void _reset() => widget.onChanged(_defaultHz);
 
   void _submitValue() {
     final value = double.tryParse(_controller.text);
@@ -70,13 +68,6 @@ class _ReferenceFrequencyControlState extends State<ReferenceFrequencyControl> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'A4:',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(width: 4),
         IconButton(
           icon: const Icon(Icons.remove_rounded, size: 16),
           onPressed: _decrement,
@@ -106,14 +97,6 @@ class _ReferenceFrequencyControlState extends State<ReferenceFrequencyControl> {
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurface.withValues(alpha: 0.7),
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, size: 16),
-          onPressed: _reset,
-          tooltip: 'Reset to 440 Hz',
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
         ),
       ],
     );

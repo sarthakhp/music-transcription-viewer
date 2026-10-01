@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../providers/app_state.dart';
 import '../../services/audio_service.dart';
-import '../../utils/filename_utils.dart';
 import 'display_settings_popover.dart';
 import 'track_switcher.dart';
+import '../../widgets/audio_controls/control_group.dart';
 
 // Colors matching instrument_renderer.dart
 import '../../theme/app_palette.dart';
@@ -16,6 +16,14 @@ class ViewerToolbar extends StatelessWidget {
   final bool isSwitchingTrack;
   final ValueChanged<AudioTrackType> onTrackChanged;
   final bool isNarrow;
+
+  /// Phone layout: one scrollable row of thumb-sized controls. Metadata and
+  /// the file name live in the app bar instead.
+  final bool isPhone;
+
+  /// Phone only: lay the controls out as a bare, non-scrolling row to embed
+  /// in another bar (landscape puts them in the app bar).
+  final bool inline;
 
   // Layer visibility
   final bool showVocals;
@@ -49,6 +57,8 @@ class ViewerToolbar extends StatelessWidget {
     required this.isSwitchingTrack,
     required this.onTrackChanged,
     this.isNarrow = false,
+    this.isPhone = false,
+    this.inline = false,
     this.showVocals = true,
     this.showBass = true,
     this.showOther = true,
@@ -72,6 +82,8 @@ class ViewerToolbar extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    if (isPhone) return _buildPhoneToolbar(context, colorScheme);
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isNarrow ? 12 : 16,
@@ -92,62 +104,94 @@ class ViewerToolbar extends StatelessWidget {
   }
 
   Widget _buildWideToolbar(BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+    final hasLayers = appState.instrumentData != null;
+    final trackCount = [
+      AudioTrackType.original,
+      AudioTrackType.vocal,
+      AudioTrackType.instrumental,
+    ].where(audioService.isTrackLoaded).length;
+
     return Row(
+      // Centred: the captioned groups are taller than the title block.
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Left side: Audio file info and metadata - wraps when narrow
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.audiotrack_rounded, size: 16, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                _EditableFilename(
-                  filename: appState.audioFileName ?? 'Audio',
-                  onRenamed: (newName) {
-                    appState.renameAudioFile(newName);
-                    if (currentJobId != null && onJobRenamed != null) {
-                      onJobRenamed!(currentJobId!, newName);
-                    }
-                  },
-                ),
-                const SizedBox(width: 12),
-                Icon(Icons.timer_outlined, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                const SizedBox(width: 4),
-                Text(appState.pitchData?.durationFormatted ?? '', style: theme.textTheme.bodySmall),
-                if (appState.pitchData?.metadata.bpm != null) ...[
-                  const SizedBox(width: 12),
-                  Icon(Icons.speed_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                  const SizedBox(width: 4),
-                  Text('${appState.pitchData?.metadata.bpm?.toStringAsFixed(1)} BPM', style: theme.textTheme.bodySmall),
-                ],
-                if (appState.chordData != null) ...[
-                  const SizedBox(width: 12),
-                  Icon(Icons.music_note_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                  const SizedBox(width: 4),
-                  Text('${appState.chordData!.uniqueChordsCount} chords', style: theme.textTheme.bodySmall),
-                ],
-                if (appState.instrumentData != null) ...[
-                  const SizedBox(width: 12),
-                  Icon(Icons.piano_rounded, size: 16, color: colorScheme.onSurface.withValues(alpha: 0.5)),
-                  const SizedBox(width: 4),
-                  Text('${appState.instrumentData!.totalNotes} notes', style: theme.textTheme.bodySmall),
-                ],
-              ],
+        // Title block: full file name, stats underneath.
+        Expanded(child: _buildTitleBlock(theme, colorScheme)),
+        const SizedBox(width: 24),
+        if (hasLayers) ...[
+          ControlGroup(
+            label: 'Layers',
+            filled: false,
+            child: _buildLayerToggles(colorScheme),
+          ),
+          const SizedBox(width: 20),
+        ],
+        if (trackCount > 1)
+          ControlGroup(
+            label: 'Listening to',
+            filled: false,
+            child: TrackSwitcher(
+              audioService: audioService,
+              currentTrack: currentTrack,
+              isSwitching: isSwitchingTrack,
+              onTrackChanged: onTrackChanged,
+              compact: true,
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildTitleBlock(ThemeData theme, ColorScheme colorScheme) {
+    final muted = colorScheme.onSurface.withValues(alpha: 0.6);
+    Widget stat(IconData icon, String text) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: muted),
+            const SizedBox(width: 4),
+            Text(text, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+          ],
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.audiotrack_rounded, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Flexible(
+              child: _EditableFilename(
+                filename: appState.audioFileName ?? 'Audio',
+                onRenamed: (newName) {
+                  appState.renameAudioFile(newName);
+                  if (currentJobId != null && onJobRenamed != null) {
+                    onJobRenamed!(currentJobId!, newName);
+                  }
+                },
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        // Right side: Layer toggles + track switcher - always visible
-        _buildLayerToggles(colorScheme),
-        const SizedBox(width: 8),
-        TrackSwitcher(
-          audioService: audioService,
-          currentTrack: currentTrack,
-          isSwitching: isSwitchingTrack,
-          onTrackChanged: onTrackChanged,
-          compact: true,
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 26),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 2,
+            children: [
+              if (appState.pitchData != null)
+                stat(Icons.timer_outlined, appState.pitchData!.durationFormatted),
+              if (appState.pitchData?.metadata.bpm != null)
+                stat(Icons.speed_rounded,
+                    '${appState.pitchData!.metadata.bpm!.toStringAsFixed(0)} BPM'),
+              if (appState.chordData != null)
+                stat(Icons.music_note_rounded, '${appState.chordData!.uniqueChordsCount} chords'),
+              if (appState.instrumentData != null)
+                stat(Icons.piano_rounded, '${appState.instrumentData!.totalNotes} notes'),
+            ],
+          ),
         ),
       ],
     );
@@ -190,6 +234,112 @@ class ViewerToolbar extends StatelessWidget {
     );
   }
 
+  /// Track switcher + layer chips + display settings in one row that scrolls
+  /// sideways rather than wrapping onto extra lines and eating graph height.
+  Widget _buildPhoneToolbar(BuildContext context, ColorScheme colorScheme) {
+    final hasInstruments = appState.instrumentData != null;
+    final hasBass = appState.instrumentData?.bass != null;
+    final hasOther = appState.instrumentData?.other != null;
+
+    final items = <Widget>[
+      TrackSwitcher(
+        audioService: audioService,
+        currentTrack: currentTrack,
+        isSwitching: isSwitchingTrack,
+        onTrackChanged: onTrackChanged,
+        compact: true,
+        dense: true,
+      ),
+      if (hasInstruments) ...[
+        _LayerChip(
+          label: 'Vocals',
+          color: colorScheme.primary,
+          selected: showVocals,
+          onToggled: onVocalsToggled,
+          large: true,
+        ),
+        if (hasBass)
+          _LayerChip(
+            label: 'Bass',
+            color: appPalette.bassColor,
+            selected: showBass,
+            onToggled: onBassToggled,
+            large: true,
+          ),
+        if (hasOther)
+          _LayerChip(
+            label: 'Other',
+            color: appPalette.otherColor,
+            selected: showOther,
+            onToggled: onOtherToggled,
+            large: true,
+          ),
+      ],
+    ];
+
+    // Pinned outside the scrolling row so display settings are always
+    // reachable, however many layer chips there are.
+    final settingsButton = DisplaySettingsButton(
+      hasInstruments: hasInstruments,
+      hasBass: hasBass,
+      hasOther: hasOther,
+      vocalsMinConfidence: vocalsMinConfidence,
+      bassMinConfidence: bassMinConfidence,
+      otherMinConfidence: otherMinConfidence,
+      onVocalsConfidenceChanged: onVocalsConfidenceChanged,
+      onBassConfidenceChanged: onBassConfidenceChanged,
+      onOtherConfidenceChanged: onOtherConfidenceChanged,
+      vocalDetail: vocalDetail,
+      onVocalDetailChanged: onVocalDetailChanged,
+      touchFriendly: true,
+    );
+
+    if (inline) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final item in items) ...[item, const SizedBox(width: 8)],
+          settingsButton,
+        ],
+      );
+    }
+
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        border: Border(
+          bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            // Fade the right edge so a clipped chip reads as "scroll for more".
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Colors.white, Colors.white, Colors.transparent],
+                stops: [0.0, 0.92, 1.0],
+              ).createShader(bounds),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(left: 12, right: 12),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => Center(child: items[i]),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: settingsButton,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLayerToggles(ColorScheme colorScheme) {
     final hasInstruments = appState.instrumentData != null;
     final hasBass = appState.instrumentData?.bass != null;
@@ -201,14 +351,6 @@ class ViewerToolbar extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Layers:',
-          style: TextStyle(
-            fontSize: 11,
-            color: colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
-        ),
-        const SizedBox(width: 6),
         _LayerChip(
           label: 'Vocals',
           color: colorScheme.primary,
@@ -269,54 +411,68 @@ class _LayerChip extends StatelessWidget {
   final Color color;
   final bool selected;
   final ValueChanged<bool> onToggled;
+  final bool large;
 
   const _LayerChip({
     required this.label,
     required this.color,
     required this.selected,
     required this.onToggled,
+    this.large = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: () => onToggled(!selected),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: selected
-              ? color.withValues(alpha: 0.15)
-              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? color.withValues(alpha: 0.6) : colorScheme.outline.withValues(alpha: 0.3),
+    final chip = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: large
+          ? const EdgeInsets.symmetric(horizontal: 14, vertical: 9)
+          : const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: selected
+            ? color.withValues(alpha: 0.15)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(large ? 16 : 12),
+        border: Border.all(
+          color: selected ? color.withValues(alpha: 0.6) : colorScheme.outline.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: large ? 9 : 7,
+            height: large ? 9 : 7,
+            decoration: BoxDecoration(
+              color: selected ? color : color.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: selected ? color : color.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
+          SizedBox(width: large ? 6 : 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: large ? 13 : 11,
+              color: selected
+                  ? colorScheme.onSurface
+                  : colorScheme.onSurface.withValues(alpha: 0.4),
             ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: selected
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      toggled: selected,
+      label: '$label layer',
+      excludeSemantics: true,
+      onTap: () => onToggled(!selected),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onToggled(!selected),
+        child: chip,
       ),
     );
   }
@@ -385,12 +541,12 @@ class _EditableFilenameState extends State<_EditableFilename> {
     final theme = Theme.of(context);
     if (_editing) {
       return ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 80, maxWidth: 220),
+        constraints: const BoxConstraints(minWidth: 80, maxWidth: 360),
         child: IntrinsicWidth(
           child: TextField(
             controller: _ctrl,
             focusNode: _focus,
-            style: theme.textTheme.bodySmall,
+            style: theme.textTheme.titleSmall,
             decoration: const InputDecoration(
               isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -406,19 +562,19 @@ class _EditableFilenameState extends State<_EditableFilename> {
       child: GestureDetector(
         onTap: _startEditing,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
                 child: Text(
-                  FilenameUtils.shortenFilename(widget.filename),
-                  style: theme.textTheme.bodySmall,
+                  widget.filename,
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.edit_rounded, size: 11,
+              Icon(Icons.edit_rounded, size: 13,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.35)),
             ],
           ),

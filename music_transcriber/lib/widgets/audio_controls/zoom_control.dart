@@ -17,11 +17,7 @@ class ZoomControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(2),
-        child: Row(
+    return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
@@ -46,8 +42,6 @@ class ZoomControl extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
     );
   }
 }

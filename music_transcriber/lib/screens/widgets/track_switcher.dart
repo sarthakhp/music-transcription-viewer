@@ -9,6 +9,9 @@ class TrackSwitcher extends StatelessWidget {
   final ValueChanged<AudioTrackType> onTrackChanged;
   final bool compact;
 
+  /// Tighter segment padding, for rows that are short on horizontal space.
+  final bool dense;
+
   const TrackSwitcher({
     super.key,
     required this.audioService,
@@ -16,6 +19,7 @@ class TrackSwitcher extends StatelessWidget {
     required this.isSwitching,
     required this.onTrackChanged,
     this.compact = false,
+    this.dense = false,
   });
 
   @override
@@ -68,6 +72,12 @@ class TrackSwitcher extends StatelessWidget {
               ? null
               : (selection) => onTrackChanged(selection.first),
           showSelectedIcon: false,
+          style: dense
+              ? const ButtonStyle(
+                  padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 4)),
+                  visualDensity: VisualDensity(horizontal: -2),
+                )
+              : null,
         ),
         if (isSwitching)
           Positioned.fill(

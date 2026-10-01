@@ -71,14 +71,6 @@ class _TransposeControlState extends State<TransposeControl> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Key',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurface.withValues(alpha: 0.6),
-            fontSize: 10,
-          ),
-        ),
-        const SizedBox(height: 2),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -112,20 +104,6 @@ class _TransposeControlState extends State<TransposeControl> {
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            ),
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: isActive
-                  ? IconButton(
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      onPressed: () => widget.onChanged(0),
-                      tooltip: 'Reset transpose',
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                    )
-                  : null,
             ),
           ],
         ),

@@ -23,6 +23,7 @@ class PlayheadPainter extends CustomPainter {
   final bool sargamEnabled;
   final int scaleRoot;
   final ActiveNotesHolder? activeNotesHolder;
+  final GraphInsets insets;
 
   PlayheadPainter({
     required this.viewState,
@@ -39,16 +40,12 @@ class PlayheadPainter extends CustomPainter {
     this.sargamEnabled = false,
     this.scaleRoot = 0,
     this.activeNotesHolder,
+    this.insets = GraphInsets.regular,
   }) : super(repaint: viewState);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final graphRect = Rect.fromLTRB(
-      GraphConstants.leftPadding,
-      GraphConstants.topPadding,
-      size.width - GraphConstants.rightPadding,
-      size.height - GraphConstants.bottomPadding,
-    );
+    final graphRect = insets.rectFor(size);
 
     final playheadRenderer = PlayheadRenderer(
       currentTime: currentTime,
@@ -81,6 +78,7 @@ class PlayheadPainter extends CustomPainter {
     // Always repaint when currentTime changes (which happens every frame during playback)
     // The activeNotesHolder is mutated in place, so we don't check it here
     return oldDelegate.currentTime != currentTime ||
+        oldDelegate.insets != insets ||
         oldDelegate.hoverTime != hoverTime ||
         oldDelegate.hoverY != hoverY;
   }

@@ -140,7 +140,7 @@ class UploadLayout extends StatelessWidget {
                       // Upload section (or hosted-viewer note in remote mode)
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 800),
-                        child: _leftPanel(context),
+                        child: _leftPanel(context, withPractice: !isMobile),
                       ),
                       SizedBox(height: isMobile ? 20 : 32),
                       // Failed jobs (retryable) — sized to content
@@ -156,16 +156,32 @@ class UploadLayout extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      // Completed job history
-                      SizedBox(
-                        height: 400,
-                        child: JobListCard(
+                      // Completed job history. On phones it grows with its
+                      // content (the page scrolls) instead of being a
+                      // scroll box nested inside the scrolling page.
+                      if (isMobile)
+                        JobListCard(
                           jobs: completedJobs,
+                          shrinkWrap: true,
                           onJobSelected: onJobSelected,
                           onJobDeleted: isRemote ? null : onJobDeleted,
                           isLoading: isLoadingJobs,
+                        )
+                      else
+                        SizedBox(
+                          height: 400,
+                          child: JobListCard(
+                            jobs: completedJobs,
+                            onJobSelected: onJobSelected,
+                            onJobDeleted: isRemote ? null : onJobDeleted,
+                            isLoading: isLoadingJobs,
+                          ),
                         ),
-                      ),
+                      if (isMobile) ...[
+                        const SizedBox(height: 20),
+                        _practiceModeCard(context),
+                      ],
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -177,7 +193,7 @@ class UploadLayout extends StatelessWidget {
   /// Left panel: the upload/URL controls locally, or a read-only note when
   /// running as the hosted viewer (no processing backend available). Either
   /// way, the fully client-side Practice Mode entry point is offered too.
-  Widget _leftPanel(BuildContext context) {
+  Widget _leftPanel(BuildContext context, {bool withPractice = true}) {
     if (!isRemote) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -192,8 +208,10 @@ class UploadLayout extends StatelessWidget {
             isLoadingAudio: isLoadingAudio,
             loadingAudioStatus: loadingAudioStatus,
           ),
-          const SizedBox(height: 20),
-          _practiceModeCard(context),
+          if (withPractice) ...[
+            const SizedBox(height: 20),
+            _practiceModeCard(context),
+          ],
         ],
       );
     }
@@ -246,8 +264,10 @@ class UploadLayout extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        _practiceModeCard(context),
+        if (withPractice) ...[
+          const SizedBox(height: 20),
+          _practiceModeCard(context),
+        ],
       ],
     );
   }

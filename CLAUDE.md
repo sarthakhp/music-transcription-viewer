@@ -60,6 +60,10 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `lib/services/tanpura_service.dart` | Tanpura — loads MP3 asset, loops, pitch via playbackRate |
 | `lib/screens/widgets/viewer_toolbar.dart` | Top toolbar including editable filename |
 | `lib/screens/widgets/tanpura_control.dart` | Tanpura app-bar button + popover |
+| `lib/utils/responsive.dart` | `ViewerLayout` (phonePortrait / phoneLandscape / regular) — drives the mobile UI |
+| `lib/widgets/graph_touch_gestures.dart` | Touch pan, fling, axis-aware pinch zoom for the pitch graph |
+| `lib/widgets/mobile_player/` | Phone player panel (seek, transport, Speed/Key/Notes/Zoom pills) + bottom sheets |
+| `lib/screens/widgets/phone_viewer_app_bar.dart` | Phone viewer app bar (track name, stats, overflow menu) |
 | `lib/config/api_config.dart` | API URL — reads `API_BASE_URL` dart-define for dev override |
 | `lib/router.dart` | go_router config |
 | `assets/audio/tanpura_g.mp3` | 90s seamless loop, G scale, 128kbps MP3 |
@@ -95,3 +99,25 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - **Tanpura pitch**: `playbackRate = 2^((scaleRoot - 7) / 12)`. Root=G → rate 1.0. Only tracks Root, not transpose.
 - **Job display name**: `userDisplayName ?? videoTitle ?? inputFilename`. Editable in toolbar, persisted via `PATCH /jobs/:id/rename`.
 - **File picker in DMG**: `lib/utils/web_file_picker.dart` calls `window.__pickFile(hint)` (defined in `web/index.html`), which fetches `http://127.0.0.1:47823/pick-file?hint=audio` — a local HTTP server in `launcher.py`. If that server returns a non-2xx, the JS catch returns `{_unavailable: true}` and Dart falls back to HTML `<input>` — but programmatic `input.click()` is blocked by WKWebView without a live gesture context, so the button silently does nothing. Always check `launcher.log` first when file picking breaks.
+- **Audio loading failure = infinite overlay**: `_loadAudio` in `home_screen_audio.dart` must always clear `_isLoadingAudio` and call `appState.setPreparingAudio(false)` on both success AND failure paths. If `success = false` goes unhandled, the loading overlay freezes permanently. On web, `platform_audio_player_web.dart` catches all `player.load()` exceptions and returns `false` — so failures are silent and this cleanup is critical.
+
+## Mobile UI
+- `ViewerLayout.of(context)`: width < 600 = phone portrait, height < 500 = phone landscape, else regular (desktop UI untouched).
+- Pinch zoom axis is decided once per gesture from how the finger span changes (`PinchAxisResolver`): sideways = time, up/down = pitch, diagonal = both. One finger pans (axis-locks when the drag is straight) and flings. Mouse/trackpad paths in `pitch_graph.dart` are unchanged.
+- Graph padding is `GraphInsets.forWidth` (tighter on phones); painters take `insets`.
+- `index.html` sets `user-scalable=no` so the browser doesn't steal the pinch; keep it.
+- Icons: `web/icons/*` and `favicon.png` are generated (equalizer bars on dark teal). iOS reads `icons/apple-touch-icon.png` (180px, opaque). iOS caches home-screen icons; re-add the page to the Home Screen to see a change.
+
+## Loading Overlay Logic
+The overlay (`LoadingOverlay`) in `home_screen.dart` is visible when:
+```
+(shell.isLoading && !shell.isReady) || shell.isPreparingAudio
+```
+- `isReady = audioBytes != null` — becomes true once `_downloadAudioStems` calls `setAudioData`
+- `isPreparingAudio` is set true in both `_downloadAudioStems` (start) and `_loadAudio` (start); only `_loadAudio` clears it on completion
+- `_buildViewerLayout` triggers `_loadAudio` via `addPostFrameCallback` whenever `!_audioLoaded && !_isLoadingAudio && audioBytes != null`
+- Error UI: audio load failure shows a SnackBar ("Audio could not be loaded. Playback is unavailable.") — the pitch visualization remains accessible
+
+## MCP / Tooling
+- **code-review-graph binary**: installed at `~/.local/bin/code-review-graph` (v2.3.7). `.mcp.json` uses the direct path — do NOT switch back to `uvx code-review-graph` (fails due to SSL cert issue on this machine).
+- **Rebuilding the graph**: run `code-review-graph build` from the repo root. Graph lives in `.code-review-graph/graph.db`.

@@ -7,11 +7,15 @@ class SeekSlider extends StatelessWidget {
   final double duration;
   final ValueChanged<double> onSeek;
 
+  /// Thicker track and larger thumb/hit area for fingers.
+  final bool touchFriendly;
+
   const SeekSlider({
     super.key,
     required this.currentTime,
     required this.duration,
     required this.onSeek,
+    this.touchFriendly = false,
   });
 
   @override
@@ -26,9 +30,9 @@ class SeekSlider extends StatelessWidget {
         Expanded(
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              trackHeight: touchFriendly ? 6 : 4,
+              thumbShape: RoundSliderThumbShape(enabledThumbRadius: touchFriendly ? 9 : 6),
+              overlayShape: RoundSliderOverlayShape(overlayRadius: touchFriendly ? 22 : 14),
             ),
             child: Slider(
               value: clamped,
