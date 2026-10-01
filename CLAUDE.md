@@ -85,18 +85,22 @@ Every feature must work on **desktop browser**, the **macOS DMG** (pywebview/WKW
 - `API_BASE_URL` dart-define overrides backend URL for dev
 
 ## Keyboard Shortcuts
+Source of truth: `_handleKeyEvent` in `home_screen_view_controls.dart` (keep `keyboard_shortcuts_dialog.dart`, hover tooltips and README in sync).
 | Key | Action |
 |-----|--------|
 | `Space` | Play/pause |
-| `←` / `→` | Seek ±5s |
-| `↑` / `↓` | Volume |
-| `+` / `-` | Transpose up/down |
-| `0` | Reset transpose |
-| `[` / `]` | Speed down/up |
-| `\` | Reset speed to 1× |
+| `←` / `→` | Seek ±1s (`⌘` held: ±5s) |
+| `↑` / `↓` | Pan the pitch view up/down |
+| `⌘⇧↑` / `⌘⇧↓` | Transpose ±1 semitone |
+| `+` / `-` | Zoom pitch (vertical) in/out |
+| `⇧+` / `⇧-` | Zoom time (horizontal) in/out |
+| `0` | Seek to start |
+| `1`-`9` | Seek to 10%-90% of the track |
 | `A` | Toggle auto-scroll |
-| Trackpad pinch / `Shift` + pinch | Zoom time / zoom pitch |
+| `[` / `]` | Speed down/up one preset |
+| `\` | Reset speed to 1x |
 | `T` | Toggle tanpura drone |
+| Trackpad pinch / `Shift` + pinch | Zoom time / zoom pitch |
 
 ## Gotchas
 - **SoundTouchNode lazy init**: re-apply pitch after `ctx.resume()` or first-play transpose is ignored
