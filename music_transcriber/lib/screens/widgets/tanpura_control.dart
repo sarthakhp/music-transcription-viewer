@@ -65,7 +65,7 @@ class _TanpuraButtonState extends State<TanpuraButton> {
     return CompositedTransformTarget(
       link: _layerLink,
       child: Tooltip(
-        message: isOn ? 'Tanpura on — tap to adjust' : 'Start tanpura drone',
+        message: isOn ? 'Tanpura on — tap to adjust (T to stop)' : 'Start tanpura drone (T)',
         child: IconButton(
           icon: _TanpuraIcon(opacity: isOn ? 1.0 : 0.6),
           isSelected: isOn,

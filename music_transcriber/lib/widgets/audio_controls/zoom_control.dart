@@ -7,6 +7,10 @@ class ZoomControl extends StatelessWidget {
   final String value;
   final String axisName;
 
+  /// Keyboard shortcuts shown in the button tooltips.
+  final String? outShortcut;
+  final String? inShortcut;
+
   /// Width reserved for the value so the buttons don't move as it changes.
   final double valueWidth;
   final VoidCallback? onZoomIn;
@@ -16,6 +20,8 @@ class ZoomControl extends StatelessWidget {
     super.key,
     required this.value,
     required this.axisName,
+    this.outShortcut,
+    this.inShortcut,
     this.valueWidth = 48,
     required this.onZoomIn,
     required this.onZoomOut,
@@ -37,7 +43,8 @@ class ZoomControl extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        button(Icons.zoom_out_rounded, 'Zoom $axisName out', onZoomOut),
+        button(Icons.zoom_out_rounded,
+            'Zoom $axisName out${outShortcut == null ? '' : ' ($outShortcut)'}', onZoomOut),
         SizedBox(
           width: valueWidth,
           child: Text(
@@ -49,7 +56,8 @@ class ZoomControl extends StatelessWidget {
             ),
           ),
         ),
-        button(Icons.zoom_in_rounded, 'Zoom $axisName in', onZoomIn),
+        button(Icons.zoom_in_rounded,
+            'Zoom $axisName in${inShortcut == null ? '' : ' ($inShortcut)'}', onZoomIn),
       ],
     );
   }

@@ -66,7 +66,9 @@ class GraphOverlayControls extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            Semantics(
+            Tooltip(
+              message: 'Auto-scroll (A)',
+              child: Semantics(
               button: true,
               toggled: isOn,
               label: 'Auto-scroll',
@@ -103,6 +105,7 @@ class GraphOverlayControls extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
             ),
           ],
         );

@@ -171,6 +171,8 @@ class AudioControls extends StatelessWidget {
           onReset: () => viewState!.resetTimeZoom(maxTime: duration),
           child: ZoomControl(
             axisName: 'time',
+            outShortcut: 'Shift −',
+            inShortcut: 'Shift +',
             value: '${viewState!.viewWindowSize.round()}s',
             onZoomIn: viewState!.viewWindowSize > ViewState.minWindowSize
                 ? () => viewState!.zoomIn(maxTime: duration)
@@ -186,6 +188,8 @@ class AudioControls extends StatelessWidget {
         onReset: () => viewState?.resetPitchZoom(),
         child: ZoomControl(
           axisName: 'pitch',
+          outShortcut: '−',
+          inShortcut: '+',
           // Semitones (notes) visible at once; fewer = more zoomed in.
           value: viewState == null
               ? '-'
@@ -261,7 +265,7 @@ class AudioControls extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.skip_previous_rounded),
           onPressed: () => onSeek(0),
-          tooltip: 'Back to start',
+          tooltip: 'Back to start (0)',
         ),
         const SizedBox(width: 4),
         // Soft teal glow while playing, so state is visible at a glance.
@@ -288,12 +292,12 @@ class AudioControls extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.replay_rounded),
           onPressed: () => onSeek((currentTime - seekStepSeconds).clamp(0, duration)),
-          tooltip: 'Back ${seekStepSeconds.toInt()}s',
+          tooltip: 'Back ${seekStepSeconds.toInt()}s (←)',
         ),
         IconButton(
           icon: Transform.flip(flipX: true, child: const Icon(Icons.replay_rounded)),
           onPressed: () => onSeek((currentTime + seekStepSeconds).clamp(0, duration)),
-          tooltip: 'Forward ${seekStepSeconds.toInt()}s',
+          tooltip: 'Forward ${seekStepSeconds.toInt()}s (→)',
         ),
       ],
     );

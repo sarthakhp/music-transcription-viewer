@@ -79,7 +79,7 @@ class _TransposeControlState extends State<TransposeControl> {
               onPressed: widget.amount > _minSemitones
                   ? () => widget.onChanged(widget.amount - 1)
                   : null,
-              tooltip: 'Transpose down',
+              tooltip: 'Transpose down (⌘⇧↓)',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -100,7 +100,7 @@ class _TransposeControlState extends State<TransposeControl> {
               onPressed: widget.amount < _maxSemitones
                   ? () => widget.onChanged(widget.amount + 1)
                   : null,
-              tooltip: 'Transpose up',
+              tooltip: 'Transpose up (⌘⇧↑)',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),

@@ -42,10 +42,10 @@ class SpeedControl extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        stepButton(Icons.remove_rounded, 'Slower  [',
+        stepButton(Icons.remove_rounded, 'Slower ([)',
             index > 0 ? () => onChanged(presets[index - 1]) : null),
         PopupMenuButton<double>(
-          tooltip: 'Choose speed',
+          tooltip: 'Choose speed (\\ resets to 1x)',
           initialValue: presets[index],
           onSelected: onChanged,
           position: PopupMenuPosition.under,
@@ -66,7 +66,7 @@ class SpeedControl extends StatelessWidget {
             ),
           ),
         ),
-        stepButton(Icons.add_rounded, 'Faster  ]',
+        stepButton(Icons.add_rounded, 'Faster (])',
             index < presets.length - 1 ? () => onChanged(presets[index + 1]) : null),
       ],
     );
