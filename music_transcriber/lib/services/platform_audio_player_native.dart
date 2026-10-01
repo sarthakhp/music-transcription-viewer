@@ -8,6 +8,9 @@ import 'platform_audio_player.dart';
 class NativeAudioPlayer implements PlatformAudioPlayer {
   ja.AudioPlayer? _player;
 
+  /// True during the muted warm-up in [load]; player events are not forwarded.
+  bool _priming = false;
+
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _playingController = StreamController<bool>.broadcast();
@@ -51,7 +54,41 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
     final source = _BytesAudioSource(bytes, mimeType);
     // ignore: experimental_member_use
     await _player!.setAudioSource(source);
+
+    await _primeRenderPipeline();
   }
+
+  /// Runs a brief muted play/pause so AVPlayer's audio-session activation and
+  /// hardware negotiation (which can glitch) happen now, during the loading
+  /// overlay, rather than on the user's first tap.
+  ///
+  /// Notes: just_audio's `play()` future completes only when playback pauses
+  /// or ends, so it must NOT be awaited before `pause()`. Player events are
+  /// suppressed meanwhile so the UI never sees a phantom play/pause, and the
+  /// volume is always restored, even if a step throws.
+  Future<void> _primeRenderPipeline() async {
+    final player = _player;
+    if (player == null) return;
+    _priming = true;
+    try {
+      await player.setVolume(0);
+      unawaited(player.play());
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await player.pause();
+      await player.seek(Duration.zero);
+    } catch (e) {
+      debugPrint('[NativeAudioPlayer] render-pipeline priming failed: $e');
+    } finally {
+      await player.setVolume(1);
+      _priming = false;
+    }
+  }
+
+  @override
+  double get audioLatencySeconds => 0.0; // handled by just_audio internally
+
+  @override
+  String? get videoViewType => null;
 
   // --- Playback -------------------------------------------------------------
 
@@ -96,9 +133,13 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
     _stateSub?.cancel();
 
     final player = _player!;
-    _posSub = player.positionStream.listen(_positionController.add);
+    _posSub = player.positionStream.listen((p) {
+      if (!_priming) _positionController.add(p);
+    });
     _durSub = player.durationStream.listen(_durationController.add);
-    _playSub = player.playingStream.listen(_playingController.add);
+    _playSub = player.playingStream.listen((p) {
+      if (!_priming) _playingController.add(p);
+    });
     _stateSub = player.processingStateStream.listen((s) {
       _stateController.add(_mapState(s));
       if (s == ja.ProcessingState.completed) player.pause();

@@ -49,12 +49,15 @@ Future<web.AudioContext> _getOrCreateContext() async {
 Future<void> _ensureWorkletRegistered(web.AudioContext ctx) async {
   if (_workletRegistered) return;
   if (_soundTouchNodeClass == null) {
+    debugPrint('[WebAudioPlayer] SoundTouchNode class not found on globalThis — worklet script did not load.');
     return;
   }
   try {
     await SoundTouchNodeJS.register(ctx, 'soundtouch-processor.js').toDart;
     _workletRegistered = true;
+    debugPrint('[WebAudioPlayer] SoundTouch worklet registered successfully.');
   } catch (e) {
+    debugPrint('[WebAudioPlayer] SoundTouch worklet registration FAILED: $e');
   }
 }
 
@@ -258,11 +261,14 @@ class WebAudioPlayer implements PlatformAudioPlayer {
         _stNode!.pitchSemitones.value = _currentSemitones.toDouble();
         _source!.connect(_stNode!);
         _stNode!.connect(_ctx!.destination);
+        debugPrint('[WebAudioPlayer] SoundTouchNode created and wired into graph.');
       } catch (e) {
+        debugPrint('[WebAudioPlayer] SoundTouchNode construction FAILED: $e — falling back to native playbackRate.');
         _stNode = null;
         _source!.connect(_ctx!.destination);
       }
     } else {
+      debugPrint('[WebAudioPlayer] Worklet unavailable — connecting source directly, no SoundTouch. workletRegistered=$_workletRegistered stClass=${_soundTouchNodeClass != null}');
       _source!.connect(_ctx!.destination);
     }
   }
