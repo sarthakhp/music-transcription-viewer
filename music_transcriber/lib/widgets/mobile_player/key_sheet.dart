@@ -62,10 +62,17 @@ class _KeyOptionsState extends State<_KeyOptions> {
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: _amount == 0 ? null : () => _set(0),
-            icon: const Icon(Icons.restart_alt_rounded),
-            label: const Text('Reset'),
+          // Hidden (not removed) when already at 0, so the sheet doesn't resize.
+          child: Visibility(
+            visible: _amount != 0,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: TextButton.icon(
+              onPressed: () => _set(0),
+              icon: const Icon(Icons.restart_alt_rounded),
+              label: const Text('Reset'),
+            ),
           ),
         ),
       ],

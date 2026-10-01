@@ -95,7 +95,7 @@ class AudioControls extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
         border: Border(
@@ -105,13 +105,23 @@ class AudioControls extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SeekSlider(
-            currentTime: currentTime,
-            duration: duration,
-            onSeek: onSeek,
-            touchFriendly: true,
+          // Row 1: transport and the seek bar share a line to save height.
+          Row(
+            children: [
+              _buildWideTransport(),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SeekSlider(
+                  currentTime: currentTime,
+                  duration: duration,
+                  onSeek: onSeek,
+                  touchFriendly: true,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          // Row 2: labelled settings.
           if (isNarrow) _buildNarrowControls() else _buildWideControls(),
         ],
       ),
@@ -180,19 +190,13 @@ class AudioControls extends StatelessWidget {
   /// groups right-aligned. FittedBox shrinks them slightly on mid-width
   /// windows instead of overflowing.
   Widget _buildWideControls() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        _buildWideTransport(),
-        const SizedBox(width: 24),
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerRight,
-            child: _withGaps(_buildGroups(), 12),
-          ),
-        ),
-      ],
+    return SizedBox(
+      width: double.infinity,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: _withGaps(_buildGroups(), 12),
+      ),
     );
   }
 
@@ -244,18 +248,12 @@ class AudioControls extends StatelessWidget {
   /// Mid-width layout (tablets, narrow windows): transport centred, the
   /// labelled groups wrapping underneath.
   Widget _buildNarrowControls() {
-    return Column(
-      children: [
-        _buildWideTransport(),
-        const SizedBox(height: 12),
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.end,
-          spacing: 12,
-          runSpacing: 10,
-          children: _buildGroups(),
-        ),
-      ],
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.end,
+      spacing: 12,
+      runSpacing: 8,
+      children: _buildGroups(),
     );
   }
 }

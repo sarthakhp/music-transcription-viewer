@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Playback speed as one-click preset chips (the selected one is filled).
+/// Compact playback-speed stepper: `− 1x +` steps through the presets, and
+/// tapping the value opens a menu to jump straight to any of them.
 class SpeedControl extends StatelessWidget {
   final double speed;
   final ValueChanged<double> onChanged;
@@ -15,43 +16,58 @@ class SpeedControl extends StatelessWidget {
 
   static String format(double v) => v == v.roundToDouble() ? '${v.toInt()}x' : '${v}x';
 
+  /// Index of the preset closest to [speed] (exact match in practice).
+  int get _index {
+    var best = 0;
+    for (var i = 1; i < presets.length; i++) {
+      if ((presets[i] - speed).abs() < (presets[best] - speed).abs()) best = i;
+    }
+    return best;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final index = _index;
+
+    Widget stepButton(IconData icon, String tooltip, VoidCallback? onPressed) => IconButton(
+          icon: Icon(icon, size: 18),
+          onPressed: onPressed,
+          tooltip: tooltip,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final p in presets)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1),
-            child: Tooltip(
-              message: 'Play at ${format(p)}',
-              child: Material(
-                color: p == speed ? scheme.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(9),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(9),
-                  onTap: () => onChanged(p),
-                  child: Container(
-                    height: 32,
-                    constraints: const BoxConstraints(minWidth: 40),
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      format(p),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        color: p == speed ? scheme.onPrimary : scheme.onSurface.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ),
-                ),
+        stepButton(Icons.remove_rounded, 'Slower  [',
+            index > 0 ? () => onChanged(presets[index - 1]) : null),
+        PopupMenuButton<double>(
+          tooltip: 'Choose speed',
+          initialValue: presets[index],
+          onSelected: onChanged,
+          position: PopupMenuPosition.under,
+          itemBuilder: (_) => [
+            for (final p in presets)
+              PopupMenuItem(value: p, child: Text(format(p))),
+          ],
+          child: Container(
+            width: 52,
+            height: 32,
+            alignment: Alignment.center,
+            child: Text(
+              format(speed),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
+        ),
+        stepButton(Icons.add_rounded, 'Faster  ]',
+            index < presets.length - 1 ? () => onChanged(presets[index + 1]) : null),
       ],
     );
   }

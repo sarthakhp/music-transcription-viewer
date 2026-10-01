@@ -75,8 +75,8 @@ class _NotationOptionsState extends State<_NotationOptions> {
       children: [
         SegmentedButton<bool>(
           segments: const [
-            ButtonSegment(value: false, label: Text('A B C')),
-            ButtonSegment(value: true, label: Text('Sa Re Ga')),
+            ButtonSegment(value: false, label: Text('Western (C D E)')),
+            ButtonSegment(value: true, label: Text('Sargam (Sa Re Ga)')),
           ],
           selected: {_sargam},
           showSelectedIcon: false,
@@ -87,7 +87,8 @@ class _NotationOptionsState extends State<_NotationOptions> {
           },
         ),
         const SizedBox(height: 20),
-        Text('Sa and tanpura pitch', style: theme.textTheme.labelLarge),
+        Text(_sargam ? 'Sa (tonic) and tanpura pitch' : 'Root note and tanpura pitch',
+            style: theme.textTheme.labelLarge),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -118,10 +119,18 @@ class _NotationOptionsState extends State<_NotationOptions> {
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: _hz == _defaultHz ? null : () => _setHz(_defaultHz),
-            icon: Icon(Icons.restart_alt_rounded, color: muted),
-            label: const Text('Reset to 440 Hz'),
+          // Hidden (not removed) when already at the default, so the sheet
+          // doesn't change height.
+          child: Visibility(
+            visible: _hz != _defaultHz,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: TextButton.icon(
+              onPressed: () => _setHz(_defaultHz),
+              icon: Icon(Icons.restart_alt_rounded, color: muted),
+              label: const Text('Reset to 440 Hz'),
+            ),
           ),
         ),
       ],

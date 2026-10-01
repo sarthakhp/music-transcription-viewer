@@ -201,10 +201,11 @@ class MobilePlayerPanel extends StatelessWidget {
         ),
       ),
       ControlPill(
-        label: sargamEnabled ? 'Sa =' : 'Notes',
-        value: sargamEnabled ? rootName : 'ABC',
+        // Always shows the selected root note; the caption says what it is.
+        label: sargamEnabled ? 'Sa' : 'Root',
+        value: rootName,
         isActive: sargamEnabled,
-        semanticsHint: 'Opens notation and tuning options',
+        semanticsHint: 'Opens root note, notation and tuning options',
         onTap: () => showNotationSheet(
           context: context,
           sargamEnabled: sargamEnabled,
