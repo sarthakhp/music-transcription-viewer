@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import '../models/audio_content_type.dart';
 import '../providers/app_state.dart';
 import 'transcription_api_service.dart';
 
@@ -19,6 +20,7 @@ class UploadService {
   Future<String?> uploadAudioFile({
     required Uint8List fileBytes,
     required String fileName,
+    AudioContentType audioType = AudioContentType.mixed,
   }) async {
     try {
       // Validate file before upload
@@ -35,6 +37,7 @@ class UploadService {
       final response = await _apiService.uploadAudioFile(
         fileBytes: fileBytes,
         fileName: fileName,
+        audioType: audioType,
       );
 
       // Handle response

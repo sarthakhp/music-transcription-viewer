@@ -69,6 +69,9 @@ Every feature must work on **desktop browser**, the **macOS DMG** (pywebview/WKW
 | `lib/widgets/audio_controls.dart` + `audio_controls/control_group.dart` | Desktop player bar; `ControlGroup` = caption + 40px body used by every control |
 | `lib/widgets/graph_overlay_controls.dart` | Auto-scroll toggle + reset-zoom button over the graph |
 | `lib/screens/widgets/phone_viewer_app_bar.dart` | Touch-layout viewer app bar (track name, stats, ⋮ menu) |
+| `lib/models/audio_content_type.dart` | `AudioContentType` (mixed / vocals / instrumental), mirrors backend `audio_type`; `AppState.audioType` + `hasVocalAnalysis` / `hasAccompanimentAnalysis` gate player UI |
+| `lib/models/job_settings.dart` + `lib/services/settings_sync_service.dart` | Per-song settings and their cloud sync (see "Per-song settings") |
+| `lib/widgets/job_list_card.dart` | Library tiles; `JobStorage` badge (On device / Cloud / Synced) |
 | `lib/config/api_config.dart` | API URL — reads `API_BASE_URL` dart-define for dev override |
 | `lib/router.dart` | go_router config |
 | `assets/audio/tanpura_g.mp3` | 90s seamless loop, G scale, 128kbps MP3 |
@@ -78,7 +81,8 @@ Every feature must work on **desktop browser**, the **macOS DMG** (pywebview/WKW
 # Hot-reload dev server — open http://localhost:8080 in your own browser
 ./scripts/dev_chrome.sh
 
-# Deploy release build to installed MusicTranscriber.app
+# Build + deploy web, launcher.py AND the backend's api/ to the installed
+# MusicTranscriber.app (run it yourself after changes; user then restarts the app)
 ./scripts/deploy_launchpad.sh
 ```
 - New assets require full server restart — hot-reload won't pick them up
@@ -116,6 +120,19 @@ Source of truth: `_handleKeyEvent` in `home_screen_view_controls.dart` (keep `ke
 - **`PlatformAudioPlayer` is `implements`-ed, not extended**: base-class getter defaults are not inherited; new getters must be added to both players.
 - **Hot reload**: removing a field/const from a const class (e.g. `AudioControls`) is rejected — use hot restart. Changes to `web/index.html` or assets need a full restart.
 
+## Audio type (Song / Voice only / Music only)
+Selector sits under the File/URL/Record tabs in `upload_section.dart` and is sent as `audio_type` by both upload paths. Player UI adapts from `AppState.audioType`: voice-only hides the Layers group, chord strip and chord/note counts; music-only hides the Vocals chip. Music-only jobs have **empty vocal frames**, so the pitch-range maths in `home_screen.dart` must not use `frequencyRange` (it falls back to `(0, 2000)`) and starts from the instrument range instead.
+
+## Cloud library (local app)
+Home list = local jobs ∪ cloud index (`GET /cloud/jobs`, fetched in the background after the local list renders). Tags: Cloud (cloud only), Synced, On device. Opening a Cloud job calls `POST /cloud/jobs/{id}/import` first, then loads it like any local job. Cloud-only jobs have no delete; deleting a Synced job removes only the local copy. No tags when the cloud is unconfigured/unreachable. The hosted viewer uses `RemoteDataSource` instead and ignores all this.
+
+## Per-song settings (local + cloud)
+- `JobSettings` is persisted per job in localStorage (`UserSettings`) and synced via `SettingsSyncService`. It covers view/zoom, speed, key, root/notation, layer toggles + confidence sliders, plus nullable per-song overrides (vocalDetail, referenceFrequency, track).
+- **Live changes never wait on the cloud**: apply + local save first; the cloud push is debounced (2s), fire-and-forget, errors swallowed. Opening a song applies local immediately, then fetches the cloud copy and applies it only if its `updatedAtMs` is newer.
+- `_saveCurrentJobSettings` stamps `updatedAtMs` and pushes **only when something other than the scroll position changed** (`_differsIgnoringPlayhead`). After any restore call `_rebaselineSettings`, or the restore looks like an edit and overwrites the cloud copy with defaults (this bug happened). Restoring the track must use `_switchTrack(..., persist: false)`.
+- Hosted viewer/phone can only read settings (public URL built from the job id via `settingsToken`); writes need the backend. The backend's cloud rules and token gotchas are in the backend repo's CLAUDE.md.
+- The confidence sliders in Display Settings are inverted in the UI (right = show everything); the stored value is still a minimum-confidence threshold.
+
 ## Mobile / Responsive UI
 - **One breakpoint**: `ViewerLayout.of(context)` — width < 760 = phonePortrait, height < 500 = phoneLandscape, else regular. It switches the app bar (`PhoneViewerAppBar`), layer row, player panel (`MobilePlayerPanel`) together. Don't add separate per-widget width checks. Desktop player bar: transport joins the settings row at width >= 1200 (`AudioControls.wideBreakpoint`), otherwise transport shares the seek-bar line.
 - **Controls never shift under the cursor**: no layout change on click (reserved space, or put dots/reset icons in the caption row, not beside the control). Reset buttons appear in the `ControlGroup` caption only when the value is non-default; in sheets they are hidden with `Visibility(maintainSize)`.
@@ -131,6 +148,7 @@ Source of truth: `_handleKeyEvent` in `home_screen_view_controls.dart` (keep `ke
 - The in-app browser is a mouse-only pane; for touch, dispatch synthetic `PointerEvent`s (`pointerType:'touch'`, distinct `pointerId`s) at `flt-glass-pane`. Screenshots can lag one frame behind — take a second one before concluding.
 - Run the dev server in the background (`flutter run -d web-server --web-port=8080 ...`) with stdin from a FIFO so `r`/`R` can be sent for hot reload/restart; reload the page afterwards. The user prefers to test interactions themselves — launch/reload, then wait for feedback instead of clicking through flows.
 - Pre-existing, unrelated: `test/widget_test.dart` is the stale counter template and fails.
+- Preview the release build against a scratch backend: `MT_WEB_DIR=music_transcriber/build/web` on the backend (it serves with `no-store`). Changing only the URL hash in the browser pane does NOT reload the app, so after rebuilding do `location.reload()`. Flutter web prefs live in localStorage (`flutter.*`); `localStorage.clear()` simulates a new device.
 
 ## Loading Overlay Logic
 The overlay (`LoadingOverlay`) in `home_screen.dart` is visible when:

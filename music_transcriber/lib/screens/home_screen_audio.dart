@@ -4,7 +4,9 @@ part of 'home_screen.dart';
 
 extension _HomeScreenAudio on _HomeScreenState {
   /// Switch to a different audio track instantly using pre-loaded players
-  Future<void> _switchTrack(AudioTrackType newTrack) async {
+  ///
+  /// [persist] is false when restoring saved settings, which isn't a user edit.
+  Future<void> _switchTrack(AudioTrackType newTrack, {bool persist = true}) async {
     if (newTrack == _currentTrack) return;
     if (!_audioService.isTrackLoaded(newTrack)) return;
     if (_isSwitchingTrack) return;
@@ -19,6 +21,7 @@ extension _HomeScreenAudio on _HomeScreenState {
           if (success) _currentTrack = newTrack;
           _isSwitchingTrack = false;
         });
+        if (success && persist) _debouncedSaveJobSettings();
       }
     } catch (e) {
       if (mounted) {

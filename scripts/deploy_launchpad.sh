@@ -34,5 +34,13 @@ if [ -n "$BACKEND_REPO" ] && [ -f "$BACKEND_REPO/packaging/launcher.py" ]; then
   cp "$BACKEND_REPO/packaging/launcher.py" "$LAUNCHPAD_RESOURCES/launcher.py"
 fi
 
+# Keep the bundled backend's API code in step with the repo. Without this a
+# new frontend can call endpoints the installed backend doesn't have yet.
+if [ -n "$BACKEND_REPO" ] && [ -d "$BACKEND_REPO/api" ]; then
+  echo "Deploying backend api/..."
+  rsync -a --delete --exclude '__pycache__' --exclude '*.pyc' \
+    "$BACKEND_REPO/api/" "$LAUNCHPAD_RESOURCES/backend/api/"
+fi
+
 echo ""
 echo "Done. Restart MusicTranscriber.app to see the changes."

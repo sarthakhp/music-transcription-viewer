@@ -165,9 +165,9 @@ class ViewerToolbar extends StatelessWidget {
               if (appState.pitchData?.metadata.bpm != null)
                 stat(Icons.speed_rounded,
                     '${appState.pitchData!.metadata.bpm!.toStringAsFixed(0)} BPM'),
-              if (appState.chordData != null)
+              if (appState.chordData != null && appState.hasAccompanimentAnalysis)
                 stat(Icons.music_note_rounded, '${appState.chordData!.uniqueChordsCount} chords'),
-              if (appState.instrumentData != null)
+              if (appState.instrumentData != null && appState.hasAccompanimentAnalysis)
                 stat(Icons.piano_rounded, '${appState.instrumentData!.totalNotes} notes'),
             ],
           ),
@@ -185,7 +185,7 @@ class ViewerToolbar extends StatelessWidget {
     ].where(audioService.isTrackLoaded).length;
 
     return [
-      if (appState.instrumentData != null)
+      if (appState.instrumentData != null && appState.hasAccompanimentAnalysis)
         ControlGroup(
           label: 'Layers',
           filled: false,
@@ -209,7 +209,8 @@ class ViewerToolbar extends StatelessWidget {
   /// Track switcher + layer chips + display settings in one row that scrolls
   /// sideways rather than wrapping onto extra lines and eating graph height.
   Widget _buildPhoneToolbar(BuildContext context, ColorScheme colorScheme) {
-    final hasInstruments = appState.instrumentData != null;
+    final hasInstruments =
+        appState.instrumentData != null && appState.hasAccompanimentAnalysis;
     final hasBass = appState.instrumentData?.bass != null;
     final hasOther = appState.instrumentData?.other != null;
 
@@ -223,13 +224,14 @@ class ViewerToolbar extends StatelessWidget {
         dense: true,
       ),
       if (hasInstruments) ...[
-        _LayerChip(
-          label: 'Vocals',
-          color: colorScheme.primary,
-          selected: showVocals,
-          onToggled: onVocalsToggled,
-          large: true,
-        ),
+        if (appState.hasVocalAnalysis)
+          _LayerChip(
+            label: 'Vocals',
+            color: colorScheme.primary,
+            selected: showVocals,
+            onToggled: onVocalsToggled,
+            large: true,
+          ),
         if (hasBass)
           _LayerChip(
             label: 'Bass',
@@ -313,7 +315,8 @@ class ViewerToolbar extends StatelessWidget {
   }
 
   Widget _buildLayerToggles(ColorScheme colorScheme) {
-    final hasInstruments = appState.instrumentData != null;
+    final hasInstruments =
+        appState.instrumentData != null && appState.hasAccompanimentAnalysis;
     final hasBass = appState.instrumentData?.bass != null;
     final hasOther = appState.instrumentData?.other != null;
 
@@ -323,14 +326,16 @@ class ViewerToolbar extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _LayerChip(
-          label: 'Vocals',
-          color: colorScheme.primary,
-          selected: showVocals,
-          onToggled: onVocalsToggled,
-        ),
-        if (hasBass) ...[
+        if (appState.hasVocalAnalysis) ...[
+          _LayerChip(
+            label: 'Vocals',
+            color: colorScheme.primary,
+            selected: showVocals,
+            onToggled: onVocalsToggled,
+          ),
           const SizedBox(width: 4),
+        ],
+        if (hasBass) ...[
           _LayerChip(
             label: 'Bass',
             color: appPalette.bassColor,

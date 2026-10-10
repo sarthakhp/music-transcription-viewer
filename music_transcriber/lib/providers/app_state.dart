@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../models/audio_content_type.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
@@ -9,6 +10,7 @@ class AppState extends ChangeNotifier {
   // Data state
   ProcessedFramesData? _pitchData;
   ChordData? _chordData;
+  AudioContentType _audioType = AudioContentType.mixed;
   Uint8List? _audioBytes;
   String? _audioFileName;
 
@@ -46,6 +48,21 @@ class AppState extends ChangeNotifier {
   // Getters - Data
   ProcessedFramesData? get pitchData => _pitchData;
   ChordData? get chordData => _chordData;
+
+  /// What the loaded job's audio contains (decides which player UI applies).
+  AudioContentType get audioType => _audioType;
+
+  /// Voice-only jobs have no accompaniment, so no chords or instrument notes.
+  bool get hasAccompanimentAnalysis => _audioType != AudioContentType.vocals;
+
+  /// Music-only jobs have no vocal pitch line.
+  bool get hasVocalAnalysis => _audioType != AudioContentType.instrumental;
+
+  void setAudioType(AudioContentType type) {
+    if (_audioType == type) return;
+    _audioType = type;
+    notifyListeners();
+  }
   Uint8List? get audioBytes => _audioBytes;
   String? get audioFileName => _audioFileName;
 
@@ -295,6 +312,7 @@ class AppState extends ChangeNotifier {
   }
 
   void reset() {
+    _audioType = AudioContentType.mixed;
     _pitchData = null;
     _chordData = null;
     _audioBytes = null;

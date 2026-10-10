@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show jsonEncode;
 import 'dart:math' show max;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../services/audio_service.dart';
 import '../services/audio_stems.dart';
 import '../services/transcription_api_service.dart';
+import '../services/settings_sync_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
 import '../services/user_settings.dart';
@@ -24,6 +26,8 @@ import '../widgets/graph_constants.dart';
 import '../widgets/graph_overlay_controls.dart';
 import '../widgets/pitch_graph.dart';
 import '../widgets/audio_controls.dart';
+import '../models/audio_content_type.dart';
+import '../models/job_settings.dart';
 import '../models/job.dart';
 import 'widgets/loading_overlay.dart';
 import 'widgets/keyboard_shortcuts_dialog.dart';
@@ -78,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Persisted user settings
   final UserSettings _userSettings = UserSettings();
+  final SettingsSyncService _settingsSync = SettingsSyncService();
 
   // API services
   late final TranscriptionApiService _apiService;
@@ -88,6 +93,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<JobListItem> _completedJobs = [];
   List<JobListItem> _failedJobs = [];
   bool _isLoadingJobs = false;
+
+  /// Jobs published to cloud storage, from the last successful cloud listing.
+  /// Empty (and badges hidden) when the cloud isn't configured or reachable.
+  List<JobListItem> _cloudJobs = [];
+  bool _cloudAvailable = false;
 
   // Audio track switching
   AudioTrackType _currentTrack = AudioTrackType.original;
@@ -128,6 +138,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Per-job settings auto-save debouncing
   Timer? _saveSettingsTimer;
+
+  /// The per-song settings last applied or saved for the open song. Used to
+  /// tell real edits from passive saves (e.g. the playhead moving).
+  JobSettings? _lastSavedSettings;
 
   /// OS media UI (notification / lock screen / media keys) on web.
   final MediaSessionController _mediaSession = MediaSessionController();
@@ -236,6 +250,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _saveSettingsTimer?.cancel();
+    _settingsSync.flush();
+    _settingsSync.dispose();
     _viewState.removeListener(_onViewStateChanged);
     _stopPlayheadAnimation();
     _scrollAnimationController.removeListener(_onScrollAnimationUpdate);
@@ -270,17 +286,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
+  /// The settings as the UI currently shows them (without a timestamp).
+  JobSettings _currentSettingsSnapshot() {
+    return _viewState
+        .extractViewSettings(
+          playbackSpeed: _playbackSpeed,
+          transposeAmount: _transposeAmount,
+          sargamEnabled: _sargamEnabled,
+          scaleRoot: _scaleRoot,
+        )
+        .copyWith(
+          showVocals: _showVocals,
+          showBass: _showBass,
+          showOther: _showOther,
+          vocalsMinConfidence: _vocalsMinConfidence,
+          bassMinConfidence: _bassMinConfidence,
+          otherMinConfidence: _otherMinConfidence,
+          vocalDetail: _vocalDetail,
+          referenceFrequency: context.read<AppState>().referenceFrequency,
+          track: _currentTrack.name,
+        );
+  }
+
+  /// Treat what the UI shows right now as the already-saved state, with the
+  /// given timestamp. Called after restoring a song's settings so that the
+  /// restore itself doesn't look like a user edit.
+  void _rebaselineSettings(int updatedAtMs) {
+    _lastSavedSettings = _currentSettingsSnapshot().copyWith(updatedAtMs: updatedAtMs);
+  }
+
   void _saveCurrentJobSettings() {
-    if (_currentJobId == null) return;
+    final jobId = _currentJobId;
+    if (jobId == null) return;
 
-    final settings = _viewState.extractViewSettings(
-      playbackSpeed: _playbackSpeed,
-      transposeAmount: _transposeAmount,
-      sargamEnabled: _sargamEnabled,
-      scaleRoot: _scaleRoot,
+    final current = _currentSettingsSnapshot();
+
+    // Only a real change gets a new timestamp and goes to the cloud. Passive
+    // saves (the view following the playhead) are kept locally and ride along
+    // with the next real change, so merely opening a song never overwrites
+    // newer settings from another device.
+    final previous = _lastSavedSettings;
+    final edited = previous == null || _differsIgnoringPlayhead(previous, current);
+    final settings = current.copyWith(
+      updatedAtMs: edited
+          ? DateTime.now().millisecondsSinceEpoch
+          : previous.updatedAtMs,
     );
+    _lastSavedSettings = settings;
+    _userSettings.saveJobSettings(jobId, settings);
+    if (edited) _settingsSync.schedulePush(jobId, settings);
+  }
 
-    _userSettings.saveJobSettings(_currentJobId!, settings);
+  /// Whether two settings differ in anything but the scroll position and
+  /// timestamp.
+  bool _differsIgnoringPlayhead(JobSettings a, JobSettings b) {
+    Map<String, dynamic> comparable(JobSettings s) => s.toJson()
+      ..remove('viewStartTime')
+      ..remove('updatedAtMs');
+    return jsonEncode(comparable(a)) != jsonEncode(comparable(b));
   }
 
   @override
@@ -308,6 +371,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _durationSubscription?.cancel();
           _playingSubscription?.cancel();
           _processingStateSubscription?.cancel();
+          _saveSettingsTimer?.cancel();
+          _saveCurrentJobSettings();
+          _settingsSync.flush();
+          _lastSavedSettings = null;
           _viewState.resetZoom();
           appState.reset();
           _currentJobId = null;
@@ -484,19 +551,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           showVocals: _showVocals,
           showBass: _showBass,
           showOther: _showOther,
-          onVocalsToggled: (v) => setState(() => _showVocals = v),
-          onBassToggled: (v) => setState(() => _showBass = v),
-          onOtherToggled: (v) => setState(() => _showOther = v),
+          onVocalsToggled: (v) {
+            setState(() => _showVocals = v);
+            _debouncedSaveJobSettings();
+          },
+          onBassToggled: (v) {
+            setState(() => _showBass = v);
+            _debouncedSaveJobSettings();
+          },
+          onOtherToggled: (v) {
+            setState(() => _showOther = v);
+            _debouncedSaveJobSettings();
+          },
           vocalsMinConfidence: _vocalsMinConfidence,
           bassMinConfidence: _bassMinConfidence,
           otherMinConfidence: _otherMinConfidence,
-          onVocalsConfidenceChanged: (v) => setState(() => _vocalsMinConfidence = v),
-          onBassConfidenceChanged: (v) => setState(() => _bassMinConfidence = v),
-          onOtherConfidenceChanged: (v) => setState(() => _otherMinConfidence = v),
+          onVocalsConfidenceChanged: (v) {
+            setState(() => _vocalsMinConfidence = v);
+            _debouncedSaveJobSettings();
+          },
+          onBassConfidenceChanged: (v) {
+            setState(() => _bassMinConfidence = v);
+            _debouncedSaveJobSettings();
+          },
+          onOtherConfidenceChanged: (v) {
+            setState(() => _otherMinConfidence = v);
+            _debouncedSaveJobSettings();
+          },
           vocalDetail: _vocalDetail,
           onVocalDetailChanged: (v) {
             setState(() => _vocalDetail = v);
             _userSettings.saveVocalDetail(v);
+            _debouncedSaveJobSettings();
           },
           currentJobId: _currentJobId,
           onJobRenamed: (jobId, newName) async {
@@ -534,25 +620,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       // user can't scroll into empty space beyond actual content.
                       const double yMarginSemitones = 3.0;
                       final pitchData = appState.pitchData!;
-                      final range = pitchData.frequencyRange;
-                      double baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - yMarginSemitones;
-                      double baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + yMarginSemitones;
-                      final instrData = appState.instrumentData;
+                      // Voice-only jobs carry no accompaniment analysis.
+                      final chordData = appState.hasAccompanimentAnalysis ? appState.chordData : null;
+                      final instrData = appState.hasAccompanimentAnalysis ? appState.instrumentData : null;
+                      // Music-only jobs have no voiced frames, so the vocal
+                      // range is meaningless; start from a neutral span and
+                      // let the instrument notes widen it.
+                      final hasVoiced = appState.hasVocalAnalysis && pitchData.voicedFrames.isNotEmpty;
+                      double baseMin = 48 - yMarginSemitones;
+                      double baseMax = 72 + yMarginSemitones;
+                      if (hasVoiced) {
+                        final range = pitchData.frequencyRange;
+                        baseMin = frequencyToMidi(range.$1, referenceFrequency: appState.referenceFrequency).floor() - yMarginSemitones;
+                        baseMax = frequencyToMidi(range.$2, referenceFrequency: appState.referenceFrequency).ceil() + yMarginSemitones;
+                      }
                       if (instrData != null) {
                         final (instrMin, instrMax) = instrData.midiRange;
-                        if (instrMin - yMarginSemitones < baseMin) baseMin = instrMin - yMarginSemitones;
-                        if (instrMax + yMarginSemitones > baseMax) baseMax = instrMax + yMarginSemitones;
+                        if (!hasVoiced) {
+                          baseMin = instrMin - yMarginSemitones;
+                          baseMax = instrMax + yMarginSemitones;
+                        } else {
+                          if (instrMin - yMarginSemitones < baseMin) baseMin = instrMin - yMarginSemitones;
+                          if (instrMax + yMarginSemitones > baseMax) baseMax = instrMax + yMarginSemitones;
+                        }
                       }
                       _viewState.setBaseMidiRange(baseMin + _transposeAmount, baseMax + _transposeAmount);
 
                       return PitchGraph(
                         viewState: _viewState,
                         data: pitchData,
-                        chordData: appState.chordData,
-                        instrumentData: appState.instrumentData,
+                        chordData: chordData,
+                        instrumentData: instrData,
                         currentTime: currentTime,
                         referenceFrequency: appState.referenceFrequency,
-                        showVocals: _showVocals,
+                        showVocals: _showVocals && appState.hasVocalAnalysis,
                         showBass: _showBass,
                         showOther: _showOther,
                         vocalsMinConfidence: _vocalsMinConfidence,
@@ -609,6 +710,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onReferenceFrequencyChange: (frequency) {
                 appState.setReferenceFrequency(frequency);
                 _userSettings.saveReferenceFrequency(frequency);
+                _debouncedSaveJobSettings();
               },
               viewState: _viewState,
               onZoomIn: () => _viewState.zoomY(ViewState.zoomFactor),

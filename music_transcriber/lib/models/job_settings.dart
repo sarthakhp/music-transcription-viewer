@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-/// Settings for a specific job (track) that should be persisted
+/// Settings for a specific job (track) that should be persisted, locally and
+/// (when cloud storage is available) per song across devices.
 class JobSettings {
   // View state (zoom/pan)
   final double viewStartTime;
@@ -15,6 +16,26 @@ class JobSettings {
   final bool sargamEnabled;
   final int scaleRoot;
 
+  // Layers and filtering
+  final bool showVocals;
+  final bool showBass;
+  final bool showOther;
+  final double vocalsMinConfidence;
+  final double bassMinConfidence;
+  final double otherMinConfidence;
+
+  /// Per-song overrides of app-wide settings. Null means "not set for this
+  /// song", so the app-wide value applies.
+  final int? vocalDetail;
+  final double? referenceFrequency;
+
+  /// Which audio track was selected: 'original', 'vocal' or 'instrumental'.
+  final String? track;
+
+  /// When these settings were last changed (ms since epoch). 0 for settings
+  /// saved before this existed. Decides which copy wins when syncing.
+  final int updatedAtMs;
+
   const JobSettings({
     this.viewStartTime = 0,
     this.viewWindowSize = 30,
@@ -25,6 +46,16 @@ class JobSettings {
     this.transposeAmount = 0,
     this.sargamEnabled = false,
     this.scaleRoot = 0,
+    this.showVocals = true,
+    this.showBass = true,
+    this.showOther = true,
+    this.vocalsMinConfidence = 0.0,
+    this.bassMinConfidence = 0.0,
+    this.otherMinConfidence = 0.0,
+    this.vocalDetail,
+    this.referenceFrequency,
+    this.track,
+    this.updatedAtMs = 0,
   });
 
   /// Create JobSettings from JSON
@@ -36,9 +67,19 @@ class JobSettings {
       yPanOffset: (json['yPanOffset'] as num?)?.toDouble() ?? 0.0,
       autoScroll: json['autoScroll'] as bool? ?? true,
       playbackSpeed: (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0,
-      transposeAmount: json['transposeAmount'] as int? ?? 0,
+      transposeAmount: (json['transposeAmount'] as num?)?.toInt() ?? 0,
       sargamEnabled: json['sargamEnabled'] as bool? ?? false,
-      scaleRoot: json['scaleRoot'] as int? ?? 0,
+      scaleRoot: (json['scaleRoot'] as num?)?.toInt() ?? 0,
+      showVocals: json['showVocals'] as bool? ?? true,
+      showBass: json['showBass'] as bool? ?? true,
+      showOther: json['showOther'] as bool? ?? true,
+      vocalsMinConfidence: (json['vocalsMinConfidence'] as num?)?.toDouble() ?? 0.0,
+      bassMinConfidence: (json['bassMinConfidence'] as num?)?.toDouble() ?? 0.0,
+      otherMinConfidence: (json['otherMinConfidence'] as num?)?.toDouble() ?? 0.0,
+      vocalDetail: (json['vocalDetail'] as num?)?.toInt(),
+      referenceFrequency: (json['referenceFrequency'] as num?)?.toDouble(),
+      track: json['track'] as String?,
+      updatedAtMs: (json['updatedAtMs'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -54,10 +95,21 @@ class JobSettings {
       'transposeAmount': transposeAmount,
       'sargamEnabled': sargamEnabled,
       'scaleRoot': scaleRoot,
+      'showVocals': showVocals,
+      'showBass': showBass,
+      'showOther': showOther,
+      'vocalsMinConfidence': vocalsMinConfidence,
+      'bassMinConfidence': bassMinConfidence,
+      'otherMinConfidence': otherMinConfidence,
+      if (vocalDetail != null) 'vocalDetail': vocalDetail,
+      if (referenceFrequency != null) 'referenceFrequency': referenceFrequency,
+      if (track != null) 'track': track,
+      'updatedAtMs': updatedAtMs,
     };
   }
 
-  /// Create a copy with some fields replaced
+  /// Create a copy with some fields replaced. The nullable overrides
+  /// ([vocalDetail], [referenceFrequency], [track]) can only be set, not cleared.
   JobSettings copyWith({
     double? viewStartTime,
     double? viewWindowSize,
@@ -68,6 +120,16 @@ class JobSettings {
     int? transposeAmount,
     bool? sargamEnabled,
     int? scaleRoot,
+    bool? showVocals,
+    bool? showBass,
+    bool? showOther,
+    double? vocalsMinConfidence,
+    double? bassMinConfidence,
+    double? otherMinConfidence,
+    int? vocalDetail,
+    double? referenceFrequency,
+    String? track,
+    int? updatedAtMs,
   }) {
     return JobSettings(
       viewStartTime: viewStartTime ?? this.viewStartTime,
@@ -79,6 +141,16 @@ class JobSettings {
       transposeAmount: transposeAmount ?? this.transposeAmount,
       sargamEnabled: sargamEnabled ?? this.sargamEnabled,
       scaleRoot: scaleRoot ?? this.scaleRoot,
+      showVocals: showVocals ?? this.showVocals,
+      showBass: showBass ?? this.showBass,
+      showOther: showOther ?? this.showOther,
+      vocalsMinConfidence: vocalsMinConfidence ?? this.vocalsMinConfidence,
+      bassMinConfidence: bassMinConfidence ?? this.bassMinConfidence,
+      otherMinConfidence: otherMinConfidence ?? this.otherMinConfidence,
+      vocalDetail: vocalDetail ?? this.vocalDetail,
+      referenceFrequency: referenceFrequency ?? this.referenceFrequency,
+      track: track ?? this.track,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
 

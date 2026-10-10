@@ -46,7 +46,7 @@ class PhoneViewerAppBar extends StatelessWidget implements PreferredSizeWidget {
       if (appState.pitchData != null) appState.pitchData!.durationFormatted,
       if (appState.pitchData?.metadata.bpm != null)
         '${appState.pitchData!.metadata.bpm!.round()} BPM',
-      if (appState.chordData != null) '${appState.chordData!.uniqueChordsCount} chords',
+      if (appState.chordData != null && appState.hasAccompanimentAnalysis) '${appState.chordData!.uniqueChordsCount} chords',
     ];
     return parts.join('  ·  ');
   }

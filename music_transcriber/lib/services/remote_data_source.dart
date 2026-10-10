@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/api_response.dart';
+import '../models/audio_content_type.dart';
 import '../models/job.dart';
 import '../models/job_status.dart';
 import '../models/pitch_data.dart';
@@ -118,6 +119,8 @@ class RemoteDataSource {
         sourceType: m['source_type'] as String?,
         sourceUrl: m['source_url'] as String?,
         videoTitle: m['title'] as String?,
+        userDisplayName: m['display_name'] as String?,
+        audioType: AudioContentType.fromApi(m['audio_type'] as String?),
       ));
     } catch (e) {
       return ApiResponse.error('Failed to load job results: $e');
@@ -211,6 +214,8 @@ class RemoteDataSource {
       sourceType: s['source_type'] as String?,
       sourceUrl: s['source_url'] as String?,
       videoTitle: title,
+      userDisplayName: s['display_name'] as String?,
+      audioType: AudioContentType.fromApi(s['audio_type'] as String?),
     );
   }
 

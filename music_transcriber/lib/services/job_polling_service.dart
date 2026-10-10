@@ -139,6 +139,7 @@ class JobPollingService {
       final resultsResponse = await _apiService.getJobResults(jobId);
       String? inputFilename;
       if (resultsResponse.isSuccess && resultsResponse.data != null) {
+        _appState.setAudioType(resultsResponse.data!.audioType);
         inputFilename = resultsResponse.data!.inputFilename;
       }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/audio_content_type.dart';
 import '../models/job.dart';
 
 /// Widget to display a list of jobs (completed history, or failed jobs that
@@ -120,7 +121,10 @@ class JobListCard extends StatelessWidget {
           onTap: isFailedList
               ? (onJobRetry != null ? () => onJobRetry!(job.id) : () {})
               : () => onJobSelected(job.id),
-          onDelete: onJobDeleted != null ? () => onJobDeleted!(job.id) : null,
+          // Cloud-only jobs have nothing on this device to delete.
+          onDelete: onJobDeleted != null && job.storage != JobStorage.cloudOnly
+              ? () => onJobDeleted!(job.id)
+              : null,
           onRetry: onJobRetry != null ? () => onJobRetry!(job.id) : null,
         );
       },
@@ -214,7 +218,9 @@ class _JobListTileState extends State<_JobListTile> {
       builder: (context) => AlertDialog(
         title: const Text('Delete Job'),
         content: Text(
-          'Are you sure you want to delete "${widget.job.displayName}"?\n\nThis will permanently delete all associated data including audio stems and processing results.',
+          widget.job.storage == JobStorage.synced
+              ? 'Remove "${widget.job.displayName}" from this device?\n\nIt stays in the cloud, and you can download it again later.'
+              : 'Are you sure you want to delete "${widget.job.displayName}"?\n\nThis will permanently delete all associated data including audio stems and processing results.',
         ),
         actions: [
           TextButton(
@@ -361,10 +367,20 @@ class _JobListTileState extends State<_JobListTile> {
                                     icon: Icons.speed_rounded,
                                     label: '${widget.job.tempoBpm.toStringAsFixed(0)} BPM',
                                   ),
-                                  _Stat(
-                                    icon: Icons.library_music_rounded,
-                                    label: '${widget.job.numChords} chords',
-                                  ),
+                                  if (widget.job.audioType != AudioContentType.mixed)
+                                    _Stat(
+                                      icon: widget.job.audioType == AudioContentType.vocals
+                                          ? Icons.mic_rounded
+                                          : Icons.piano_rounded,
+                                      label: widget.job.audioType.label,
+                                    ),
+                                  if (widget.job.audioType != AudioContentType.vocals)
+                                    _Stat(
+                                      icon: Icons.library_music_rounded,
+                                      label: '${widget.job.numChords} chords',
+                                    ),
+                                  if (widget.job.storage != null)
+                                    _StorageBadge(storage: widget.job.storage!),
                                   Text(
                                     widget.job.createdAtFormatted,
                                     style: theme.textTheme.bodySmall?.copyWith(
@@ -480,3 +496,32 @@ class _Stat extends StatelessWidget {
   }
 }
 
+
+/// Small tag showing where a job's data lives (this device, the cloud, or both).
+class _StorageBadge extends StatelessWidget {
+  final JobStorage storage;
+
+  const _StorageBadge({required this.storage});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, label, tooltip) = switch (storage) {
+      JobStorage.deviceOnly => (
+          Icons.computer_rounded,
+          'On device',
+          'Stored on this device only',
+        ),
+      JobStorage.cloudOnly => (
+          Icons.cloud_download_outlined,
+          'Cloud',
+          'In the cloud. Opening it downloads it to this device',
+        ),
+      JobStorage.synced => (
+          Icons.cloud_done_outlined,
+          'Synced',
+          'On this device and in the cloud',
+        ),
+    };
+    return Tooltip(message: tooltip, child: _Stat(icon: icon, label: label));
+  }
+}

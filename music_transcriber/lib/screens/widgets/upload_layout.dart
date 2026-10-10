@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../providers/app_state.dart';
+import '../../models/audio_content_type.dart';
 import '../../models/job.dart';
 import '../../services/transcription_api_service.dart';
 import '../../widgets/job_list_card.dart';
@@ -17,9 +18,20 @@ class UploadLayout extends StatelessWidget {
   final Future<void> Function(String) onJobSelected;
   final Future<void> Function(String) onJobDeleted;
   final Future<void> Function(String) onJobRetry;
-  final Future<void> Function(Uint8List bytes, String fileName)? onFileUpload;
+  final Future<void> Function(
+    Uint8List bytes,
+    String fileName, {
+    AudioContentType audioType,
+  })?
+  onFileUpload;
   final bool isRemote;
-  final Future<void> Function(String url, {double? startTime, double? endTime})? onUrlSubmitted;
+  final Future<void> Function(
+    String url, {
+    double? startTime,
+    double? endTime,
+    AudioContentType audioType,
+  })?
+  onUrlSubmitted;
   final Future<void> Function()? onCancel;
   final bool isLoadingJson;
   final bool isLoadingAudio;

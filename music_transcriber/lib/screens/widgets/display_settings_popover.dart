@@ -295,9 +295,13 @@ class _PanelOverlayState extends State<_PanelOverlay> {
   }
 }
 
+/// Slider for a layer's minimum-confidence threshold, shown inverted: all the
+/// way right shows every point (threshold 0), sliding left shows fewer.
 class _SliderRow extends StatelessWidget {
   final String label;
   final Color color;
+
+  /// The confidence threshold (0 = show everything, 1 = only the surest).
   final double value;
   final ValueChanged<double> onChanged;
 
@@ -334,18 +338,18 @@ class _SliderRow extends StatelessWidget {
               overlayColor: color.withValues(alpha: 0.15),
             ),
             child: Slider(
-              value: value,
+              value: 1 - value,
               min: 0,
               max: 1,
               divisions: 20,
-              onChanged: onChanged,
+              onChanged: (v) => onChanged(((1 - v) * 20).round() / 20),
             ),
           ),
         ),
         SizedBox(
           width: 30,
           child: Text(
-            value.toStringAsFixed(2),
+            (1 - value).toStringAsFixed(2),
             style: TextStyle(
               fontSize: 11,
               color: colorScheme.onSurface.withValues(alpha: 0.6),

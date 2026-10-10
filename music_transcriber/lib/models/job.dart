@@ -1,3 +1,4 @@
+import 'audio_content_type.dart';
 import 'job_status.dart';
 
 /// Job creation response model
@@ -39,6 +40,7 @@ class JobResultsSummary {
   final String? sourceUrl;
   final String? videoTitle;
   final String? userDisplayName;
+  final AudioContentType audioType;
 
   const JobResultsSummary({
     required this.jobId,
@@ -57,6 +59,7 @@ class JobResultsSummary {
     this.sourceUrl,
     this.videoTitle,
     this.userDisplayName,
+    this.audioType = AudioContentType.mixed,
   });
 
   /// Display name: user rename > video title > input filename.
@@ -83,6 +86,7 @@ class JobResultsSummary {
       sourceUrl: json['source_url'] as String?,
       videoTitle: json['video_title'] as String?,
       userDisplayName: json['display_name'] as String?,
+      audioType: AudioContentType.fromApi(json['audio_type'] as String?),
     );
   }
 
@@ -195,6 +199,44 @@ class JobDeletionResponse {
 }
 
 /// Job list item model
+/// Where a job's data lives, when cloud storage is available.
+enum JobStorage {
+  /// Only on this device (not published to the cloud).
+  deviceOnly,
+
+  /// Only in the cloud; opening it downloads it first.
+  cloudOnly,
+
+  /// On this device and in the cloud.
+  synced,
+}
+
+/// Response of the backend's cloud listing.
+class CloudJobsResponse {
+  /// False when this install has no cloud storage; true but [available] false
+  /// means cloud storage is set up but couldn't be reached.
+  final bool configured;
+  final bool available;
+  final List<JobListItem> jobs;
+
+  const CloudJobsResponse({
+    required this.configured,
+    required this.available,
+    required this.jobs,
+  });
+
+  factory CloudJobsResponse.fromJson(Map<String, dynamic> json) {
+    return CloudJobsResponse(
+      configured: json['configured'] as bool? ?? false,
+      available: json['available'] as bool? ?? false,
+      jobs: ((json['jobs'] as List<dynamic>?) ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(JobListItem.fromCloudJson)
+          .toList(),
+    );
+  }
+}
+
 class JobListItem {
   final String id;
   final JobStatus status;
@@ -214,6 +256,11 @@ class JobListItem {
   final String? sourceUrl;
   final String? videoTitle;
   final String? userDisplayName;
+  final AudioContentType audioType;
+
+  /// Where this job's data lives. Null when cloud storage isn't in play
+  /// (no cloud configured or unreachable), so no badge is shown.
+  final JobStorage? storage;
 
   const JobListItem({
     required this.id,
@@ -234,10 +281,67 @@ class JobListItem {
     this.sourceUrl,
     this.videoTitle,
     this.userDisplayName,
+    this.audioType = AudioContentType.mixed,
+    this.storage,
   });
 
   /// Display name: user rename > video title > input filename.
   String get displayName => userDisplayName ?? videoTitle ?? inputFilename;
+
+  /// A copy of this job tagged with where its data lives.
+  JobListItem withStorage(JobStorage? storage) => JobListItem(
+        id: id,
+        status: status,
+        stage: stage,
+        progress: progress,
+        createdAt: createdAt,
+        startedAt: startedAt,
+        completedAt: completedAt,
+        errorMessage: errorMessage,
+        inputFilename: inputFilename,
+        fileSize: fileSize,
+        duration: duration,
+        tempoBpm: tempoBpm,
+        numFrames: numFrames,
+        numChords: numChords,
+        sourceType: sourceType,
+        sourceUrl: sourceUrl,
+        videoTitle: videoTitle,
+        userDisplayName: userDisplayName,
+        audioType: audioType,
+        storage: storage,
+      );
+
+  /// Builds a list entry from a cloud index summary (a job not yet on this device).
+  factory JobListItem.fromCloudJson(Map<String, dynamic> json) {
+    final title = (json['title'] ?? 'Untitled') as String;
+    DateTime created;
+    try {
+      created = DateTime.parse('${json['created_at']}Z').toLocal();
+    } catch (_) {
+      created = DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return JobListItem(
+      id: json['id'] as String,
+      status: JobStatus.completed,
+      progress: 100,
+      createdAt: created,
+      inputFilename: title,
+      fileSize: 0,
+      duration: (json['duration'] as num?)?.toDouble() ?? 0.0,
+      tempoBpm: (json['tempo_bpm'] as num?)?.toDouble() ?? 0.0,
+      numFrames: 0,
+      numChords: (json['num_chords'] as num?)?.toInt() ?? 0,
+      sourceType: json['source_type'] as String?,
+      sourceUrl: json['source_url'] as String?,
+      videoTitle: title,
+      userDisplayName: json['display_name'] as String?,
+      audioType: AudioContentType.fromApi(json['audio_type'] as String?),
+      storage: (json['on_device'] as bool? ?? false)
+          ? JobStorage.synced
+          : JobStorage.cloudOnly,
+    );
+  }
 
   /// Whether this job was created from a URL.
   bool get isUrlSource => sourceType == 'url';
@@ -267,6 +371,7 @@ class JobListItem {
       sourceUrl: json['source_url'] as String?,
       videoTitle: json['video_title'] as String?,
       userDisplayName: json['display_name'] as String?,
+      audioType: AudioContentType.fromApi(json['audio_type'] as String?),
     );
   }
 

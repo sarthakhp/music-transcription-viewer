@@ -100,6 +100,17 @@ class UserSettings {
     }
   }
 
+  /// Whether any settings have been saved for this job on this device.
+  bool hasJobSettings(String jobId) {
+    final allSettingsJson = _prefs.getString(_keyJobSettings);
+    if (allSettingsJson == null) return false;
+    try {
+      return (jsonDecode(allSettingsJson) as Map<String, dynamic>).containsKey(jobId);
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Save settings for a specific job
   void saveJobSettings(String jobId, JobSettings settings) {
     final allSettingsJson = _prefs.getString(_keyJobSettings);

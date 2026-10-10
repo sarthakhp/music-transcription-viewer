@@ -21,7 +21,7 @@ extension _HomeScreenJobs on _HomeScreenState {
 
       setState(() {
         if (completedResponse.isSuccess && completedResponse.data != null) {
-          _completedJobs = completedResponse.data!.jobs;
+          _completedJobs = _withCloudJobs(completedResponse.data!.jobs);
         } else {
         }
         if (failedResponse.isSuccess && failedResponse.data != null) {
@@ -30,9 +30,77 @@ extension _HomeScreenJobs on _HomeScreenState {
         }
         _isLoadingJobs = false;
       });
+      _refreshCloudJobs();
     } catch (e) {
       setState(() => _isLoadingJobs = false);
     }
+  }
+
+  /// Merge the local job list with the cloud listing: local jobs are tagged
+  /// synced or device-only, and cloud jobs not on this device are appended.
+  /// Without a reachable cloud the list is returned untouched (no badges).
+  List<JobListItem> _withCloudJobs(List<JobListItem> local) {
+    if (!_cloudAvailable) return local;
+    final cloudIds = {for (final job in _cloudJobs) job.id};
+    final localIds = {for (final job in local) job.id};
+    final merged = [
+      for (final job in local)
+        job.withStorage(
+          cloudIds.contains(job.id) ? JobStorage.synced : JobStorage.deviceOnly,
+        ),
+      for (final job in _cloudJobs)
+        if (!localIds.contains(job.id)) job.withStorage(JobStorage.cloudOnly),
+    ];
+    merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return merged;
+  }
+
+  /// Fetch the cloud listing in the background, so the local list shows
+  /// immediately and cloud-only jobs fill in once it arrives.
+  Future<void> _refreshCloudJobs() async {
+    if (ApiConfig.isRemote) return;
+    try {
+      final response = await _apiService.listCloudJobs();
+      if (!mounted) return;
+      final data = response.data;
+      if (!response.isSuccess || data == null || !data.available) return;
+      setState(() {
+        _cloudJobs = data.jobs;
+        _cloudAvailable = true;
+        _completedJobs = _withCloudJobs(
+          _completedJobs.where((j) => j.storage != JobStorage.cloudOnly).toList(),
+        );
+      });
+    } catch (_) {
+      // The cloud is optional: keep showing the local list.
+    }
+  }
+
+  /// Download a cloud-only job onto this device. Returns false (and shows an
+  /// error) if it couldn't be fetched.
+  Future<bool> _importCloudJob(String jobId) async {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Downloading from cloud...'),
+      behavior: SnackBarBehavior.floating,
+    ));
+    final response = await _apiService.importCloudJob(jobId);
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    if (!response.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(response.error ?? 'Could not download from cloud'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return false;
+    }
+    setState(() {
+      _completedJobs = [
+        for (final job in _completedJobs)
+          job.id == jobId ? job.withStorage(JobStorage.synced) : job,
+      ];
+    });
+    return true;
   }
 
   /// Retry a failed job. Reuses audio already on the server (no re-download).
@@ -82,9 +150,18 @@ extension _HomeScreenJobs on _HomeScreenState {
       appState.setLoading(true);
       appState.setError(null);
 
+      final isCloudOnly = _completedJobs.any(
+        (job) => job.id == jobId && job.storage == JobStorage.cloudOnly,
+      );
+      if (isCloudOnly && !await _importCloudJob(jobId)) {
+        appState.setLoading(false);
+        return;
+      }
+
       final resultsResponse = await _apiService.getJobResults(jobId);
       String? inputFilename;
       if (resultsResponse.isSuccess && resultsResponse.data != null) {
+        appState.setAudioType(resultsResponse.data!.audioType);
         // Prefer user-set display_name over the original input filename.
         inputFilename = resultsResponse.data!.userDisplayName
             ?? resultsResponse.data!.videoTitle
@@ -122,16 +199,38 @@ extension _HomeScreenJobs on _HomeScreenState {
     }
   }
 
-  /// Restore saved settings for a job (view state, playback settings)
+  /// Restore saved settings for a job (view state, playback settings).
+  ///
+  /// The local copy is applied immediately, so opening a song never waits on
+  /// the network. A newer cloud copy (from another device) is fetched in the
+  /// background and applied on top when it arrives.
   void _restoreJobSettings(String jobId) {
     final settings = _userSettings.loadJobSettings(jobId);
+    _applyJobSettings(settings);
+    _syncJobSettingsWithCloud(jobId, hadLocal: _userSettings.hasJobSettings(jobId));
+  }
 
+  /// Apply [settings] to the UI, the player and the view.
+  void _applyJobSettings(JobSettings settings) {
+    final appState = context.read<AppState>();
     setState(() {
       _playbackSpeed = settings.playbackSpeed;
       _transposeAmount = settings.transposeAmount;
       _sargamEnabled = settings.sargamEnabled;
       _scaleRoot = settings.scaleRoot;
+      _showVocals = settings.showVocals;
+      _showBass = settings.showBass;
+      _showOther = settings.showOther;
+      _vocalsMinConfidence = settings.vocalsMinConfidence;
+      _bassMinConfidence = settings.bassMinConfidence;
+      _otherMinConfidence = settings.otherMinConfidence;
+      // Songs without their own value fall back to the app-wide one.
+      _vocalDetail = settings.vocalDetail ?? _userSettings.vocalDetail;
     });
+    appState.setReferenceFrequency(
+      settings.referenceFrequency ?? _userSettings.referenceFrequency,
+    );
+    _tanpura.setSemitones(settings.scaleRoot);
 
     // Apply to view state
     _viewState.applyViewSettings(settings);
@@ -139,6 +238,45 @@ extension _HomeScreenJobs on _HomeScreenState {
     // Apply to audio service
     _audioService.setSpeed(settings.playbackSpeed);
     _audioService.setPitchSemitones(settings.transposeAmount);
+
+    // The restore itself isn't an edit: record what the UI now shows as the
+    // saved state (the track switch below is async, so re-record after it).
+    _rebaselineSettings(settings.updatedAtMs);
+    final track = AudioTrackType.values.where((t) => t.name == settings.track);
+    if (track.isNotEmpty) {
+      _switchTrack(track.first, persist: false).then((_) {
+        if (mounted) _rebaselineSettings(_lastSavedSettings?.updatedAtMs ?? settings.updatedAtMs);
+      });
+    }
+  }
+
+  /// Reconcile this song's settings with the cloud copy, never blocking the
+  /// UI: whichever side changed last wins, and a song with local settings but
+  /// nothing in the cloud uploads them so other devices get them too.
+  Future<void> _syncJobSettingsWithCloud(String jobId, {required bool hadLocal}) async {
+    final cloud = await _settingsSync.fetch(jobId);
+    // The user may have moved on to another song while this was in flight.
+    if (!mounted || _currentJobId != jobId) return;
+
+    final local = _lastSavedSettings ?? const JobSettings();
+    if (cloud == null) {
+      if (hadLocal) {
+        final stamped = local.copyWith(
+          updatedAtMs: local.updatedAtMs > 0
+              ? local.updatedAtMs
+              : DateTime.now().millisecondsSinceEpoch,
+        );
+        _lastSavedSettings = stamped;
+        _userSettings.saveJobSettings(jobId, stamped);
+        _settingsSync.schedulePush(jobId, stamped);
+      }
+      return;
+    }
+    if (cloud.updatedAtMs <= local.updatedAtMs) return; // local is as new or newer
+
+    _lastSavedSettings = cloud;
+    _userSettings.saveJobSettings(jobId, cloud);
+    _applyJobSettings(cloud);
   }
 
   /// Open the job referenced by the URL on startup (e.g. a direct link to
@@ -176,6 +314,10 @@ extension _HomeScreenJobs on _HomeScreenState {
         setState(() {
           _completedJobs.removeWhere((job) => job.id == jobId);
           _failedJobs.removeWhere((job) => job.id == jobId);
+          // Deleting removes only the local copy; a cloud copy stays listed.
+          _completedJobs = _withCloudJobs(
+            _completedJobs.where((j) => j.storage != JobStorage.cloudOnly).toList(),
+          );
         });
 
         if (mounted) {
@@ -258,7 +400,12 @@ extension _HomeScreenJobs on _HomeScreenState {
   }
 
   /// Submit a URL for transcription
-  Future<void> _submitUrlForTranscription(String url, {double? startTime, double? endTime}) async {
+  Future<void> _submitUrlForTranscription(
+    String url, {
+    double? startTime,
+    double? endTime,
+    AudioContentType audioType = AudioContentType.mixed,
+  }) async {
     final appState = context.read<AppState>();
 
     appState.startUpload();
@@ -268,6 +415,7 @@ extension _HomeScreenJobs on _HomeScreenState {
         url: url,
         startTime: startTime,
         endTime: endTime,
+        audioType: audioType,
       );
 
       if (!mounted) return;
@@ -287,11 +435,16 @@ extension _HomeScreenJobs on _HomeScreenState {
   }
 
   /// Upload audio bytes directly (used by file-with-trim and recording flows).
-  Future<void> _uploadAudioBytes(Uint8List bytes, String fileName) async {
+  Future<void> _uploadAudioBytes(
+    Uint8List bytes,
+    String fileName, {
+    AudioContentType audioType = AudioContentType.mixed,
+  }) async {
     if (!mounted) return;
     final jobId = await _uploadService.uploadAudioFile(
       fileBytes: bytes,
       fileName: fileName,
+      audioType: audioType,
     );
     if (jobId != null && mounted) {
       _pollingService.startPolling(jobId);

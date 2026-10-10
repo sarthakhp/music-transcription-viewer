@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/api_response.dart';
+import '../models/audio_content_type.dart';
 import '../models/job.dart';
 import '../models/job_status.dart';
 import '../models/pitch_data.dart';
@@ -42,6 +43,7 @@ class TranscriptionApiService {
   Future<ApiResponse<JobCreationResponse>> uploadAudioFile({
     required Uint8List fileBytes,
     required String fileName,
+    AudioContentType audioType = AudioContentType.mixed,
   }) async {
     if (_remote != null) return _remoteUnsupported();
     try {
@@ -49,6 +51,7 @@ class TranscriptionApiService {
 
       final request = http.MultipartRequest('POST', uri);
       request.headers.addAll(_commonHeaders);
+      request.fields['audio_type'] = audioType.apiValue;
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -79,10 +82,14 @@ class TranscriptionApiService {
     required String url,
     double? startTime,
     double? endTime,
+    AudioContentType audioType = AudioContentType.mixed,
   }) async {
     if (_remote != null) return _remoteUnsupported();
     try {
-      final body = <String, dynamic>{'url': url};
+      final body = <String, dynamic>{
+        'url': url,
+        'audio_type': audioType.apiValue,
+      };
       if (startTime != null) body['start_time'] = startTime;
       if (endTime != null) body['end_time'] = endTime;
 
@@ -334,6 +341,41 @@ class TranscriptionApiService {
       () => _client.get(uriWithParams, headers: _commonHeaders).timeout(ApiConfig.requestTimeout),
       (json) => JobListResponse.fromJson(json),
     );
+  }
+
+  /// Jobs published to cloud storage, flagged by whether they're on this
+  /// device. Not available in the hosted viewer (it already reads the cloud).
+  /// GET /api/v1/cloud/jobs
+  Future<ApiResponse<CloudJobsResponse>> listCloudJobs() async {
+    if (_remote != null) return ApiResponse.error('Not applicable', statusCode: 405);
+    return ApiErrorHandler.executeApiCall(
+      () => _client
+          .get(Uri.parse(ApiConfig.getUrl('/cloud/jobs')), headers: _commonHeaders)
+          .timeout(ApiConfig.requestTimeout),
+      (json) => CloudJobsResponse.fromJson(json),
+    );
+  }
+
+  /// Download a cloud-only job onto this device so it opens like any local job.
+  /// POST /api/v1/cloud/jobs/{job_id}/import
+  Future<ApiResponse<void>> importCloudJob(String jobId) async {
+    try {
+      final response = await _client
+          .post(
+            Uri.parse(ApiConfig.getUrl('/cloud/jobs/$jobId/import')),
+            headers: _commonHeaders,
+          )
+          .timeout(ApiConfig.downloadTimeout);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return ApiResponse.success(null, statusCode: response.statusCode);
+      }
+      return ApiResponse.error(
+        'Could not download from cloud (HTTP ${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiErrorHandler.handleException(e);
+    }
   }
 
   /// Dispose of the HTTP client

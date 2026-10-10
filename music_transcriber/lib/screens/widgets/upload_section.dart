@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../../utils/web_file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
+import '../../models/audio_content_type.dart';
 import '../../models/job.dart';
 import '../../providers/app_state.dart';
 import '../../services/audio_recorder_service.dart';
@@ -23,9 +24,19 @@ class UploadSection extends StatefulWidget {
   final TranscriptionApiService apiService;
 
   /// Called when the user wants to upload ready-to-go audio bytes (file or recording).
-  final Future<void> Function(Uint8List bytes, String fileName)? onFileUpload;
+  final Future<void> Function(
+    Uint8List bytes,
+    String fileName, {
+    AudioContentType audioType,
+  })?
+  onFileUpload;
 
-  final Future<void> Function(String url, {double? startTime, double? endTime})?
+  final Future<void> Function(
+    String url, {
+    double? startTime,
+    double? endTime,
+    AudioContentType audioType,
+  })?
   onUrlSubmitted;
   final Future<void> Function()? onCancel;
   final bool isLoadingJson;
@@ -50,6 +61,9 @@ class UploadSection extends StatefulWidget {
 
 class _UploadSectionState extends State<UploadSection> {
   _Tab _tab = _Tab.file;
+
+  /// What the audio contains; shared by all three input tabs.
+  AudioContentType _audioType = AudioContentType.mixed;
 
   // ---- URL state ----
   final _urlController = TextEditingController();
@@ -195,7 +209,12 @@ class _UploadSectionState extends State<UploadSection> {
           endTime = _urlTrimEnd;
         }
       }
-      await widget.onUrlSubmitted!(url, startTime: startTime, endTime: endTime);
+      await widget.onUrlSubmitted!(
+        url,
+        startTime: startTime,
+        endTime: endTime,
+        audioType: _audioType,
+      );
     } finally {
       if (mounted) setState(() => _isSubmittingUrl = false);
     }
@@ -240,7 +259,7 @@ class _UploadSectionState extends State<UploadSection> {
         _fileName ?? 'audio.wav',
         bytes != _fileBytes,
       );
-      await widget.onFileUpload!(bytes, name);
+      await widget.onFileUpload!(bytes, name, audioType: _audioType);
     } finally {
       if (mounted) setState(() => _isSubmittingFile = false);
     }
@@ -451,6 +470,7 @@ class _UploadSectionState extends State<UploadSection> {
       await widget.onFileUpload!(
         bytes,
         'Recording $date $time ($durStr)_$tsFile.wav',
+        audioType: _audioType,
       );
     } finally {
       if (mounted) setState(() => _isSubmittingRecord = false);
@@ -674,6 +694,8 @@ class _UploadSectionState extends State<UploadSection> {
           },
           showSelectedIcon: false,
         ),
+        const SizedBox(height: 16),
+        _buildAudioTypeSelector(context),
         const SizedBox(height: 20),
 
         if (_tab == _Tab.file)
@@ -682,6 +704,37 @@ class _UploadSectionState extends State<UploadSection> {
           _buildUrlTab(context)
         else
           _buildRecordTab(context),
+      ],
+    );
+  }
+
+  /// Picks what the audio contains so the backend can skip stages that don't
+  /// apply (e.g. no vocal separation for a solo instrument).
+  Widget _buildAudioTypeSelector(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      children: [
+        SegmentedButton<AudioContentType>(
+          segments: [
+            for (final type in AudioContentType.values)
+              ButtonSegment(value: type, label: Text(type.label)),
+          ],
+          selected: {_audioType},
+          expandedInsets: EdgeInsets.zero,
+          onSelectionChanged: (selected) =>
+              setState(() => _audioType = selected.first),
+          showSelectedIcon: false,
+          style: const ButtonStyle(visualDensity: VisualDensity.compact),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${_audioType.label}: ${_audioType.description}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
