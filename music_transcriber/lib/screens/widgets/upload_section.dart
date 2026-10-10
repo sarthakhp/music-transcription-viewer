@@ -25,7 +25,8 @@ class UploadSection extends StatefulWidget {
   /// Called when the user wants to upload ready-to-go audio bytes (file or recording).
   final Future<void> Function(Uint8List bytes, String fileName)? onFileUpload;
 
-  final Future<void> Function(String url, {double? startTime, double? endTime})? onUrlSubmitted;
+  final Future<void> Function(String url, {double? startTime, double? endTime})?
+  onUrlSubmitted;
   final Future<void> Function()? onCancel;
   final bool isLoadingJson;
   final bool isLoadingAudio;
@@ -107,7 +108,8 @@ class _UploadSectionState extends State<UploadSection> {
     setState(() => _urlError = null);
     _debounceTimer?.cancel();
     final url = text.trim();
-    if (url.isEmpty || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+    if (url.isEmpty ||
+        (!url.startsWith('http://') && !url.startsWith('https://'))) {
       if (_metadata != null || _isFetchingMetadata) {
         setState(() {
           _metadata = null;
@@ -118,7 +120,10 @@ class _UploadSectionState extends State<UploadSection> {
       return;
     }
     if (url == _metadataUrl) return;
-    _debounceTimer = Timer(const Duration(milliseconds: 600), () => _fetchMetadata(url));
+    _debounceTimer = Timer(
+      const Duration(milliseconds: 600),
+      () => _fetchMetadata(url),
+    );
   }
 
   Future<void> _fetchMetadata(String url) async {
@@ -159,23 +164,36 @@ class _UploadSectionState extends State<UploadSection> {
 
   Future<void> _submitUrl() async {
     final url = _urlController.text.trim();
-    if (url.isEmpty) { setState(() => _urlError = 'Please enter a URL'); return; }
+    if (url.isEmpty) {
+      setState(() => _urlError = 'Please enter a URL');
+      return;
+    }
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       setState(() => _urlError = 'URL must start with http:// or https://');
       return;
     }
-    if (_metadata != null && (_urlTrimEnd - _urlTrimStart) > _metadata!.maxDurationSeconds) {
-      setState(() => _urlError = 'Selection is too long. Adjust the trim handles.');
+    if (_metadata != null &&
+        (_urlTrimEnd - _urlTrimStart) > _metadata!.maxDurationSeconds) {
+      setState(
+        () => _urlError = 'Selection is too long. Adjust the trim handles.',
+      );
       return;
     }
     if (widget.onUrlSubmitted == null) return;
-    setState(() { _urlError = null; _isSubmittingUrl = true; });
+    setState(() {
+      _urlError = null;
+      _isSubmittingUrl = true;
+    });
     try {
       double? startTime;
       double? endTime;
       if (_metadata != null) {
-        final isFullRange = _urlTrimStart <= 0.5 && (_urlTrimEnd >= _metadata!.duration - 0.5);
-        if (!isFullRange) { startTime = _urlTrimStart; endTime = _urlTrimEnd; }
+        final isFullRange =
+            _urlTrimStart <= 0.5 && (_urlTrimEnd >= _metadata!.duration - 0.5);
+        if (!isFullRange) {
+          startTime = _urlTrimStart;
+          endTime = _urlTrimEnd;
+        }
       }
       await widget.onUrlSubmitted!(url, startTime: startTime, endTime: endTime);
     } finally {
@@ -218,7 +236,10 @@ class _UploadSectionState extends State<UploadSection> {
     setState(() => _isSubmittingFile = true);
     try {
       final bytes = await _trimmedFileBytes();
-      final name = _trimmedFileName(_fileName ?? 'audio.wav', bytes != _fileBytes);
+      final name = _trimmedFileName(
+        _fileName ?? 'audio.wav',
+        bytes != _fileBytes,
+      );
       await widget.onFileUpload!(bytes, name);
     } finally {
       if (mounted) setState(() => _isSubmittingFile = false);
@@ -233,7 +254,11 @@ class _UploadSectionState extends State<UploadSection> {
 
     final decoded = await AudioTrimService.decode(_fileBytes!);
     if (decoded == null) return _fileBytes!;
-    return AudioTrimService.trimAndEncodeWav(decoded, _fileTrimStart, _fileTrimEnd);
+    return AudioTrimService.trimAndEncodeWav(
+      decoded,
+      _fileTrimStart,
+      _fileTrimEnd,
+    );
   }
 
   String _trimmedFileName(String original, bool wasTrimmed) {
@@ -255,7 +280,9 @@ class _UploadSectionState extends State<UploadSection> {
   // ══════════════════════════════════════════════════════════ Record logic ═══
 
   Future<void> _startRecording() async {
-    setState(() { _recordError = null; });
+    setState(() {
+      _recordError = null;
+    });
     try {
       await _recorder.start();
       setState(() {
@@ -267,7 +294,10 @@ class _UploadSectionState extends State<UploadSection> {
         if (mounted) setState(() => _elapsed += const Duration(seconds: 1));
       });
     } catch (e) {
-      setState(() => _recordError = 'Could not access microphone. Check browser permissions.');
+      setState(
+        () => _recordError =
+            'Could not access microphone. Check browser permissions.',
+      );
     }
   }
 
@@ -352,7 +382,11 @@ class _UploadSectionState extends State<UploadSection> {
     _previewOnEnded = ((web.Event _) {
       _previewPositionTimer?.cancel();
       _previewPositionTimer = null;
-      if (mounted) setState(() { _previewPlaying = false; _previewPosition = 0; });
+      if (mounted)
+        setState(() {
+          _previewPlaying = false;
+          _previewPosition = 0;
+        });
     }).toJS;
     _previewAudio!.addEventListener('ended', _previewOnEnded!);
     web.document.body!.append(_previewAudio!);
@@ -368,11 +402,14 @@ class _UploadSectionState extends State<UploadSection> {
     } else {
       if (_previewAudio!.ended) _previewAudio!.currentTime = 0;
       _previewAudio!.play();
-      _previewPositionTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-        if (mounted && _previewAudio != null) {
-          setState(() => _previewPosition = _previewAudio!.currentTime);
-        }
-      });
+      _previewPositionTimer = Timer.periodic(
+        const Duration(milliseconds: 200),
+        (_) {
+          if (mounted && _previewAudio != null) {
+            setState(() => _previewPosition = _previewAudio!.currentTime);
+          }
+        },
+      );
       setState(() => _previewPlaying = true);
     }
   }
@@ -391,11 +428,15 @@ class _UploadSectionState extends State<UploadSection> {
       final now = DateTime.now();
 
       // Date-time stamp: YYYY-MM-DD HH:MM
-      final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      final date =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final time =
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
       // Actual submitted duration (respects trim handles)
-      final isFullRange = _recordTrimStart <= 0.5 && (_recordTrimEnd >= _recordedDuration - 0.5);
+      final isFullRange =
+          _recordTrimStart <= 0.5 &&
+          (_recordTrimEnd >= _recordedDuration - 0.5);
       final submitDuration = isFullRange
           ? _recordedDuration
           : (_recordTrimEnd - _recordTrimStart);
@@ -405,8 +446,12 @@ class _UploadSectionState extends State<UploadSection> {
           : '${totalSecs}s';
 
       // Filename uses underscores for filesystem safety; display title uses readable separators
-      final tsFile = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-      await widget.onFileUpload!(bytes, 'Recording $date $time ($durStr)_$tsFile.wav');
+      final tsFile =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      await widget.onFileUpload!(
+        bytes,
+        'Recording $date $time ($durStr)_$tsFile.wav',
+      );
     } finally {
       if (mounted) setState(() => _isSubmittingRecord = false);
     }
@@ -415,12 +460,17 @@ class _UploadSectionState extends State<UploadSection> {
   Future<Uint8List> _trimmedRecordingBytes() async {
     final dur = _recordedDuration;
     if (dur == 0) return _recordedBytes!;
-    final isFullRange = _recordTrimStart <= 0.5 && (_recordTrimEnd >= dur - 0.5);
+    final isFullRange =
+        _recordTrimStart <= 0.5 && (_recordTrimEnd >= dur - 0.5);
     if (isFullRange) return _recordedBytes!;
 
     final decoded = await AudioTrimService.decode(_recordedBytes!);
     if (decoded == null) return _recordedBytes!;
-    return AudioTrimService.trimAndEncodeWav(decoded, _recordTrimStart, _recordTrimEnd);
+    return AudioTrimService.trimAndEncodeWav(
+      decoded,
+      _recordTrimStart,
+      _recordTrimEnd,
+    );
   }
 
   // ══════════════════════════════════════════════════════════ Build ══════════
@@ -437,34 +487,42 @@ class _UploadSectionState extends State<UploadSection> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // App icon
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.easeOut,
-          builder: (context, value, child) => Transform.translate(
-            offset: Offset(0, 20 * (1 - value)),
-            child: Opacity(opacity: value, child: child),
-          ),
-          child: Container(
-            padding: EdgeInsets.all(compact ? 16 : 28),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  colorScheme.primaryContainer.withValues(alpha: 0.6),
-                  colorScheme.primaryContainer.withValues(alpha: 0.2),
+        // App icon. The top inset gives the glow room: the scroll view above
+        // clips anything painted outside its bounds, which cut the glow off.
+        Padding(
+          padding: const EdgeInsets.only(top: 40),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOut,
+            builder: (context, value, child) => Transform.translate(
+              offset: Offset(0, 20 * (1 - value)),
+              child: Opacity(opacity: value, child: child),
+            ),
+            child: Container(
+              padding: EdgeInsets.all(compact ? 16 : 28),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colorScheme.primaryContainer.withValues(alpha: 0.6),
+                    colorScheme.primaryContainer.withValues(alpha: 0.2),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
                 ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: 0.2),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                ),
-              ],
+              child: Icon(
+                Icons.graphic_eq_rounded,
+                size: compact ? 40 : 64,
+                color: colorScheme.primary,
+              ),
             ),
-            child: Icon(Icons.graphic_eq_rounded, size: compact ? 40 : 64, color: colorScheme.primary),
           ),
         ),
         SizedBox(height: compact ? 16 : 40),
@@ -473,13 +531,18 @@ class _UploadSectionState extends State<UploadSection> {
           tween: Tween(begin: 0, end: 1),
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeOut,
-          builder: (context, value, child) => Opacity(opacity: value, child: child),
+          builder: (context, value, child) =>
+              Opacity(opacity: value, child: child),
           child: Text(
             'Music Transcriber',
-            style: (compact ? theme.textTheme.titleLarge : theme.textTheme.headlineMedium)?.copyWith(
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
-            ),
+            style:
+                (compact
+                        ? theme.textTheme.titleLarge
+                        : theme.textTheme.headlineMedium)
+                    ?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
           ),
         ),
         SizedBox(height: compact ? 6 : 12),
@@ -488,7 +551,8 @@ class _UploadSectionState extends State<UploadSection> {
           tween: Tween(begin: 0, end: 1),
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeOut,
-          builder: (context, value, child) => Opacity(opacity: value, child: child),
+          builder: (context, value, child) =>
+              Opacity(opacity: value, child: child),
           child: Text(
             'Upload a file, paste a URL, or record audio',
             style: theme.textTheme.bodyLarge?.copyWith(
@@ -501,23 +565,32 @@ class _UploadSectionState extends State<UploadSection> {
 
         // Loading
         if (widget.isLoadingJson || widget.isLoadingAudio)
-          Column(children: [
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: CircularProgressIndicator(strokeWidth: 3, color: colorScheme.primary),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              widget.loadingAudioStatus ??
-                  (widget.isLoadingJson ? 'Loading pitch data...' : 'Loading audio...'),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.7),
-                fontStyle: widget.loadingAudioStatus != null ? FontStyle.italic : null,
+          Column(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: colorScheme.primary,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ]),
+              const SizedBox(height: 24),
+              Text(
+                widget.loadingAudioStatus ??
+                    (widget.isLoadingJson
+                        ? 'Loading pitch data...'
+                        : 'Loading audio...'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontStyle: widget.loadingAudioStatus != null
+                      ? FontStyle.italic
+                      : null,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
 
         // Error banner
         AnimatedSize(
@@ -540,7 +613,9 @@ class _UploadSectionState extends State<UploadSection> {
                         Flexible(
                           child: SelectableText(
                             appState.errorMessage!,
-                            style: TextStyle(color: colorScheme.onErrorContainer),
+                            style: TextStyle(
+                              color: colorScheme.onErrorContainer,
+                            ),
                           ),
                         ),
                         IconButton(
@@ -601,9 +676,12 @@ class _UploadSectionState extends State<UploadSection> {
         ),
         const SizedBox(height: 20),
 
-        if (_tab == _Tab.file)   _buildFileTab(context)
-        else if (_tab == _Tab.url) _buildUrlTab(context)
-        else                       _buildRecordTab(context),
+        if (_tab == _Tab.file)
+          _buildFileTab(context)
+        else if (_tab == _Tab.url)
+          _buildUrlTab(context)
+        else
+          _buildRecordTab(context),
       ],
     );
   }
@@ -632,7 +710,9 @@ class _UploadSectionState extends State<UploadSection> {
         Card(
           elevation: 0,
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -640,12 +720,18 @@ class _UploadSectionState extends State<UploadSection> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.audio_file_rounded, color: colorScheme.primary, size: 20),
+                    Icon(
+                      Icons.audio_file_rounded,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _fileName ?? 'audio file',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -666,20 +752,25 @@ class _UploadSectionState extends State<UploadSection> {
 
                 if (_isDecodingFile) ...[
                   const SizedBox(height: 12),
-                  Row(children: [
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Analysing audio...',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.primary,
+                        ),
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Analysing audio...',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
                 ] else if (_fileDuration != null && _fileDuration! > 0) ...[
                   const SizedBox(height: 16),
                   TrimRangeSlider(
@@ -708,12 +799,16 @@ class _UploadSectionState extends State<UploadSection> {
         const SizedBox(height: 16),
 
         FilledButton.tonalIcon(
-          onPressed: (_isDecodingFile || _isSubmittingFile) ? null : _submitFile,
+          onPressed: (_isDecodingFile || _isSubmittingFile)
+              ? null
+              : _submitFile,
           icon: _isSubmittingFile
               ? SizedBox(
-                  width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2, color: colorScheme.onSurface,
+                    strokeWidth: 2,
+                    color: colorScheme.onSurface,
                   ),
                 )
               : const Icon(Icons.play_arrow_rounded),
@@ -732,8 +827,10 @@ class _UploadSectionState extends State<UploadSection> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final canTranscribe = !_isSubmittingUrl &&
-        (_metadata == null || (_urlTrimEnd - _urlTrimStart) <= _metadata!.maxDurationSeconds);
+    final canTranscribe =
+        !_isSubmittingUrl &&
+        (_metadata == null ||
+            (_urlTrimEnd - _urlTrimStart) <= _metadata!.maxDurationSeconds);
 
     return Column(
       children: [
@@ -744,30 +841,34 @@ class _UploadSectionState extends State<UploadSection> {
             prefixIcon: const Icon(Icons.link_rounded),
             errorText: _urlError,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             suffixIcon: _isFetchingMetadata
                 ? const Padding(
                     padding: EdgeInsets.all(12),
                     child: SizedBox(
-                      width: 20, height: 20,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
                 : _urlController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18),
-                        onPressed: () {
-                          _urlController.clear();
-                          _debounceTimer?.cancel();
-                          setState(() {
-                            _urlError = null;
-                            _metadata = null;
-                            _metadataUrl = null;
-                            _isFetchingMetadata = false;
-                          });
-                        },
-                      )
-                    : null,
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    onPressed: () {
+                      _urlController.clear();
+                      _debounceTimer?.cancel();
+                      setState(() {
+                        _urlError = null;
+                        _metadata = null;
+                        _metadataUrl = null;
+                        _isFetchingMetadata = false;
+                      });
+                    },
+                  )
+                : null,
           ),
           keyboardType: TextInputType.url,
           onChanged: _onUrlChanged,
@@ -802,9 +903,11 @@ class _UploadSectionState extends State<UploadSection> {
           onPressed: canTranscribe ? _submitUrl : null,
           icon: _isSubmittingUrl
               ? SizedBox(
-                  width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2, color: colorScheme.onSurface,
+                    strokeWidth: 2,
+                    color: colorScheme.onSurface,
                   ),
                 )
               : const Icon(Icons.play_arrow_rounded),
@@ -821,9 +924,9 @@ class _UploadSectionState extends State<UploadSection> {
 
   Widget _buildRecordTab(BuildContext context) {
     return switch (_recordState) {
-      _RecordState.idle     => _buildRecordIdle(context),
+      _RecordState.idle => _buildRecordIdle(context),
       _RecordState.recording => _buildRecordActive(context),
-      _RecordState.recorded  => _buildRecordPreview(context),
+      _RecordState.recorded => _buildRecordPreview(context),
     };
   }
 
@@ -843,7 +946,11 @@ class _UploadSectionState extends State<UploadSection> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 18),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: colorScheme.error,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
@@ -887,7 +994,11 @@ class _UploadSectionState extends State<UploadSection> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.mic_rounded, size: 13, color: colorScheme.onSurface.withValues(alpha: 0.45)),
+          Icon(
+            Icons.mic_rounded,
+            size: 13,
+            color: colorScheme.onSurface.withValues(alpha: 0.45),
+          ),
           const SizedBox(width: 4),
           Text(
             _micLabel!,
@@ -912,17 +1023,18 @@ class _UploadSectionState extends State<UploadSection> {
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeInOut,
           onEnd: () => setState(() {}),
-          builder: (context, scale, child) => Transform.scale(
-            scale: scale,
-            child: child,
-          ),
+          builder: (context, scale, child) =>
+              Transform.scale(scale: scale, child: child),
           child: Container(
             width: 72,
             height: 72,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: colorScheme.error.withValues(alpha: 0.15),
-              border: Border.all(color: colorScheme.error.withValues(alpha: 0.4), width: 2),
+              border: Border.all(
+                color: colorScheme.error.withValues(alpha: 0.4),
+                width: 2,
+              ),
             ),
             child: Icon(Icons.mic_rounded, size: 36, color: colorScheme.error),
           ),
@@ -964,7 +1076,10 @@ class _UploadSectionState extends State<UploadSection> {
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.error,
                 foregroundColor: colorScheme.onError,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
               ),
             ),
           ],
@@ -981,8 +1096,12 @@ class _UploadSectionState extends State<UploadSection> {
       return Column(
         children: [
           SizedBox(
-            width: 36, height: 36,
-            child: CircularProgressIndicator(strokeWidth: 3, color: colorScheme.primary),
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: colorScheme.primary,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -1001,7 +1120,9 @@ class _UploadSectionState extends State<UploadSection> {
         Card(
           elevation: 0,
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1009,16 +1130,24 @@ class _UploadSectionState extends State<UploadSection> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.mic_rounded, color: colorScheme.primary, size: 20),
+                    Icon(
+                      Icons.mic_rounded,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Recorded audio',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     Text(
-                      _formatDuration(Duration(seconds: _recordedDuration.round())),
+                      _formatDuration(
+                        Duration(seconds: _recordedDuration.round()),
+                      ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurface.withValues(alpha: 0.55),
                       ),
@@ -1027,10 +1156,16 @@ class _UploadSectionState extends State<UploadSection> {
                     IconButton(
                       iconSize: 22,
                       visualDensity: VisualDensity.compact,
-                      tooltip: _previewPlaying ? 'Pause preview' : 'Play preview',
-                      onPressed: _isSubmittingRecord ? null : _togglePreviewPlayback,
+                      tooltip: _previewPlaying
+                          ? 'Pause preview'
+                          : 'Play preview',
+                      onPressed: _isSubmittingRecord
+                          ? null
+                          : _togglePreviewPlayback,
                       icon: Icon(
-                        _previewPlaying ? Icons.pause_circle_rounded : Icons.play_circle_rounded,
+                        _previewPlaying
+                            ? Icons.pause_circle_rounded
+                            : Icons.play_circle_rounded,
                         color: colorScheme.primary,
                       ),
                     ),
@@ -1042,8 +1177,12 @@ class _UploadSectionState extends State<UploadSection> {
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 3,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
                     ),
                     child: Slider(
                       min: 0,
@@ -1058,13 +1197,19 @@ class _UploadSectionState extends State<UploadSection> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _formatDuration(Duration(milliseconds: (_previewPosition * 1000).round())),
+                          _formatDuration(
+                            Duration(
+                              milliseconds: (_previewPosition * 1000).round(),
+                            ),
+                          ),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
                         Text(
-                          _formatDuration(Duration(seconds: _recordedDuration.round())),
+                          _formatDuration(
+                            Duration(seconds: _recordedDuration.round()),
+                          ),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
@@ -1111,15 +1256,22 @@ class _UploadSectionState extends State<UploadSection> {
                 onPressed: _isSubmittingRecord ? null : _submitRecording,
                 icon: _isSubmittingRecord
                     ? SizedBox(
-                        width: 18, height: 18,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2, color: colorScheme.onSurface,
+                          strokeWidth: 2,
+                          color: colorScheme.onSurface,
                         ),
                       )
                     : const Icon(Icons.play_arrow_rounded),
-                label: Text(_isSubmittingRecord ? 'Preparing...' : 'Transcribe'),
+                label: Text(
+                  _isSubmittingRecord ? 'Preparing...' : 'Transcribe',
+                ),
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                 ),
               ),
             ),
@@ -1142,7 +1294,9 @@ class _UploadSectionState extends State<UploadSection> {
     return Row(
       children: [
         Icon(
-          isFullRange ? Icons.check_circle_outline_rounded : Icons.content_cut_rounded,
+          isFullRange
+              ? Icons.check_circle_outline_rounded
+              : Icons.content_cut_rounded,
           size: 16,
           color: colorScheme.primary,
         ),
