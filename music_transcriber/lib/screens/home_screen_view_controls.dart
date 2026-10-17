@@ -60,8 +60,13 @@ extension _HomeScreenViewControls on _HomeScreenState {
   void _attachMediaSession(AppState appState) {
     _mediaSession.attach(
       title: appState.audioFileName ?? 'Audio',
-      onPlay: () => _audioService.play(),
-      onPause: () => _audioService.pause(),
+      onPlay: () {
+        if (!_countIn.isRunning && !context.read<AppState>().isPlaying) _togglePlayback();
+      },
+      onPause: () {
+        _countIn.cancel();
+        _audioService.pause();
+      },
       onSeekTo: _seekTo,
       onSeekBy: (delta) {
         final duration = context.read<AppState>().duration;
@@ -155,7 +160,14 @@ extension _HomeScreenViewControls on _HomeScreenState {
     final maxTime = appState.pitchData?.maxTime ?? 120;
 
     if (event.logicalKey == LogicalKeyboardKey.space) {
-      _audioService.togglePlayPause();
+      _togglePlayback();
+      return KeyEventResult.handled;
+    }
+
+    // Enter: back to the start
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _seekTo(0);
       return KeyEventResult.handled;
     }
 

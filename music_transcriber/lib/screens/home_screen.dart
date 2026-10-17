@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../services/audio_service.dart';
 import '../services/audio_stems.dart';
 import '../services/transcription_api_service.dart';
+import '../services/count_in_service.dart';
 import '../services/settings_sync_service.dart';
 import '../services/upload_service.dart';
 import '../services/job_polling_service.dart';
@@ -34,12 +35,14 @@ import 'widgets/keyboard_shortcuts_dialog.dart';
 import 'widgets/upload_layout.dart';
 import 'widgets/phone_viewer_app_bar.dart';
 import 'widgets/viewer_toolbar.dart';
+import 'widgets/count_in_control.dart';
 import 'widgets/tanpura_control.dart';
 import '../services/tanpura_service.dart';
 import '../services/media_session/media_session.dart';
 import 'package:go_router/go_router.dart';
 
 part 'home_screen_audio.dart';
+part 'home_screen_count_in.dart';
 part 'home_screen_jobs.dart';
 part 'home_screen_view_controls.dart';
 
@@ -70,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Tanpura drone synthesizer
   final TanpuraService _tanpura = TanpuraService();
+  final CountInService _countIn = CountInService();
 
   // Download export state
   bool _isExporting = false;
@@ -187,6 +191,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _sargamEnabled = _userSettings.sargamEnabled;
         _vocalDetail = _userSettings.vocalDetail;
       });
+      _countIn.setBeats(_userSettings.countInBeats);
       final appState = context.read<AppState>();
       appState.setReferenceFrequency(_userSettings.referenceFrequency);
 
@@ -265,6 +270,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _mediaSession.detach();
     _audioService.dispose();
     _tanpura.dispose();
+    _countIn.dispose();
 
     PerformanceMonitor.instance.stop();
     _pollingService.dispose();
@@ -371,6 +377,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _durationSubscription?.cancel();
           _playingSubscription?.cancel();
           _processingStateSubscription?.cancel();
+          _countIn.cancel();
           _saveSettingsTimer?.cancel();
           _saveCurrentJobSettings();
           _settingsSync.flush();
@@ -396,9 +403,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ? _buildViewerToolbar(appState,
                               isNarrow: true, isPhone: true, inline: true)
                           : null,
-                      tanpuraButton: TanpuraButton(
-                        tanpura: _tanpura,
-                        onBeforeStart: () => _tanpura.setSemitones(_scaleRoot),
+                      tanpuraButton: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CountInButton(countIn: _countIn, onBeatsChanged: _setCountInBeats),
+                          TanpuraButton(
+                            tanpura: _tanpura,
+                            onBeforeStart: () => _tanpura.setSemitones(_scaleRoot),
+                          ),
+                        ],
                       ),
                       onBack: handleLoadNew,
                       onRename: (newName) {
@@ -453,6 +466,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       tooltip: themeProvider.themeModeTooltip,
                     ),
                   ),
+                  if (shell.isReady)
+                    CountInButton(countIn: _countIn, onBeatsChanged: _setCountInBeats),
                   if (shell.isReady)
                     TanpuraButton(
                       tanpura: _tanpura,
@@ -672,6 +687,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
+                Positioned.fill(child: CountInOverlay(countIn: _countIn)),
+
                 Positioned(
                   // Sit above the time-axis labels.
                   bottom: (isPhone ? GraphInsets.compact.bottom : GraphInsets.regular.bottom) + 8,
@@ -704,7 +721,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               currentTime: audio.currentTime,
               duration: audio.duration > 0 ? audio.duration : (appState.pitchData?.maxTime ?? 0.0),
               referenceFrequency: audio.referenceFrequency,
-              onPlayPause: () => _audioService.togglePlayPause(),
+              onPlayPause: _togglePlayback,
               onStop: () => _audioService.stop(),
               onSeek: _seekTo,
               onReferenceFrequencyChange: (frequency) {

@@ -12,6 +12,7 @@ class UserSettings {
   static const _keyVocalDetail = 'vocalDetail';
   static const _keyJobSettings = 'jobSettings'; // Map of jobId -> settings JSON
   static const _keyThemeMode = 'themeMode';
+  static const _keyCountInBeats = 'countInBeats';
 
   static const double defaultPlaybackSpeed = 1.0;
   static const int defaultTransposeAmount = 0;
@@ -31,6 +32,9 @@ class UserSettings {
   int vocalDetail = defaultVocalDetail;
   ThemeMode themeMode = defaultThemeMode;
 
+  /// Clicks counted in before playback starts; 0 = off.
+  int countInBeats = 0;
+
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     playbackSpeed = _prefs.getDouble(_keyPlaybackSpeed) ?? defaultPlaybackSpeed;
@@ -39,6 +43,7 @@ class UserSettings {
     scaleRoot = _prefs.getInt(_keyScaleRoot) ?? defaultScaleRoot;
     referenceFrequency = _prefs.getDouble(_keyReferenceFrequency) ?? defaultReferenceFrequency;
     vocalDetail = _prefs.getInt(_keyVocalDetail) ?? defaultVocalDetail;
+    countInBeats = _prefs.getInt(_keyCountInBeats) ?? 0;
 
     // Load theme mode
     final themeModeIndex = _prefs.getInt(_keyThemeMode);
@@ -75,6 +80,11 @@ class UserSettings {
   void saveVocalDetail(int value) {
     vocalDetail = value;
     _prefs.setInt(_keyVocalDetail, value);
+  }
+
+  void saveCountInBeats(int value) {
+    countInBeats = value;
+    _prefs.setInt(_keyCountInBeats, value);
   }
 
   void saveThemeMode(ThemeMode value) {

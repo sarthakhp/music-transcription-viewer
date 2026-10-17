@@ -92,7 +92,8 @@ Every feature must work on **desktop browser**, the **macOS DMG** (pywebview/WKW
 Source of truth: `_handleKeyEvent` in `home_screen_view_controls.dart` (keep `keyboard_shortcuts_dialog.dart`, hover tooltips and README in sync).
 | Key | Action |
 |-----|--------|
-| `Space` | Play/pause |
+| `Space` | Play/pause (counts in first when count-in is on) |
+| `Enter` | Seek to start (playhead to 0, keeps playing state) |
 | `←` / `→` | Seek ±1s (`⌘` held: ±5s) |
 | `↑` / `↓` | Pan the pitch view up/down |
 | `⌘⇧↑` / `⌘⇧↓` | Transpose ±1 semitone |
@@ -105,6 +106,9 @@ Source of truth: `_handleKeyEvent` in `home_screen_view_controls.dart` (keep `ke
 | `\` | Reset speed to 1x |
 | `T` | Toggle tanpura drone |
 | Trackpad pinch / `Shift` + pinch | Zoom time / zoom pitch |
+
+## Count-in
+`CountInService` (Web Audio clicks scheduled on the audio clock, interval = `60 / (bpm × speed)`, first click accented) + `CountInButton` in the app bar next to the tanpura (Off/1-4 clicks, saved in `UserSettings.countInBeats`, app-wide not per song) + `CountInOverlay` (big beat number over the graph). **All play paths go through `_togglePlayback()`** (`home_screen_count_in.dart`): Space, desktop and phone play buttons, and the media-session `play` handler. Never call `_audioService.togglePlayPause()` directly from UI, or that path skips the count-in. Pressing play during a count cancels it. `handleLoadNew` cancels it too.
 
 ## Gotchas
 - **SoundTouchNode lazy init**: re-apply pitch after `ctx.resume()` or first-play transpose is ignored

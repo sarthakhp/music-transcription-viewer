@@ -40,6 +40,7 @@ class KeyboardShortcutsDialog extends StatelessWidget {
           _buildShortcutRow(context, ']', 'Speed up'),
           _buildShortcutRow(context, '\\', 'Reset speed to 1×'),
           _buildShortcutRow(context, 'T', 'Toggle tanpura drone'),
+          _buildShortcutRow(context, 'Enter', 'Back to the start'),
           _buildShortcutRow(context, '⌘⇧↑', 'Pitch up 1 semitone'),
           _buildShortcutRow(context, '⌘⇧↓', 'Pitch down 1 semitone'),
         ],

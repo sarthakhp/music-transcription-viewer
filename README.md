@@ -26,6 +26,7 @@ It runs in the browser on desktop and phone, and as a macOS app (DMG) that bundl
 - **Key transpose**: shift audio and graph up or down by up to 12 semitones
 - **Tuning**: adjustable reference pitch (A4, 400 to 480 Hz)
 - **Tanpura drone**: a looping G-scale tanpura whose pitch follows the selected root note
+- **Count-in**: choose 1 to 4 metronome clicks before playback starts, at the song's tempo and current speed, so you can come in together while practicing
 - **Seek tools**: seek bar, jump to start, and 1s or 5s skips
 - **Lock screen and media keys**: title, icon, and play, pause, seek controls in the phone notification, lock screen, and keyboard media keys
 - **Download**: export the original, vocals, or instrumental stem as MP3, right in the browser
@@ -72,7 +73,7 @@ It runs in the browser on desktop and phone, and as a macOS app (DMG) that bundl
 | `⌘⇧↑` / `⌘⇧↓` | Transpose up / down 1 semitone |
 | `+` / `-` | Zoom pitch (vertical) in / out |
 | `⇧+` / `⇧-` | Zoom time (horizontal) in / out |
-| `0` | Seek to start |
+| `0` or `Enter` | Seek to start |
 | `1` to `9` | Seek to 10% to 90% of the track |
 | `A` | Toggle auto-scroll |
 | `[` / `]` | Slow down / speed up one preset |
