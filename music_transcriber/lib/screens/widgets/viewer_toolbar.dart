@@ -1,3 +1,4 @@
+import 'bpm_control.dart';
 import 'package:flutter/material.dart';
 import '../../providers/app_state.dart';
 import '../../services/audio_service.dart';
@@ -24,6 +25,7 @@ class ViewerToolbar extends StatelessWidget {
   /// Phone only: lay the controls out as a bare, non-scrolling row to embed
   /// in another bar (landscape puts them in the app bar).
   final bool inline;
+  final ValueChanged<double?> onBpmChanged;
 
   // Layer visibility
   final bool showVocals;
@@ -58,6 +60,7 @@ class ViewerToolbar extends StatelessWidget {
     required this.onTrackChanged,
     this.isNarrow = false,
     this.isPhone = false,
+    required this.onBpmChanged,
     this.inline = false,
     this.showVocals = true,
     this.showBass = true,
@@ -162,9 +165,14 @@ class ViewerToolbar extends StatelessWidget {
             children: [
               if (appState.pitchData != null)
                 stat(Icons.timer_outlined, appState.pitchData!.durationFormatted),
-              if (appState.pitchData?.metadata.bpm != null)
-                stat(Icons.speed_rounded,
-                    '${appState.pitchData!.metadata.bpm!.toStringAsFixed(0)} BPM'),
+              if (appState.pitchData != null)
+                BpmStat(
+                  bpm: appState.effectiveBpm,
+                  detectedBpm: appState.detectedBpm,
+                  onChanged: onBpmChanged,
+                  color: muted,
+                  style: theme.textTheme.bodySmall,
+                ),
               if (appState.chordData != null && appState.hasAccompanimentAnalysis)
                 stat(Icons.music_note_rounded, '${appState.chordData!.uniqueChordsCount} chords'),
               if (appState.instrumentData != null && appState.hasAccompanimentAnalysis)

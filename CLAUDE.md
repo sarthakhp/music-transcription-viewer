@@ -107,6 +107,11 @@ Source of truth: `_handleKeyEvent` in `home_screen_view_controls.dart` (keep `ke
 | `T` | Toggle tanpura drone |
 | Trackpad pinch / `Shift` + pinch | Zoom time / zoom pitch |
 
+## Cycle, tempo and GarageBand-style keys
+- **Cycle (loop)**: `CycleState` (`models/cycle_state.dart`) holds the region; `CycleBar` (`widgets/graph_renderers/cycle_renderer.dart`) draws it in the strip above the plot (top inset) and tints the plot. `PitchGraph` owns the drag gestures (drag empty strip = new region, drag edges = resize, drag body = move, click body = on/off); strip pointers never pan or seek. Looping happens in the playhead ticker (`home_screen_cycle.dart`): it wraps only when the previous tick was inside the region, and `_seekTo` resets `_lastTickPosition` so a seek never looks like crossing the end. Starting playback outside an active region jumps to its start. Region + on/off persist and sync in `JobSettings` (`cycleEnabled/Start/End`).
+- **Editable BPM**: detection is often half/double, so the BPM stat opens a dialog (type, ½×, 2×, tap tempo, use detected). The override lives in `AppState.bpmOverride` (`effectiveBpm` = override ?? detected), is saved in `JobSettings.bpmOverride` (0 = none) and drives the count-in.
+- Keys: `C` cycle, `I`/`O` set cycle start/end at playhead, `K` count-in on/off (remembers last click count).
+
 ## Count-in
 `CountInService` (Web Audio clicks scheduled on the audio clock, interval = `60 / (bpm × speed)`, first click accented) + `CountInButton` in the app bar next to the tanpura (Off/1-4 clicks, saved in `UserSettings.countInBeats`, app-wide not per song) + `CountInOverlay` (big beat number over the graph). **All play paths go through `_togglePlayback()`** (`home_screen_count_in.dart`): Space, desktop and phone play buttons, and the media-session `play` handler. Never call `_audioService.togglePlayPause()` directly from UI, or that path skips the count-in. Pressing play during a count cancels it. `handleLoadNew` cancels it too.
 

@@ -29,6 +29,14 @@ class JobSettings {
   final int? vocalDetail;
   final double? referenceFrequency;
 
+  /// Tempo set by the user, replacing the detected one. 0 means "use detected".
+  final double bpmOverride;
+
+  /// Cycle (loop) region. Counts as set only when [cycleEnd] > [cycleStart].
+  final bool cycleEnabled;
+  final double cycleStart;
+  final double cycleEnd;
+
   /// Which audio track was selected: 'original', 'vocal' or 'instrumental'.
   final String? track;
 
@@ -55,6 +63,10 @@ class JobSettings {
     this.vocalDetail,
     this.referenceFrequency,
     this.track,
+    this.bpmOverride = 0,
+    this.cycleEnabled = false,
+    this.cycleStart = 0,
+    this.cycleEnd = 0,
     this.updatedAtMs = 0,
   });
 
@@ -79,6 +91,10 @@ class JobSettings {
       vocalDetail: (json['vocalDetail'] as num?)?.toInt(),
       referenceFrequency: (json['referenceFrequency'] as num?)?.toDouble(),
       track: json['track'] as String?,
+      bpmOverride: (json['bpmOverride'] as num?)?.toDouble() ?? 0,
+      cycleEnabled: json['cycleEnabled'] as bool? ?? false,
+      cycleStart: (json['cycleStart'] as num?)?.toDouble() ?? 0,
+      cycleEnd: (json['cycleEnd'] as num?)?.toDouble() ?? 0,
       updatedAtMs: (json['updatedAtMs'] as num?)?.toInt() ?? 0,
     );
   }
@@ -104,6 +120,10 @@ class JobSettings {
       if (vocalDetail != null) 'vocalDetail': vocalDetail,
       if (referenceFrequency != null) 'referenceFrequency': referenceFrequency,
       if (track != null) 'track': track,
+      'bpmOverride': bpmOverride,
+      'cycleEnabled': cycleEnabled,
+      'cycleStart': cycleStart,
+      'cycleEnd': cycleEnd,
       'updatedAtMs': updatedAtMs,
     };
   }
@@ -129,6 +149,10 @@ class JobSettings {
     int? vocalDetail,
     double? referenceFrequency,
     String? track,
+    double? bpmOverride,
+    bool? cycleEnabled,
+    double? cycleStart,
+    double? cycleEnd,
     int? updatedAtMs,
   }) {
     return JobSettings(
@@ -150,6 +174,10 @@ class JobSettings {
       vocalDetail: vocalDetail ?? this.vocalDetail,
       referenceFrequency: referenceFrequency ?? this.referenceFrequency,
       track: track ?? this.track,
+      bpmOverride: bpmOverride ?? this.bpmOverride,
+      cycleEnabled: cycleEnabled ?? this.cycleEnabled,
+      cycleStart: cycleStart ?? this.cycleStart,
+      cycleEnd: cycleEnd ?? this.cycleEnd,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }

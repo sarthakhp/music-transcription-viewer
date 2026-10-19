@@ -42,5 +42,12 @@ if [ -n "$BACKEND_REPO" ] && [ -d "$BACKEND_REPO/api" ]; then
     "$BACKEND_REPO/api/" "$LAUNCHPAD_RESOURCES/backend/api/"
 fi
 
+# Pipeline code (tempo detection etc.) lives in src/ and is bundled too.
+if [ -n "$BACKEND_REPO" ] && [ -d "$BACKEND_REPO/src" ] && [ -d "$LAUNCHPAD_RESOURCES/backend/src" ]; then
+  echo "Deploying backend src/..."
+  rsync -a --exclude '__pycache__' --exclude '*.pyc' \
+    "$BACKEND_REPO/src/" "$LAUNCHPAD_RESOURCES/backend/src/"
+fi
+
 echo ""
 echo "Done. Restart MusicTranscriber.app to see the changes."

@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../services/audio_service.dart';
 import '../services/audio_stems.dart';
 import '../services/transcription_api_service.dart';
+import '../models/cycle_state.dart';
 import '../services/count_in_service.dart';
 import '../services/settings_sync_service.dart';
 import '../services/upload_service.dart';
@@ -36,6 +37,7 @@ import 'widgets/upload_layout.dart';
 import 'widgets/phone_viewer_app_bar.dart';
 import 'widgets/viewer_toolbar.dart';
 import 'widgets/count_in_control.dart';
+import 'widgets/cycle_button.dart';
 import 'widgets/tanpura_control.dart';
 import '../services/tanpura_service.dart';
 import '../services/media_session/media_session.dart';
@@ -43,6 +45,7 @@ import 'package:go_router/go_router.dart';
 
 part 'home_screen_audio.dart';
 part 'home_screen_count_in.dart';
+part 'home_screen_cycle.dart';
 part 'home_screen_jobs.dart';
 part 'home_screen_view_controls.dart';
 
@@ -74,6 +77,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Tanpura drone synthesizer
   final TanpuraService _tanpura = TanpuraService();
   final CountInService _countIn = CountInService();
+  final CycleState _cycle = CycleState();
+  int _lastCountInBeats = 4;
+  double _lastTickPosition = 0; // for detecting the playhead reaching the cycle end
 
   // Download export state
   bool _isExporting = false;
@@ -157,6 +163,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Listen to ViewState changes to auto-save zoom/pan
     _viewState.addListener(_onViewStateChanged);
+    _cycle.addListener(_debouncedSaveJobSettings);
 
     PerformanceMonitor.instance.start();
 
@@ -271,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _audioService.dispose();
     _tanpura.dispose();
     _countIn.dispose();
+    _cycle.dispose();
 
     PerformanceMonitor.instance.stop();
     _pollingService.dispose();
@@ -311,6 +319,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           vocalDetail: _vocalDetail,
           referenceFrequency: context.read<AppState>().referenceFrequency,
           track: _currentTrack.name,
+          bpmOverride: context.read<AppState>().bpmOverride ?? 0,
+          cycleEnabled: _cycle.enabled,
+          cycleStart: _cycle.start,
+          cycleEnd: _cycle.end,
         );
   }
 
@@ -378,6 +390,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _playingSubscription?.cancel();
           _processingStateSubscription?.cancel();
           _countIn.cancel();
+          _cycle.clear();
           _saveSettingsTimer?.cancel();
           _saveCurrentJobSettings();
           _settingsSync.flush();
@@ -406,6 +419,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       tanpuraButton: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          CycleButton(cycle: _cycle, onPressed: _toggleCycle),
                           CountInButton(countIn: _countIn, onBeatsChanged: _setCountInBeats),
                           TanpuraButton(
                             tanpura: _tanpura,
@@ -413,6 +427,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ],
                       ),
+                      onBpmChanged: _setBpm,
                       onBack: handleLoadNew,
                       onRename: (newName) {
                         appState.renameAudioFile(newName);
@@ -466,6 +481,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       tooltip: themeProvider.themeModeTooltip,
                     ),
                   ),
+                  if (shell.isReady) CycleButton(cycle: _cycle, onPressed: _toggleCycle),
                   if (shell.isReady)
                     CountInButton(countIn: _countIn, onBeatsChanged: _setCountInBeats),
                   if (shell.isReady)
@@ -599,6 +615,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _userSettings.saveVocalDetail(v);
             _debouncedSaveJobSettings();
           },
+          onBpmChanged: _setBpm,
           currentJobId: _currentJobId,
           onJobRenamed: (jobId, newName) async {
             await _apiService.renameJob(jobId, newName);
@@ -682,6 +699,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         onZoom: _handleZoom,
                         onYPan: _handleYPan,
                         onPan: _handlePan,
+                        cycle: _cycle,
                       );
                     },
                   ),

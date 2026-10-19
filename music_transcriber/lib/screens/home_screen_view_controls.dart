@@ -99,6 +99,7 @@ extension _HomeScreenViewControls on _HomeScreenState {
 
   void _seekTo(double time) {
     PerformanceMonitor.instance.reportAction(UserAction.seek);
+    _lastTickPosition = time;
     _audioService.seekToSeconds(time);
     _syncMediaSession(position: time);
 
@@ -266,6 +267,28 @@ extension _HomeScreenViewControls on _HomeScreenState {
     if (event.logicalKey == LogicalKeyboardKey.backslash) {
       _setSpeed(1.0);
       return KeyEventResult.handled;
+    }
+
+    // C: cycle on/off. K: count-in on/off. I / O: cycle start / end at playhead.
+    final plainKey = !HardwareKeyboard.instance.isMetaPressed &&
+        !HardwareKeyboard.instance.isControlPressed;
+    if (plainKey && event is KeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.keyC) {
+        _toggleCycle();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyK) {
+        _toggleCountIn();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyI) {
+        _setCycleEdge(start: true);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyO) {
+        _setCycleEdge(start: false);
+        return KeyEventResult.handled;
+      }
     }
 
     if (event.logicalKey == LogicalKeyboardKey.keyT) {

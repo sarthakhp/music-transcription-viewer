@@ -231,6 +231,12 @@ extension _HomeScreenJobs on _HomeScreenState {
       settings.referenceFrequency ?? _userSettings.referenceFrequency,
     );
     _tanpura.setSemitones(settings.scaleRoot);
+    appState.setBpmOverride(settings.bpmOverride > 0 ? settings.bpmOverride : null);
+    _cycle.restore(
+      enabled: settings.cycleEnabled,
+      start: settings.cycleStart,
+      end: settings.cycleEnd,
+    );
 
     // Apply to view state
     _viewState.applyViewSettings(settings);

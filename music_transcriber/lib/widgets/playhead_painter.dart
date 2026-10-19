@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/view_state.dart';
 import 'graph_constants.dart';
 import 'graph_renderers/playhead_renderer.dart';
+import '../models/cycle_state.dart';
+import 'graph_renderers/cycle_renderer.dart';
 import 'pitch_graph.dart'; // for ActiveNotesHolder
 
 /// Painter for just the playhead (dynamic layer that repaints frequently).
@@ -24,6 +26,7 @@ class PlayheadPainter extends CustomPainter {
   final int scaleRoot;
   final ActiveNotesHolder? activeNotesHolder;
   final GraphInsets insets;
+  final CycleState? cycle;
 
   PlayheadPainter({
     required this.viewState,
@@ -41,11 +44,16 @@ class PlayheadPainter extends CustomPainter {
     this.scaleRoot = 0,
     this.activeNotesHolder,
     this.insets = GraphInsets.regular,
-  }) : super(repaint: viewState);
+    this.cycle,
+  }) : super(repaint: Listenable.merge([viewState, cycle]));
 
   @override
   void paint(Canvas canvas, Size size) {
     final graphRect = insets.rectFor(size);
+
+    if (cycle != null) {
+      CycleBar(cycle: cycle!, viewState: viewState, insets: insets, size: size).paint(canvas);
+    }
 
     final playheadRenderer = PlayheadRenderer(
       currentTime: currentTime,

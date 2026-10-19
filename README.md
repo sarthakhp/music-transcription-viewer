@@ -74,6 +74,9 @@ It runs in the browser on desktop and phone, and as a macOS app (DMG) that bundl
 | `+` / `-` | Zoom pitch (vertical) in / out |
 | `⇧+` / `⇧-` | Zoom time (horizontal) in / out |
 | `0` or `Enter` | Seek to start |
+| `C` | Cycle (loop) on / off; drag the yellow bar above the graph to set the region |
+| `I` / `O` | Set cycle start / end at the playhead |
+| `K` | Count-in on / off |
 | `1` to `9` | Seek to 10% to 90% of the track |
 | `A` | Toggle auto-scroll |
 | `[` / `]` | Slow down / speed up one preset |

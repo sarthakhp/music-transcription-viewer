@@ -1,3 +1,4 @@
+import 'bpm_control.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,7 @@ class PhoneViewerAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Future<void> Function(String stemLabel, Uint8List bytes) onDownload;
   final VoidCallback onThemeToggle;
   final bool compactHeight;
+  final ValueChanged<double?> onBpmChanged;
 
   /// Extra controls shown before the tanpura button (landscape layer chips).
   final Widget? inlineControls;
@@ -34,6 +36,7 @@ class PhoneViewerAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.exportProgress,
     required this.onDownload,
     required this.onThemeToggle,
+    required this.onBpmChanged,
     this.compactHeight = false,
     this.inlineControls,
   });
@@ -44,8 +47,6 @@ class PhoneViewerAppBar extends StatelessWidget implements PreferredSizeWidget {
   String get _stats {
     final parts = <String>[
       if (appState.pitchData != null) appState.pitchData!.durationFormatted,
-      if (appState.pitchData?.metadata.bpm != null)
-        '${appState.pitchData!.metadata.bpm!.round()} BPM',
       if (appState.chordData != null && appState.hasAccompanimentAnalysis) '${appState.chordData!.uniqueChordsCount} chords',
     ];
     return parts.join('  ·  ');
@@ -92,14 +93,28 @@ class PhoneViewerAppBar extends StatelessWidget implements PreferredSizeWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-              if (!compactHeight && _stats.isNotEmpty)
-                Text(
-                  _stats,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+              if (!compactHeight)
+                Row(
+                  children: [
+                    BpmStat(
+                      bpm: appState.effectiveBpm,
+                      detectedBpm: appState.detectedBpm,
+                      onChanged: onBpmChanged,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      style: theme.textTheme.labelSmall,
+                    ),
+                    if (_stats.isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          '  ·  $_stats',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
             ],
           ),

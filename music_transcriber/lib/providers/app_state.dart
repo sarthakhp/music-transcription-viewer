@@ -28,6 +28,7 @@ class AppState extends ChangeNotifier {
   double _duration = 0;
 
   // Display state
+  double? _bpmOverride;
   double _referenceFrequency = 440.0; // A4 reference frequency in Hz
 
   // Job state (NEW)
@@ -81,6 +82,22 @@ class AppState extends ChangeNotifier {
 
   // Getters - Display
   double get referenceFrequency => _referenceFrequency;
+
+  /// Tempo typed or tapped in by the user for this song, if any.
+  double? get bpmOverride => _bpmOverride;
+
+  /// The detected tempo, which detection can get wrong (often by half/double).
+  double? get detectedBpm => _pitchData?.metadata.bpm;
+
+  /// The tempo everything should use: the user's value when set, else detected.
+  double? get effectiveBpm => _bpmOverride ?? detectedBpm;
+
+  void setBpmOverride(double? bpm) {
+    final value = bpm == null ? null : bpm.clamp(20.0, 400.0).toDouble();
+    if (_bpmOverride == value) return;
+    _bpmOverride = value;
+    notifyListeners();
+  }
 
   // Getters - Job state (NEW)
   String? get currentJobId => _currentJobId;
@@ -313,6 +330,7 @@ class AppState extends ChangeNotifier {
 
   void reset() {
     _audioType = AudioContentType.mixed;
+    _bpmOverride = null;
     _pitchData = null;
     _chordData = null;
     _audioBytes = null;

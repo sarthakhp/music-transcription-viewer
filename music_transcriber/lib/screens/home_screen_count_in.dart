@@ -16,11 +16,13 @@ extension _HomeScreenCountIn on _HomeScreenState {
     }
     final appState = context.read<AppState>();
     if (appState.isPlaying || _countIn.beats == 0) {
+      if (!appState.isPlaying) _jumpIntoCycleIfOutside();
       await _audioService.togglePlayPause();
       return;
     }
+    _jumpIntoCycleIfOutside();
     final counted = await _countIn.run(
-      bpm: appState.pitchData?.metadata.bpm,
+      bpm: appState.effectiveBpm,
       speed: _playbackSpeed,
     );
     if (counted && mounted) await _audioService.togglePlayPause();
@@ -29,5 +31,26 @@ extension _HomeScreenCountIn on _HomeScreenState {
   void _setCountInBeats(int beats) {
     _countIn.setBeats(beats);
     _userSettings.saveCountInBeats(beats);
+    if (beats > 0) _lastCountInBeats = beats;
+  }
+
+  /// K: switch the count-in on (with the last used number of clicks) or off.
+  void _toggleCountIn() {
+    final turningOn = _countIn.beats == 0;
+    _setCountInBeats(turningOn ? _lastCountInBeats : 0);
+    _showHint(turningOn
+        ? 'Count-in: $_lastCountInBeats click${_lastCountInBeats == 1 ? '' : 's'}'
+        : 'Count-in off');
+  }
+
+  void _showHint(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        duration: const Duration(milliseconds: 1100),
+        behavior: SnackBarBehavior.floating,
+        width: 240,
+      ));
   }
 }

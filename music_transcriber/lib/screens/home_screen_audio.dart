@@ -238,7 +238,8 @@ extension _HomeScreenAudio on _HomeScreenState {
       }
       if (_waitingForBuffer) return;
 
-      final pos = _audioService.position.inMilliseconds / 1000.0;
+      var pos = _audioService.position.inMilliseconds / 1000.0;
+      pos = _loopCycleIfNeeded(pos);
       appState.setCurrentTime(pos);
       _viewState.updateViewWindowForPlayback(pos, appState.pitchData?.maxTime ?? 120);
     });

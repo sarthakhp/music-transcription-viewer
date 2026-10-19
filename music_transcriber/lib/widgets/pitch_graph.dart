@@ -1,11 +1,13 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HardwareKeyboard;
+import '../models/cycle_state.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
 import '../models/view_state.dart';
 import 'graph_constants.dart';
+import 'graph_renderers/cycle_renderer.dart';
 import 'graph_touch_gestures.dart';
 import 'pitch_graph_painter.dart';
 import 'playhead_painter.dart';
@@ -44,6 +46,9 @@ class PitchGraph extends StatefulWidget {
   final Function(double scrollDeltaY)? onYPan;
   final Function(double panDelta)? onPan;
 
+  /// The cycle region drawn above the plot and edited by dragging it.
+  final CycleState? cycle;
+
   const PitchGraph({
     super.key,
     required this.viewState,
@@ -66,6 +71,7 @@ class PitchGraph extends StatefulWidget {
     this.onZoom,
     this.onYPan,
     this.onPan,
+    this.cycle,
   });
 
   @override
@@ -79,6 +85,7 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
 
   double? _hoverTime;
   double? _hoverY;
+  double? _hoverX;
   bool _isDragging = false;
   double? _dragStartX;
   Size _size = Size.zero;
@@ -94,6 +101,90 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
   final ActiveNotesHolder _activeNotesHolder = ActiveNotesHolder();
 
   ViewState get _vs => widget.viewState;
+
+  // --- Cycle bar dragging ----------------------------------------------------
+
+  CycleHit _cycleDrag = CycleHit.none; // edge/body being dragged
+  bool _cycleCreating = false;
+  bool _cycleGesture = false; // a pointer that began in the strip is down
+  double _cycleAnchor = 0; // time where a create-drag began
+  double _cycleGrabOffset = 0; // body drag: pointer time minus region start
+  Offset _cycleDownPos = Offset.zero;
+  bool _cycleMoved = false;
+
+  CycleBar? _bar() => widget.cycle == null
+      ? null
+      : CycleBar(cycle: widget.cycle!, viewState: _vs, insets: _insets, size: _size);
+
+  /// Starts a cycle drag if [pos] is in the strip; returns whether it did.
+  bool _beginCycleGesture(Offset pos) {
+    final bar = _bar();
+    final cycle = widget.cycle;
+    if (bar == null || cycle == null || !bar.inStrip(pos)) return false;
+    final time = bar.timeOf(pos.dx).clamp(0.0, widget.data.maxTime).toDouble();
+    _cycleGesture = true;
+    _cycleMoved = false;
+    _cycleDownPos = pos;
+    _cycleDrag = bar.hit(pos);
+    _cycleCreating = _cycleDrag == CycleHit.none;
+    _cycleAnchor = time;
+    _cycleGrabOffset = time - cycle.start;
+    return true;
+  }
+
+  void _updateCycleGesture(Offset pos) {
+    final bar = _bar();
+    final cycle = widget.cycle;
+    if (!_cycleGesture || bar == null || cycle == null) return;
+    if (!_cycleMoved && (pos - _cycleDownPos).distance < 4) return;
+    _cycleMoved = true;
+    final maxTime = widget.data.maxTime;
+    final time = bar.timeOf(pos.dx).clamp(0.0, maxTime).toDouble();
+    if (_cycleCreating) {
+      cycle.setRegion(_cycleAnchor, time, maxTime: maxTime, enabled: true);
+    } else if (_cycleDrag == CycleHit.startEdge) {
+      cycle.setStart(time);
+    } else if (_cycleDrag == CycleHit.endEdge) {
+      cycle.setEnd(time, maxTime: maxTime);
+    } else if (_cycleDrag == CycleHit.body) {
+      cycle.moveTo(time - _cycleGrabOffset, maxTime: maxTime);
+    }
+  }
+
+  void _endCycleGesture() {
+    // A click on the bar (no drag) switches the cycle on or off.
+    final cycle = widget.cycle;
+    if (_cycleGesture && !_cycleMoved && cycle != null && cycle.hasRegion &&
+        _cycleDrag == CycleHit.body) {
+      cycle.setEnabled(!cycle.enabled);
+    }
+    _cycleGesture = false;
+    _cycleDrag = CycleHit.none;
+    _cycleCreating = false;
+  }
+
+  MouseCursor _cursorFor() {
+    if (_cycleGesture) {
+      if (_cycleDrag == CycleHit.startEdge || _cycleDrag == CycleHit.endEdge) {
+        return SystemMouseCursors.resizeLeftRight;
+      }
+      return SystemMouseCursors.grabbing;
+    }
+    final bar = _bar();
+    final x = _hoverX, y = _hoverY;
+    if (bar != null && x != null && y != null && bar.inStrip(Offset(x, y))) {
+      switch (bar.hit(Offset(x, y))) {
+        case CycleHit.startEdge:
+        case CycleHit.endEdge:
+          return SystemMouseCursors.resizeLeftRight;
+        case CycleHit.body:
+          return SystemMouseCursors.grab;
+        case CycleHit.none:
+          return SystemMouseCursors.precise;
+      }
+    }
+    return widget.onSeek != null ? SystemMouseCursors.click : SystemMouseCursors.basic;
+  }
 
   @override
   void dispose() {
@@ -113,6 +204,7 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
     if (widget.onSeek == null) return;
     // A tap that is really the end of a drag or pinch must not seek.
     if (_touch.suppressTap) return;
+    if (details.localPosition.dy < _insets.top) return; // cycle strip
     final x = details.localPosition.dx;
     if (x < _leftPadding || x > width - _rightPadding) return;
     widget.onSeek!(_xToTime(x, width).clamp(0, widget.data.maxTime));
@@ -128,6 +220,7 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
     }
     setState(() {
       _hoverTime = _xToTime(x, width);
+      _hoverX = x;
       _hoverY = event.localPosition.dy;
     });
   }
@@ -136,6 +229,10 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
   // stays here; trackpad pinch and wheel scrolling are PointerSignal events
   // handled in build().
   void _handlePointerDown(PointerDownEvent event, double width) {
+    final mouse = event.kind == PointerDeviceKind.mouse;
+    if ((!mouse || event.buttons == 1) && _beginCycleGesture(event.localPosition)) {
+      return; // the cycle bar owns this pointer: no pan, no seek
+    }
     _touch.onPointerDown(event);
     if (event.kind == PointerDeviceKind.mouse && event.buttons == 1) {
       _isDragging = true;
@@ -144,6 +241,10 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
   }
 
   void _handlePointerMove(PointerMoveEvent event, double width) {
+    if (_cycleGesture) {
+      _updateCycleGesture(event.localPosition);
+      return;
+    }
     _touch.onPointerMove(event);
     if (_isDragging && _dragStartX != null && widget.onPan != null) {
       final dx = event.localPosition.dx - _dragStartX!;
@@ -157,6 +258,10 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
   }
 
   void _handlePointerUp(PointerEvent event) {
+    if (_cycleGesture) {
+      _endCycleGesture();
+      return;
+    }
     _touch.onPointerUp(event);
     _isDragging = false;
     _dragStartX = null;
@@ -226,7 +331,7 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
           child: MouseRegion(
             onHover: (event) => _handleHover(event, width),
             onExit: (_) => setState(() { _hoverTime = null; _hoverY = null; }),
-            cursor: widget.onSeek != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+            cursor: _cursorFor(),
             child: GestureDetector(
               onTapUp: (details) => _handleTap(details, width),
               child: Container(
@@ -278,6 +383,7 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
                     scaleRoot: widget.scaleRoot,
                     activeNotesHolder: _activeNotesHolder,
                     insets: _insets,
+                    cycle: widget.cycle,
                   ),
                 ),
               ),
