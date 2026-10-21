@@ -365,6 +365,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The route keeps this State alive across /jobs/:id changes (see
+    // router.dart), so browser back/forward arrives here instead of initState.
+    final id = widget.initialJobId;
+    if (id == oldWidget.initialJobId || id == _currentJobId) return;
+    final appState = context.read<AppState>();
+    if (id == null) {
+      if (appState.isReady) _resetViewer(goHome: false);
+    } else {
+      if (appState.isReady) _resetViewer(goHome: false);
+      _onJobSelected(id);
+    }
+  }
+
+  /// Tear the open song down and return to the library. [goHome] also
+  /// updates the URL; browser back sets it already, so it passes false.
+  void _resetViewer({required bool goHome}) {
+    _stopPlayheadAnimation();
+    _mediaSession.detach();
+    _audioService.stop();
+    _audioLoaded = false;
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _playingSubscription?.cancel();
+    _processingStateSubscription?.cancel();
+    _countIn.cancel();
+    _cycle.clear();
+    _saveSettingsTimer?.cancel();
+    _saveCurrentJobSettings();
+    _settingsSync.flush();
+    _lastSavedSettings = null;
+    _viewState.resetZoom();
+    context.read<AppState>().reset();
+    _currentJobId = null;
+
+    if (goHome) context.go('/');
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -380,26 +420,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final layout = ViewerLayout.of(context);
         final isPhoneViewer = shell.isReady && layout.isPhone;
 
-        void handleLoadNew() {
-          _stopPlayheadAnimation();
-          _mediaSession.detach();
-          _audioService.stop();
-          _audioLoaded = false;
-          _positionSubscription?.cancel();
-          _durationSubscription?.cancel();
-          _playingSubscription?.cancel();
-          _processingStateSubscription?.cancel();
-          _countIn.cancel();
-          _cycle.clear();
-          _saveSettingsTimer?.cancel();
-          _saveCurrentJobSettings();
-          _settingsSync.flush();
-          _lastSavedSettings = null;
-          _viewState.resetZoom();
-          appState.reset();
-          _currentJobId = null;
-          context.go('/');
-        }
+        void handleLoadNew() => _resetViewer(goHome: true);
 
         return Focus(
           focusNode: _focusNode,
