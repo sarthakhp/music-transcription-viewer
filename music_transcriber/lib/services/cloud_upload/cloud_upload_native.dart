@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -76,18 +76,20 @@ class CloudUpload {
         .putString(entry, metadata: SettableMetadata(contentType: 'application/json'));
   }
 
-  /// Uploads [bytes] and queues them. Returns the request id to poll.
+  /// Streams the file at [path] to storage and queues it, optionally cut to
+  /// [trimStart]..[trimEnd] seconds by the worker. Returns the request id.
   Future<String> submit({
-    required Uint8List bytes,
+    required String path,
     required String fileName,
     required AudioContentType audioType,
+    double? trimStart,
+    double? trimEnd,
     void Function(double fraction)? onProgress,
   }) async {
     await _init();
     final id = _newRequestId();
-    final storage = FirebaseStorage.instance;
 
-    final task = storage.ref('uploads/$id/$fileName').putData(bytes);
+    final task = FirebaseStorage.instance.ref('uploads/$id/$fileName').putFile(File(path));
     task.snapshotEvents.listen((s) {
       if (s.totalBytes > 0) onProgress?.call(s.bytesTransferred / s.totalBytes);
     });
@@ -97,6 +99,8 @@ class CloudUpload {
       'id': id,
       'filename': fileName,
       'audio_type': audioType.apiValue,
+      if (trimStart != null) 'trim_start': trimStart,
+      if (trimEnd != null) 'trim_end': trimEnd,
     });
     return id;
   }

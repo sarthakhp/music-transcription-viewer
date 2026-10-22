@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../models/audio_content_type.dart';
 import '../../../services/cloud_upload/cloud_upload.dart';
-import '../../../services/phone_recording.dart';
-import '../../../services/system_audio_recorder.dart';
-import '../../../utils/web_file_picker.dart';
+import '../../../services/phone_audio/audio_draft.dart';
+import '../../../services/phone_audio/phone_file_picker.dart';
+import '../../../services/phone_audio/phone_recording.dart';
+import '../../../services/phone_audio/system_audio_recorder.dart';
 import 'account_bar.dart';
+import 'clip_review.dart';
 import 'record_controls.dart';
 import 'submission_list.dart';
 import 'submission_tracker.dart';
@@ -27,13 +29,13 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   final _cloud = CloudUpload();
   late final SubmissionTracker _tracker;
   final PhoneRecording _recording = PhoneRecording();
+  final AudioDraft _draft = AudioDraft();
   final TextEditingController _url = TextEditingController();
 
   String? _email;
   _Source _source = _Source.file;
   RecordSource _recordSource = RecordSource.microphone;
   AudioContentType _audioType = AudioContentType.mixed;
-  WebFilePickerResult? _picked;
   bool _phoneAudioSupported = false;
   bool _busy = false;
   double? _uploadFraction;
@@ -46,6 +48,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     _tracker = SubmissionTracker(_cloud, onJobFinished: widget.onLibraryChanged)
       ..addListener(_rebuild);
     _recording.addListener(_rebuild);
+    _draft.addListener(_rebuild);
     _url.addListener(_rebuild);
     SystemAudioRecorder.isSupported().then((v) {
       if (mounted) setState(() => _phoneAudioSupported = v);
@@ -57,6 +60,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   void dispose() {
     _tracker.dispose();
     _recording.dispose();
+    _draft.dispose();
     _url.dispose();
     super.dispose();
   }
@@ -90,25 +94,21 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   // --- Sources ---------------------------------------------------------------
 
   Future<void> _pickFile() async {
-    final picked = await pickFileWeb(hint: 'audio');
-    if (picked != null && mounted) setState(() => _picked = picked);
+    final picked = await pickAudioFile();
+    if (picked == null || !mounted) return;
+    setState(() => _error = null);
+    if (!await _draft.replaceWith(picked) && mounted) {
+      setState(() => _error = 'That file could not be read as audio.');
+    }
   }
 
   Future<void> _toggleRecording() async {
-    if (_recording.isRecording) {
-      final done = await _recording.stop();
-      if (!mounted) return;
-      setState(() {
-        _picked = done?.file;
-        _warning = done?.warning;
-        if (done == null) _error = 'Nothing was recorded.';
-      });
-      return;
-    }
+    if (_recording.isRecording) return _finishRecording();
+    // A new take replaces the previous one: delete it before recording starts.
+    await _draft.clear();
     setState(() {
       _error = null;
       _warning = null;
-      _picked = null;
     });
     final started = await _recording.start(_recordSource);
     if (!started && mounted) {
@@ -116,26 +116,42 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     }
   }
 
+  Future<void> _finishRecording() async {
+    final done = await _recording.stop();
+    if (!mounted) return;
+    if (done == null) {
+      setState(() => _error = 'Nothing was recorded.');
+      return;
+    }
+    setState(() => _warning = done.warning);
+    if (!await _draft.replaceWith(done.audio) && mounted) {
+      setState(() => _error = 'The recording could not be read.');
+    }
+  }
+
   // --- Submitting ------------------------------------------------------------
 
   bool get _canSubmit {
     if (_busy || _recording.isRecording) return false;
-    return _source == _Source.link ? _url.text.trim().isNotEmpty : _picked != null;
+    return _source == _Source.link ? _url.text.trim().isNotEmpty : _draft.hasAudio && _draft.duration > 0;
   }
 
   Future<void> _submitSelected() =>
       _source == _Source.link ? _submitLink() : _submitFile();
 
   Future<void> _submitFile() async {
-    final picked = _picked;
-    if (picked == null) return;
-    await _submit(picked.name, () => _cloud.submit(
-          bytes: picked.bytes,
-          fileName: picked.name,
+    final audio = _draft.audio;
+    if (audio == null) return;
+    final trimmed = _draft.isTrimmed;
+    await _submit(audio.name, () => _cloud.submit(
+          path: audio.path,
+          fileName: audio.name,
           audioType: _audioType,
+          trimStart: trimmed ? _draft.trimStart : null,
+          trimEnd: trimmed ? _draft.trimEnd : null,
           onProgress: (f) => setState(() => _uploadFraction = f),
         ));
-    if (mounted) setState(() => _picked = null);
+    await _draft.clear(); // uploaded: drop the local copy
   }
 
   Future<void> _submitLink() async {
@@ -247,20 +263,32 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   Widget _sourceBody() {
     switch (_source) {
       case _Source.file:
-        return OutlinedButton.icon(
-          onPressed: _busy ? null : _pickFile,
-          icon: const Icon(Icons.folder_open_rounded),
-          label: Text(_picked?.name ?? 'Choose an audio file', overflow: TextOverflow.ellipsis),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _pickFile,
+              icon: const Icon(Icons.folder_open_rounded),
+              label: Text(_draft.hasAudio ? 'Choose a different file' : 'Choose an audio file'),
+            ),
+            _review(),
+          ],
         );
       case _Source.record:
-        return RecordControls(
-          recording: _recording,
-          source: _recordSource,
-          phoneAudioSupported: _phoneAudioSupported,
-          enabled: !_busy,
-          recordedName: _picked?.name,
-          onSourceChanged: (s) => setState(() => _recordSource = s),
-          onToggle: _toggleRecording,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RecordControls(
+              recording: _recording,
+              source: _recordSource,
+              phoneAudioSupported: _phoneAudioSupported,
+              enabled: !_busy,
+              hasTake: _draft.hasAudio,
+              onSourceChanged: (s) => setState(() => _recordSource = s),
+              onToggle: _toggleRecording,
+            ),
+            _review(),
+          ],
         );
       case _Source.link:
         return TextField(
@@ -273,6 +301,15 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
           ),
         );
     }
+  }
+
+  /// The clip under review, with spacing only when there is one to show.
+  Widget _review() {
+    if (!_draft.hasAudio || _recording.isRecording) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: ClipReview(draft: _draft),
+    );
   }
 
   Widget _typeChips() => Wrap(

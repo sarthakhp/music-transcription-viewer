@@ -1,24 +1,26 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'audio_recorder_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'selected_audio.dart';
 import 'system_audio_recorder.dart';
-import '../utils/web_file_picker.dart';
 
 enum RecordSource { microphone, phoneAudio }
 
-/// A finished recording, ready to upload like a picked file.
+/// A finished recording, as a temp file ready for review and upload.
 class FinishedRecording {
-  final WebFilePickerResult file;
+  final SelectedAudio audio;
 
   /// Set when the recording came out silent, e.g. the playing app blocks capture.
   final String? warning;
-  const FinishedRecording(this.file, {this.warning});
+  const FinishedRecording(this.audio, {this.warning});
 }
 
 /// Drives one recording at a time from either the microphone or the audio
-/// other apps are playing, and exposes elapsed time for the UI.
+/// other apps are playing, and exposes elapsed time for the UI. Recordings go
+/// straight to a file, never into memory.
 class PhoneRecording extends ChangeNotifier {
-  final AudioRecorderService _mic = AudioRecorderService();
+  final AudioRecorder _mic = AudioRecorder();
   final SystemAudioRecorder _system = SystemAudioRecorder();
   Timer? _ticker;
   RecordSource? _active;
@@ -29,9 +31,7 @@ class PhoneRecording extends ChangeNotifier {
 
   /// False if the user declined a permission prompt.
   Future<bool> start(RecordSource source) async {
-    final ok = source == RecordSource.microphone
-        ? await _startMic()
-        : await _system.start();
+    final ok = source == RecordSource.microphone ? await _startMic() : await _system.start();
     if (!ok) return false;
     _active = source;
     _elapsed = Duration.zero;
@@ -44,12 +44,21 @@ class PhoneRecording extends ChangeNotifier {
   }
 
   Future<bool> _startMic() async {
-    try {
-      await _mic.start();
-      return true;
-    } catch (_) {
-      return false;
-    }
+    if (!await _mic.hasPermission()) return false;
+    final dir = await getTemporaryDirectory();
+    // Voice processing off, so music and instruments aren't filtered out.
+    await _mic.start(
+      const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 44100,
+        numChannels: 1,
+        autoGain: false,
+        echoCancel: false,
+        noiseSuppress: false,
+      ),
+      path: '${dir.path}/mic_${DateTime.now().millisecondsSinceEpoch}.wav',
+    );
+    return true;
   }
 
   Future<FinishedRecording?> stop() async {
@@ -61,14 +70,14 @@ class PhoneRecording extends ChangeNotifier {
 
     final stamp = DateTime.now().toString().substring(0, 16).replaceAll(':', '.');
     if (source == RecordSource.microphone) {
-      final bytes = await _mic.stop();
-      if (bytes.isEmpty) return null;
-      return FinishedRecording(WebFilePickerResult(bytes, 'Recording $stamp.wav'));
+      final path = await _mic.stop();
+      if (path == null) return null;
+      return FinishedRecording(SelectedAudio(path: path, name: 'Recording $stamp.wav'));
     }
     final result = await _system.stop();
-    if (result == null || result.wavBytes.length < 1000) return null;
+    if (result == null) return null;
     return FinishedRecording(
-      WebFilePickerResult(result.wavBytes, 'Phone audio $stamp.wav'),
+      SelectedAudio(path: result.path, name: 'Phone audio $stamp.wav'),
       warning: result.looksSilent
           ? 'Nothing was captured. The app you played from may block '
               'recording its audio (some music and video apps do).'
@@ -80,6 +89,7 @@ class PhoneRecording extends ChangeNotifier {
   void dispose() {
     _ticker?.cancel();
     if (_active == RecordSource.microphone) _mic.cancel();
+    _mic.dispose();
     super.dispose();
   }
 }

@@ -1,14 +1,13 @@
-import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 
-/// Result of recording what other apps played.
+/// A finished recording of other apps' audio, left on disk at [path].
 class SystemAudioResult {
-  final Uint8List wavBytes;
+  final String path;
 
   /// Loudest sample (0 to 32767). Near 0 means the playing app blocks capture.
   final int peak;
-  const SystemAudioResult(this.wavBytes, this.peak);
+  const SystemAudioResult(this.path, this.peak);
   bool get looksSilent => peak < 200;
 }
 
@@ -39,9 +38,6 @@ class SystemAudioRecorder {
     final result = await _channel.invokeMapMethod<String, dynamic>('stop');
     final path = result?['path'] as String?;
     if (path == null) return null;
-    final file = File(path);
-    final bytes = await file.readAsBytes();
-    await file.delete();
-    return SystemAudioResult(bytes, (result?['peak'] as int?) ?? 0);
+    return SystemAudioResult(path, (result?['peak'] as int?) ?? 0);
   }
 }

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import '../../models/audio_content_type.dart';
 import 'queue_status.dart';
 
@@ -10,9 +9,11 @@ class CloudUpload {
   Future<String> signIn() => throw UnsupportedError('Upload is Android only');
   Future<void> signOut() async {}
   Future<String> submit({
-    required Uint8List bytes,
+    required String path,
     required String fileName,
     required AudioContentType audioType,
+    double? trimStart,
+    double? trimEnd,
     void Function(double fraction)? onProgress,
   }) =>
       throw UnsupportedError('Upload is Android only');

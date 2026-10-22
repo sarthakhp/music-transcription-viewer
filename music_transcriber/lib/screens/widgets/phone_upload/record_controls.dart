@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../../services/phone_recording.dart';
+import '../../../services/phone_audio/phone_recording.dart';
 
-/// Source choice, record/stop button and status line for the Record tab.
+/// Source choice, hint and record/stop button for the Record tab. The hint
+/// area has a fixed height so the button never moves when the source changes.
 class RecordControls extends StatelessWidget {
+  static const _hintHeight = 44.0;
+
   final PhoneRecording recording;
   final RecordSource source;
   final bool phoneAudioSupported;
   final bool enabled;
-  final String? recordedName;
+  final bool hasTake;
   final ValueChanged<RecordSource> onSourceChanged;
   final VoidCallback onToggle;
 
@@ -17,7 +20,7 @@ class RecordControls extends StatelessWidget {
     required this.source,
     required this.phoneAudioSupported,
     required this.enabled,
-    required this.recordedName,
+    required this.hasTake,
     required this.onSourceChanged,
     required this.onToggle,
   });
@@ -30,16 +33,13 @@ class RecordControls extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (phoneAudioSupported) _sourceChips(isRecording),
-        if (source == RecordSource.phoneAudio && !isRecording)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Records whatever another app plays. Start here, switch to '
-              'that app and press play.',
-              style: theme.textTheme.bodySmall,
-            ),
+        SizedBox(
+          height: _hintHeight,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(_hint(isRecording), style: theme.textTheme.bodySmall),
           ),
-        const SizedBox(height: 8),
+        ),
         FilledButton.tonalIcon(
           onPressed: enabled ? onToggle : null,
           icon: Icon(
@@ -48,11 +48,6 @@ class RecordControls extends StatelessWidget {
           ),
           label: Text(_buttonLabel(isRecording)),
         ),
-        if (recordedName != null && !isRecording)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text('Recorded: $recordedName', style: theme.textTheme.bodySmall),
-          ),
       ],
     );
   }
@@ -61,25 +56,38 @@ class RecordControls extends StatelessWidget {
     return Wrap(
       spacing: 8,
       children: [
-        ChoiceChip(
-          avatar: const Icon(Icons.mic_rounded, size: 18),
-          label: const Text('Microphone'),
-          selected: source == RecordSource.microphone,
-          onSelected: locked ? null : (_) => onSourceChanged(RecordSource.microphone),
-        ),
-        ChoiceChip(
-          avatar: const Icon(Icons.phone_android_rounded, size: 18),
-          label: const Text('Phone audio'),
-          selected: source == RecordSource.phoneAudio,
-          onSelected: locked ? null : (_) => onSourceChanged(RecordSource.phoneAudio),
-        ),
+        _chip(Icons.mic_rounded, 'Microphone', RecordSource.microphone, locked),
+        _chip(Icons.phone_android_rounded, 'Phone audio', RecordSource.phoneAudio, locked),
       ],
     );
   }
 
+  Widget _chip(IconData icon, String label, RecordSource value, bool locked) {
+    final selected = source == value;
+    return ChoiceChip(
+      // The icon already carries the label; a tick would overlap it.
+      showCheckmark: false,
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      selected: selected,
+      onSelected: locked ? null : (_) => onSourceChanged(value),
+    );
+  }
+
+  String _hint(bool isRecording) {
+    if (isRecording) {
+      return source == RecordSource.phoneAudio
+          ? 'Recording phone audio. Switch to the other app and play.'
+          : 'Recording from the microphone.';
+    }
+    return source == RecordSource.phoneAudio
+        ? 'Records whatever another app plays. Start here, switch to that app and press play.'
+        : 'Records through the microphone. Hold the phone near the sound.';
+  }
+
   String _buttonLabel(bool isRecording) {
     if (isRecording) return 'Stop (${_clock(recording.elapsed)})';
-    return recordedName == null ? 'Start recording' : 'Record again';
+    return hasTake ? 'Record again' : 'Start recording';
   }
 
   static String _clock(Duration d) =>
