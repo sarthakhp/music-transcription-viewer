@@ -326,12 +326,19 @@ class TranscriptionApiService {
     );
   }
 
+  /// Fires when a background refresh found a changed song list (hosted/phone
+  /// mode only; never fires against the local backend).
+  Stream<void> get libraryUpdates => _remote?.libraryUpdates ?? const Stream.empty();
+
   // ========== Endpoint 10: List Jobs ==========
 
   /// List jobs with optional status filter
   /// GET /api/v1/jobs?status={status}
-  Future<ApiResponse<JobListResponse>> listJobs({String? status}) async {
-    if (_remote != null) return _remote.listJobs(status: status);
+  ///
+  /// In hosted/phone mode the list comes from the on-device copy; [fresh] waits
+  /// for the network instead.
+  Future<ApiResponse<JobListResponse>> listJobs({String? status, bool fresh = false}) async {
+    if (_remote != null) return _remote.listJobs(status: status, fresh: fresh);
     final uri = Uri.parse(ApiConfig.getUrl(ApiConfig.jobsEndpoint));
     final uriWithParams = status != null
         ? uri.replace(queryParameters: {'status': status})

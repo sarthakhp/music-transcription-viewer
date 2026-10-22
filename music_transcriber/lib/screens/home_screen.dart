@@ -41,6 +41,7 @@ import 'widgets/cycle_button.dart';
 import 'widgets/tanpura_control.dart';
 import '../services/tanpura_service.dart';
 import '../services/media_session/media_session.dart';
+import '../services/library_sync.dart';
 import 'package:go_router/go_router.dart';
 
 part 'home_screen_audio.dart';
@@ -156,6 +157,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   /// OS media UI (notification / lock screen / media keys) on web.
   final MediaSessionController _mediaSession = MediaSessionController();
   String? _currentJobId;
+  late final LibrarySync _librarySync;
 
   @override
   void initState() {
@@ -177,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // Initialize API services
     final appState = context.read<AppState>();
     _apiService = TranscriptionApiService();
+    _librarySync = LibrarySync(_apiService, reload: _loadCompletedJobs)..start();
     _uploadService = UploadService(
       apiService: _apiService,
       appState: appState,
@@ -261,6 +264,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _librarySync.dispose();
     _saveSettingsTimer?.cancel();
     _settingsSync.flush();
     _settingsSync.dispose();
@@ -582,7 +586,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       isLoadingAudio: _isLoadingAudio,
       loadingAudioStatus: _loadingAudioStatus,
       isRemote: ApiConfig.isRemote,
-      onLibraryChanged: _loadCompletedJobs,
+      onLibraryChanged: () => _loadCompletedJobs(fresh: true),
     );
   }
 

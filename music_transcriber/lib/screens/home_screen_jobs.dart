@@ -7,12 +7,16 @@ extension _HomeScreenJobs on _HomeScreenState {
   ///
   /// Failed jobs are surfaced separately so the user can retry them without
   /// re-uploading the file / re-entering the URL.
-  Future<void> _loadCompletedJobs() async {
-    setState(() => _isLoadingJobs = true);
+  ///
+  /// The list shows the on-device copy first when one exists; [fresh] waits for
+  /// the latest from the network. The loading card only shows on the very
+  /// first load, so a background refresh never blanks a list you're reading.
+  Future<void> _loadCompletedJobs({bool fresh = false}) async {
+    if (_completedJobs.isEmpty) setState(() => _isLoadingJobs = true);
 
     try {
       final results = await Future.wait([
-        _apiService.listJobs(status: 'completed'),
+        _apiService.listJobs(status: 'completed', fresh: fresh),
         _apiService.listJobs(status: 'failed'),
       ]);
 

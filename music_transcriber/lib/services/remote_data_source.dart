@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,9 @@ import '../models/job_status.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
+import 'cache/cached_fetcher.dart';
+import 'cache/disk_cache.dart';
+import 'cache/remote_index_store.dart';
 
 /// Read-only data source for the hosted viewer.
 ///
@@ -17,35 +21,33 @@ import '../models/instrument_data.dart';
 ///   manifest.json → per-job metadata + file URLs (frames/chords/instruments/
 ///                   original/stems)
 ///
-/// The index and each manifest are cached for the session. No backend is
+/// Everything is cached on the device (see services/cache): the song list and
+/// manifests are shown from the saved copy and refreshed in the background;
+/// pitch, chord and audio files are fetched once per URL. No backend is
 /// involved, so create/cancel/delete/retry are unsupported here.
 class RemoteDataSource {
   final http.Client _client;
-  RemoteDataSource({http.Client? client}) : _client = client ?? http.Client();
+  late final CachedFetcher _data;
+  late final CachedFetcher _audio;
+  late final RemoteIndexStore _indexStore;
 
-  Map<String, dynamic>? _index; // raw index.json
-  final Map<String, Map<String, dynamic>> _manifests = {}; // jobId -> manifest
-
-  Future<Map<String, dynamic>> _loadIndex() async {
-    if (_index != null) return _index!;
-    if (ApiConfig.firebaseIndexUrl.isEmpty) {
-      throw StateError(
-        'FIREBASE_INDEX_URL is not set. Build with '
-        '--dart-define=FIREBASE_INDEX_URL=<public index.json URL>.',
-      );
-    }
-    final res = await _client
-        .get(Uri.parse(ApiConfig.firebaseIndexUrl))
-        .timeout(ApiConfig.requestTimeout);
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to load index.json: HTTP ${res.statusCode}');
-    }
-    _index = json.decode(res.body) as Map<String, dynamic>;
-    return _index!;
+  RemoteDataSource({http.Client? client}) : _client = client ?? http.Client() {
+    _data = CachedFetcher(_client, const DiskCache('remote_data', maxBytes: 100 * 1024 * 1024),
+        timeout: ApiConfig.requestTimeout);
+    _audio = CachedFetcher(_client, const DiskCache('remote_audio', maxBytes: 500 * 1024 * 1024),
+        timeout: ApiConfig.downloadTimeout);
+    _indexStore = RemoteIndexStore(_data);
   }
 
+  final Map<String, Map<String, dynamic>> _manifests = {}; // jobId -> manifest
+
+  /// Fires when a background refresh finds a changed song list.
+  Stream<void> get libraryUpdates => _indexStore.updates;
+
+  Future<Map<String, dynamic>> _loadIndex() => _indexStore.load();
+
   Map<String, dynamic>? _summaryFor(String jobId) {
-    final jobs = (_index?['jobs'] as List<dynamic>?) ?? const [];
+    final jobs = (_indexStore.current?['jobs'] as List<dynamic>?) ?? const [];
     for (final j in jobs) {
       if (j is Map<String, dynamic> && j['id'] == jobId) return j;
     }
@@ -62,16 +64,26 @@ class RemoteDataSource {
     if (manifestUrl == null) {
       throw Exception('No manifest URL for job $jobId');
     }
-    final res = await _client
-        .get(Uri.parse(manifestUrl))
-        .timeout(ApiConfig.requestTimeout);
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to load manifest for $jobId: HTTP ${res.statusCode}');
-    }
-    final manifest = json.decode(res.body) as Map<String, dynamic>;
+    final manifest = await _readManifest(manifestUrl);
     _manifests[jobId] = manifest;
     return manifest;
   }
+
+  /// Manifests can change in place (a rename), so the saved copy is used for
+  /// speed and a fresh one replaces it in memory a moment later.
+  Future<Map<String, dynamic>> _readManifest(String url) async {
+    final saved = await _data.peek(url);
+    if (saved == null) return _decode(await _data.getFresh(url));
+    unawaited(_data.getFresh(url).then((bytes) {
+      final fresh = _decode(bytes);
+      final id = fresh['id'] as String?;
+      if (id != null) _manifests[id] = fresh;
+    }).catchError((_) {}));
+    return _decode(saved);
+  }
+
+  Map<String, dynamic> _decode(Uint8List bytes) =>
+      json.decode(utf8.decode(bytes)) as Map<String, dynamic>;
 
   String? _fileUrl(Map<String, dynamic> manifest, String key) {
     final files = manifest['files'] as Map<String, dynamic>?;
@@ -83,13 +95,15 @@ class RemoteDataSource {
   /// Completed jobs from index.json. Any non-'completed' status (e.g. the
   /// 'failed' query the home screen makes) yields an empty list — the hosted
   /// viewer only ever shows finished work.
-  Future<ApiResponse<JobListResponse>> listJobs({String? status}) async {
+  ///
+  /// Served from the saved copy when there is one; pass [fresh] to wait for the
+  /// latest list from the network instead.
+  Future<ApiResponse<JobListResponse>> listJobs({String? status, bool fresh = false}) async {
     if (status != null && status != 'completed') {
       return ApiResponse.success(const JobListResponse(jobs: []));
     }
-    _index = null; // a list call is a refresh: pick up newly published jobs
     try {
-      final index = await _loadIndex();
+      final index = fresh ? await _indexStore.refresh() : await _loadIndex();
       final jobs = ((index['jobs'] as List<dynamic>?) ?? const [])
           .whereType<Map<String, dynamic>>()
           .map(_summaryToJobListItem)
@@ -154,12 +168,8 @@ class RemoteDataSource {
       if (url == null) {
         return ApiResponse.error('$key not available for job $jobId', statusCode: 404);
       }
-      final res = await _client.get(Uri.parse(url)).timeout(ApiConfig.requestTimeout);
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        return ApiResponse.error('Failed to fetch $key: HTTP ${res.statusCode}',
-            statusCode: res.statusCode);
-      }
-      return ApiResponse.success(await parse(res.body));
+      final bytes = await _data.getImmutable(url);
+      return ApiResponse.success(await parse(utf8.decode(bytes)));
     } catch (e) {
       return ApiResponse.error('Failed to fetch $key: $e');
     }
@@ -182,12 +192,7 @@ class RemoteDataSource {
       if (url == null) {
         return ApiResponse.error('Stem "$stemName" not available', statusCode: 404);
       }
-      final res = await _client.get(Uri.parse(url)).timeout(ApiConfig.downloadTimeout);
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        return ApiResponse.error('Failed to download $stemName: HTTP ${res.statusCode}',
-            statusCode: res.statusCode);
-      }
-      return ApiResponse.success(res.bodyBytes);
+      return ApiResponse.success(await _audio.getImmutable(url));
     } catch (e) {
       return ApiResponse.error('Failed to download $stemName: $e');
     }
@@ -220,7 +225,10 @@ class RemoteDataSource {
     );
   }
 
-  void dispose() => _client.close();
+  void dispose() {
+    _indexStore.dispose();
+    _client.close();
+  }
 }
 
 double _toDouble(dynamic v) => v is num ? v.toDouble() : 0.0;
