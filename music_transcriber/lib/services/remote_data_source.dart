@@ -10,6 +10,7 @@ import '../models/job_status.dart';
 import '../models/pitch_data.dart';
 import '../models/chord_data.dart';
 import '../models/instrument_data.dart';
+import '../utils/server_time.dart';
 import 'cache/cached_fetcher.dart';
 import 'cache/disk_cache.dart';
 import 'cache/remote_index_store.dart';
@@ -202,7 +203,7 @@ class RemoteDataSource {
     final title = (s['title'] ?? 'Untitled') as String;
     DateTime created;
     try {
-      created = DateTime.parse(s['created_at'] as String).toLocal();
+      created = parseServerTime(s['created_at'] as String);
     } catch (_) {
       created = DateTime.fromMillisecondsSinceEpoch(0);
     }

@@ -1,3 +1,4 @@
+import '../utils/server_time.dart';
 import 'audio_content_type.dart';
 import 'job_status.dart';
 
@@ -317,7 +318,7 @@ class JobListItem {
     final title = (json['title'] ?? 'Untitled') as String;
     DateTime created;
     try {
-      created = DateTime.parse('${json['created_at']}Z').toLocal();
+      created = parseServerTime('${json['created_at']}');
     } catch (_) {
       created = DateTime.fromMillisecondsSinceEpoch(0);
     }
@@ -352,12 +353,12 @@ class JobListItem {
       status: JobStatus.fromString(json['status'] as String),
       stage: json['stage'] as String?,
       progress: json['progress'] as int,
-      createdAt: DateTime.parse('${json['created_at'] as String}Z').toLocal(),
+      createdAt: parseServerTime(json['created_at'] as String),
       startedAt: json['started_at'] != null
-          ? DateTime.parse('${json['started_at'] as String}Z').toLocal()
+          ? parseServerTime(json['started_at'] as String)
           : null,
       completedAt: json['completed_at'] != null
-          ? DateTime.parse('${json['completed_at'] as String}Z').toLocal()
+          ? parseServerTime(json['completed_at'] as String)
           : null,
       errorMessage: json['error_message'] as String?,
       inputFilename: json['input_filename'] as String,

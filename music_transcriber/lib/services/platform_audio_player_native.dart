@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart' as ja;
@@ -7,6 +8,9 @@ import 'platform_audio_player.dart';
 /// Native implementation using just_audio.
 class NativeAudioPlayer implements PlatformAudioPlayer {
   ja.AudioPlayer? _player;
+
+  /// Kept so a transpose set before (or between) loads survives a new player.
+  double _pitchRatio = 1.0;
 
   /// True during the muted warm-up in [load]; player events are not forwarded.
   bool _priming = false;
@@ -54,6 +58,7 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
     final source = _BytesAudioSource(bytes, mimeType);
     // ignore: experimental_member_use
     await _player!.setAudioSource(source);
+    if (_pitchRatio != 1.0) await _player!.setPitch(_pitchRatio);
 
     await _primeRenderPipeline();
   }
@@ -120,8 +125,10 @@ class NativeAudioPlayer implements PlatformAudioPlayer {
 
   @override
   void setPitchSemitones(int semitones) {
-    // just_audio supports setPitch on Android only (ratio, not semitones).
-    // For now, no-op on native. Could be wired up per-platform later.
+    // Android's player shifts pitch independently of speed (a ratio, not
+    // semitones). iOS ignores it, where the phone path doesn't apply.
+    _pitchRatio = math.pow(2, semitones / 12.0).toDouble();
+    _player?.setPitch(_pitchRatio);
   }
 
   // --- Listeners ------------------------------------------------------------
