@@ -23,6 +23,12 @@ class JobListCard extends StatelessWidget {
   /// the card is stacked above another list in a Column.
   final bool shrinkWrap;
 
+  /// When [previewCount] is set and [showAll] is false, only that many tiles
+  /// show, followed by a button that calls [onToggleShowAll] to reveal the rest.
+  final int? previewCount;
+  final bool showAll;
+  final VoidCallback? onToggleShowAll;
+
   const JobListCard({
     super.key,
     required this.jobs,
@@ -30,9 +36,12 @@ class JobListCard extends StatelessWidget {
     this.onJobDeleted,
     this.onJobRetry,
     this.isLoading = false,
-    this.title = 'Previous Jobs',
+    this.title = 'Your Songs',
     this.isFailedList = false,
     this.shrinkWrap = false,
+    this.previewCount,
+    this.showAll = false,
+    this.onToggleShowAll,
   });
 
   @override
@@ -58,7 +67,7 @@ class JobListCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Loading previous jobs...',
+                  'Loading your songs...',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
@@ -85,7 +94,7 @@ class JobListCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No previous jobs',
+                  'No songs yet',
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
@@ -107,11 +116,15 @@ class JobListCard extends StatelessWidget {
     final accentColor = isFailedList ? colorScheme.error : colorScheme.primary;
     final isMobile = MediaQuery.of(context).size.width < 600;
 
+    final preview = previewCount;
+    final canCollapse = onToggleShowAll != null && preview != null && jobs.length > preview;
+    final visibleCount = canCollapse && !showAll ? preview : jobs.length;
+
     final listView = ListView.separated(
       padding: const EdgeInsets.all(12),
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const ClampingScrollPhysics() : null,
-      itemCount: jobs.length,
+      itemCount: visibleCount,
       separatorBuilder: (context, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final job = jobs[index];
@@ -156,7 +169,7 @@ class JobListCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${jobs.length} ${jobs.length == 1 ? 'job' : 'jobs'}',
+                  '${jobs.length} ${jobs.length == 1 ? 'song' : 'songs'}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
@@ -166,6 +179,12 @@ class JobListCard extends StatelessWidget {
           ),
           const Divider(height: 1),
           if (shrinkWrap) Flexible(child: listView) else Expanded(child: listView),
+          if (canCollapse)
+            TextButton.icon(
+              onPressed: onToggleShowAll,
+              icon: Icon(showAll ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+              label: Text(showAll ? 'Show fewer' : 'Show all ${jobs.length} songs'),
+            ),
         ],
       ),
     );

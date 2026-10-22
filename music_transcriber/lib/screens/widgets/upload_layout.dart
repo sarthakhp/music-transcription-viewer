@@ -7,7 +7,7 @@ import '../../services/transcription_api_service.dart';
 import '../../widgets/job_list_card.dart';
 import '../practice_screen.dart';
 import '../../services/cloud_upload/cloud_upload.dart';
-import 'phone_upload_panel.dart';
+import 'phone_upload/phone_upload_panel.dart';
 import 'upload_section.dart';
 
 /// Upload layout widget with responsive design
@@ -176,12 +176,17 @@ class UploadLayout extends StatelessWidget {
                       // content (the page scrolls) instead of being a
                       // scroll box nested inside the scrolling page.
                       if (isMobile)
-                        JobListCard(
-                          jobs: completedJobs,
-                          shrinkWrap: true,
-                          onJobSelected: onJobSelected,
-                          onJobDeleted: isRemote ? null : onJobDeleted,
-                          isLoading: isLoadingJobs,
+                        _CollapsibleHistory(
+                          builder: (showAll, toggle) => JobListCard(
+                            jobs: completedJobs,
+                            shrinkWrap: true,
+                            previewCount: 5,
+                            showAll: showAll,
+                            onToggleShowAll: toggle,
+                            onJobSelected: onJobSelected,
+                            onJobDeleted: isRemote ? null : onJobDeleted,
+                            isLoading: isLoadingJobs,
+                          ),
                         )
                       else
                         SizedBox(
@@ -272,7 +277,9 @@ class UploadLayout extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Hosted, read-only. Run the app locally to transcribe new audio.',
+                        CloudUpload.isSupported
+                            ? 'Add songs above. They are processed on your computer, or in the cloud.'
+                            : 'Hosted, read-only. Run the app locally to transcribe new audio.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
@@ -328,3 +335,21 @@ class UploadLayout extends StatelessWidget {
   }
 }
 
+
+/// Holds the phone song list's "show all" state. Only the latest few songs
+/// show by default, so sections below it (like Practice Mode) stay reachable.
+class _CollapsibleHistory extends StatefulWidget {
+  final Widget Function(bool showAll, VoidCallback toggle) builder;
+  const _CollapsibleHistory({required this.builder});
+
+  @override
+  State<_CollapsibleHistory> createState() => _CollapsibleHistoryState();
+}
+
+class _CollapsibleHistoryState extends State<_CollapsibleHistory> {
+  bool _showAll = false;
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(_showAll, () => setState(() => _showAll = !_showAll));
+}

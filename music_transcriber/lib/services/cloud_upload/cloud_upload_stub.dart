@@ -16,5 +16,10 @@ class CloudUpload {
     void Function(double fraction)? onProgress,
   }) =>
       throw UnsupportedError('Upload is Android only');
+  Future<String> submitUrl({
+    required String url,
+    required AudioContentType audioType,
+  }) =>
+      throw UnsupportedError('Upload is Android only');
   Future<QueueStatus?> status(String requestId) async => null;
 }

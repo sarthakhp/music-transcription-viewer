@@ -37,7 +37,7 @@ It runs in the browser on desktop and phone, and as a macOS app (DMG) that bundl
 - **Paste a URL**, with optional start and end trimming
 - **Record** audio from the microphone
 - **Practice Mode**: load any audio or video file and change its key or speed entirely in the browser, with no transcription needed
-- **Library**: browse previous jobs, retry failed ones, and delete old ones
+- **Library**: browse your songs, retry failed ones, and delete old ones
 
 ### Pan and zoom
 - **Two zoom axes**: zoom time and pitch separately, each with its own readout (seconds visible, notes visible) and reset
