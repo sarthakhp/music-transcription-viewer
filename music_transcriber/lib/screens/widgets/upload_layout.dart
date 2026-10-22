@@ -6,6 +6,8 @@ import '../../models/job.dart';
 import '../../services/transcription_api_service.dart';
 import '../../widgets/job_list_card.dart';
 import '../practice_screen.dart';
+import '../../services/cloud_upload/cloud_upload.dart';
+import 'phone_upload_panel.dart';
 import 'upload_section.dart';
 
 /// Upload layout widget with responsive design
@@ -25,6 +27,7 @@ class UploadLayout extends StatelessWidget {
   })?
   onFileUpload;
   final bool isRemote;
+  final VoidCallback? onLibraryChanged;
   final Future<void> Function(
     String url, {
     double? startTime,
@@ -54,6 +57,7 @@ class UploadLayout extends StatelessWidget {
     this.isLoadingAudio = false,
     this.loadingAudioStatus,
     this.isRemote = false,
+    this.onLibraryChanged,
   });
 
   @override
@@ -233,6 +237,10 @@ class UploadLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (CloudUpload.isSupported && onLibraryChanged != null) ...[
+          PhoneUploadPanel(onLibraryChanged: onLibraryChanged!),
+          const SizedBox(height: 20),
+        ],
         Card(
           child: Padding(
             padding: const EdgeInsets.all(24),

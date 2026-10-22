@@ -87,6 +87,7 @@ class RemoteDataSource {
     if (status != null && status != 'completed') {
       return ApiResponse.success(const JobListResponse(jobs: []));
     }
+    _index = null; // a list call is a refresh: pick up newly published jobs
     try {
       final index = await _loadIndex();
       final jobs = ((index['jobs'] as List<dynamic>?) ?? const [])

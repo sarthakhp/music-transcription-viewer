@@ -582,6 +582,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       isLoadingAudio: _isLoadingAudio,
       loadingAudioStatus: _loadingAudioStatus,
       isRemote: ApiConfig.isRemote,
+      onLibraryChanged: _loadCompletedJobs,
     );
   }
 
