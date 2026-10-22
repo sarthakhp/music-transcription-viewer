@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:js_interop';
 import 'dart:typed_data';
+import '../../utils/preview_audio.dart';
 import '../../utils/web_file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:web/web.dart' as web;
 import '../../models/audio_content_type.dart';
 import '../../models/job.dart';
 import '../../providers/app_state.dart';
@@ -99,12 +98,10 @@ class _UploadSectionState extends State<UploadSection> {
   String? _micLabel;
   bool _isDecodingRecording = false;
   bool _isSubmittingRecord = false;
-  web.HTMLAudioElement? _previewAudio;
-  String? _previewBlobUrl;
+  PreviewAudio? _previewAudio;
   bool _previewPlaying = false;
   double _previewPosition = 0;
   Timer? _previewPositionTimer;
-  JSFunction? _previewOnEnded;
 
   @override
   void dispose() {
@@ -371,44 +368,23 @@ class _UploadSectionState extends State<UploadSection> {
   void _destroyPreviewAudio() {
     _previewPositionTimer?.cancel();
     _previewPositionTimer = null;
-    if (_previewAudio != null) {
-      _previewAudio!.pause();
-      if (_previewOnEnded != null) {
-        _previewAudio!.removeEventListener('ended', _previewOnEnded!);
-        _previewOnEnded = null;
-      }
-      _previewAudio!.removeAttribute('src');
-      _previewAudio!.remove();
-      _previewAudio = null;
-    }
-    if (_previewBlobUrl != null) {
-      web.URL.revokeObjectURL(_previewBlobUrl!);
-      _previewBlobUrl = null;
-    }
+    _previewAudio?.dispose();
+    _previewAudio = null;
   }
 
   void _initPreviewAudio(Uint8List bytes, String mimeType) {
     _destroyPreviewAudio();
-    final blob = web.Blob(
-      [bytes.buffer.toJS].toJS,
-      web.BlobPropertyBag(type: mimeType),
-    );
-    _previewBlobUrl = web.URL.createObjectURL(blob);
-    _previewAudio = web.document.createElement('audio') as web.HTMLAudioElement;
-    _previewAudio!.src = _previewBlobUrl!;
-    _previewAudio!.preload = 'auto';
     _previewPosition = 0;
-    _previewOnEnded = ((web.Event _) {
+    _previewAudio = PreviewAudio(bytes, mimeType, () {
       _previewPositionTimer?.cancel();
       _previewPositionTimer = null;
-      if (mounted)
+      if (mounted) {
         setState(() {
           _previewPlaying = false;
           _previewPosition = 0;
         });
-    }).toJS;
-    _previewAudio!.addEventListener('ended', _previewOnEnded!);
-    web.document.body!.append(_previewAudio!);
+      }
+    });
   }
 
   void _togglePreviewPlayback() {
