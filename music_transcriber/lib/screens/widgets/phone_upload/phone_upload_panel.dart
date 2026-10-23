@@ -10,6 +10,7 @@ import '../../../services/share_intake/share_intake.dart';
 import '../../../services/share_intake/shared_item.dart';
 import '../upload_shared/audio_type_chips.dart';
 import '../upload_shared/busy_guard.dart';
+import '../upload_shared/instrument_picker.dart';
 import '../upload_shared/link_field.dart';
 import '../upload_shared/upload_card.dart';
 import '../upload_shared/upload_submit.dart';
@@ -42,6 +43,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   UploadSource _source = UploadSource.file;
   RecordSource _recordSource = RecordSource.microphone;
   AudioContentType _audioType = AudioContentType.mixed;
+  Set<String> _instruments = {};
   bool _phoneAudioSupported = false;
   String? _warning;
 
@@ -161,6 +163,10 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
 
   // --- Submitting ------------------------------------------------------------
 
+  /// Voice-only recordings have no instruments to look for.
+  bool get _usesInstruments => _audioType != AudioContentType.vocals;
+  List<String> get _chosenInstruments => _usesInstruments ? _instruments.toList() : const [];
+
   bool get _canSubmit {
     if (busy || _recording.isRecording) return false;
     return _source == UploadSource.link ? _url.text.trim().isNotEmpty : _draft.hasAudio && _draft.duration > 0;
@@ -179,6 +185,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
           audioType: _audioType,
           trimStart: trimmed ? _draft.trimStart : null,
           trimEnd: trimmed ? _draft.trimEnd : null,
+          instruments: _chosenInstruments,
           onProgress: (f) => setState(() => uploadFraction = f),
         ));
     await _draft.clear(); // uploaded: drop the local copy
@@ -190,7 +197,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
       setState(() => error = 'Paste a full link starting with http');
       return;
     }
-    await _submit(url, () => _cloud.submitUrl(url: url, audioType: _audioType));
+    await _submit(url, () => _cloud.submitUrl(url: url, audioType: _audioType, instruments: _chosenInstruments));
     _url.clear();
   }
 
@@ -228,6 +235,14 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
         _sourceBody(),
         const SizedBox(height: 12),
         _typeChips(),
+        if (_usesInstruments) ...[
+          const SizedBox(height: 8),
+          InstrumentPicker(
+            selected: _instruments,
+            enabled: !busy,
+            onChanged: (chosen) => setState(() => _instruments = chosen),
+          ),
+        ],
         const SizedBox(height: 12),
         UploadSubmit(
           source: _source,

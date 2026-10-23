@@ -415,6 +415,7 @@ extension _HomeScreenJobs on _HomeScreenState {
     double? startTime,
     double? endTime,
     AudioContentType audioType = AudioContentType.mixed,
+    List<String> instruments = const [],
   }) async {
     final appState = context.read<AppState>();
 
@@ -426,6 +427,7 @@ extension _HomeScreenJobs on _HomeScreenState {
         startTime: startTime,
         endTime: endTime,
         audioType: audioType,
+        instruments: instruments,
       );
 
       if (!mounted) return;
@@ -449,12 +451,14 @@ extension _HomeScreenJobs on _HomeScreenState {
     Uint8List bytes,
     String fileName, {
     AudioContentType audioType = AudioContentType.mixed,
+    List<String> instruments = const [],
   }) async {
     if (!mounted) return;
     final jobId = await _uploadService.uploadAudioFile(
       fileBytes: bytes,
       fileName: fileName,
       audioType: audioType,
+      instruments: instruments,
     );
     if (jobId != null && mounted) {
       _pollingService.startPolling(jobId);

@@ -9,6 +9,7 @@ import '../../providers/app_state.dart';
 import '../../services/audio_recorder_service.dart';
 import '../../services/transcription_api_service.dart';
 import '../../utils/audio_trim_service.dart';
+import 'upload_shared/instrument_picker.dart';
 import '../../widgets/processing_status_card.dart';
 import '../../widgets/trim_range_slider.dart';
 import '../../widgets/url_preview_panel.dart';
@@ -27,6 +28,7 @@ class UploadSection extends StatefulWidget {
     Uint8List bytes,
     String fileName, {
     AudioContentType audioType,
+    List<String> instruments,
   })?
   onFileUpload;
 
@@ -35,6 +37,7 @@ class UploadSection extends StatefulWidget {
     double? startTime,
     double? endTime,
     AudioContentType audioType,
+    List<String> instruments,
   })?
   onUrlSubmitted;
   final Future<void> Function()? onCancel;
@@ -63,6 +66,7 @@ class _UploadSectionState extends State<UploadSection> {
 
   /// What the audio contains; shared by all three input tabs.
   AudioContentType _audioType = AudioContentType.mixed;
+  Set<String> _instruments = {};
 
   // ---- URL state ----
   final _urlController = TextEditingController();
@@ -211,6 +215,7 @@ class _UploadSectionState extends State<UploadSection> {
         startTime: startTime,
         endTime: endTime,
         audioType: _audioType,
+        instruments: _chosenInstruments,
       );
     } finally {
       if (mounted) setState(() => _isSubmittingUrl = false);
@@ -256,7 +261,12 @@ class _UploadSectionState extends State<UploadSection> {
         _fileName ?? 'audio.wav',
         bytes != _fileBytes,
       );
-      await widget.onFileUpload!(bytes, name, audioType: _audioType);
+      await widget.onFileUpload!(
+        bytes,
+        name,
+        audioType: _audioType,
+        instruments: _chosenInstruments,
+      );
     } finally {
       if (mounted) setState(() => _isSubmittingFile = false);
     }
@@ -447,6 +457,7 @@ class _UploadSectionState extends State<UploadSection> {
         bytes,
         'Recording $date $time ($durStr)_$tsFile.wav',
         audioType: _audioType,
+        instruments: _chosenInstruments,
       );
     } finally {
       if (mounted) setState(() => _isSubmittingRecord = false);
@@ -711,9 +722,21 @@ class _UploadSectionState extends State<UploadSection> {
           ),
           textAlign: TextAlign.center,
         ),
+        if (_usesInstruments) ...[
+          const SizedBox(height: 8),
+          InstrumentPicker(
+            selected: _instruments,
+            enabled: true,
+            onChanged: (chosen) => setState(() => _instruments = chosen),
+          ),
+        ],
       ],
     );
   }
+
+  /// Voice-only recordings have no instruments to look for.
+  bool get _usesInstruments => _audioType != AudioContentType.vocals;
+  List<String> get _chosenInstruments => _usesInstruments ? _instruments.toList() : const [];
 
   // ── File tab ──────────────────────────────────────────────────────────────
 

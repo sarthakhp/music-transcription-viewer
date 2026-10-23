@@ -6,7 +6,7 @@ import 'package:music_transcriber/services/cloud_upload/queue_protocol.dart';
 void main() {
   final fixedTime = DateTime.fromMillisecondsSinceEpoch(1_700_000_000_000);
 
-  Map<String, dynamic> entry({String? url, double? start, double? end, String? topic}) =>
+  Map<String, dynamic> entry({String? url, double? start, double? end, String? topic, List<String> instruments = const []}) =>
       jsonDecode(queueEntryJson(
         id: 'r1',
         filename: 'song.mp3',
@@ -15,6 +15,7 @@ void main() {
         trimStart: start,
         trimEnd: end,
         notifyTopic: topic,
+        instruments: instruments,
         now: fixedTime,
       )) as Map<String, dynamic>;
 
@@ -34,6 +35,11 @@ void main() {
     expect(full['trim_start'], 1.5);
     expect(full['trim_end'], 9);
     expect(full['notify_topic'], 'n_abc');
+  });
+
+  test('chosen instruments are listed, and left out when none are chosen', () {
+    expect(entry(instruments: ['flutes', 'organ'])['instruments'], ['flutes', 'organ']);
+    expect(entry().containsKey('instruments'), isFalse); // the worker decides on its own
   });
 
   test('paths follow the layout the workers and storage rules expect', () {

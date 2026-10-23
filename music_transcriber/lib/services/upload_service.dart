@@ -21,6 +21,7 @@ class UploadService {
     required Uint8List fileBytes,
     required String fileName,
     AudioContentType audioType = AudioContentType.mixed,
+    List<String> instruments = const [],
   }) async {
     try {
       // Validate file before upload
@@ -38,6 +39,7 @@ class UploadService {
         fileBytes: fileBytes,
         fileName: fileName,
         audioType: audioType,
+        instruments: instruments,
       );
 
       // Handle response

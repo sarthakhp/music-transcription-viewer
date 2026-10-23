@@ -44,6 +44,7 @@ class TranscriptionApiService {
     required Uint8List fileBytes,
     required String fileName,
     AudioContentType audioType = AudioContentType.mixed,
+    List<String> instruments = const [],
   }) async {
     if (_remote != null) return _remoteUnsupported();
     try {
@@ -52,6 +53,7 @@ class TranscriptionApiService {
       final request = http.MultipartRequest('POST', uri);
       request.headers.addAll(_commonHeaders);
       request.fields['audio_type'] = audioType.apiValue;
+      if (instruments.isNotEmpty) request.fields['instruments'] = instruments.join(',');
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -83,6 +85,7 @@ class TranscriptionApiService {
     double? startTime,
     double? endTime,
     AudioContentType audioType = AudioContentType.mixed,
+    List<String> instruments = const [],
   }) async {
     if (_remote != null) return _remoteUnsupported();
     try {
@@ -90,6 +93,7 @@ class TranscriptionApiService {
         'url': url,
         'audio_type': audioType.apiValue,
       };
+      if (instruments.isNotEmpty) body['instruments'] = instruments;
       if (startTime != null) body['start_time'] = startTime;
       if (endTime != null) body['end_time'] = endTime;
 

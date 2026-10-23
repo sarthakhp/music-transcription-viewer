@@ -17,6 +17,7 @@ class CloudUpload {
     required AudioContentType audioType,
     double? trimStart,
     double? trimEnd,
+    List<String> instruments = const [],
     void Function(double fraction)? onProgress,
   }) =>
       throw UnsupportedError('Upload is not available here');
@@ -28,6 +29,7 @@ class CloudUpload {
     required AudioContentType audioType,
     double? trimStart,
     double? trimEnd,
+    List<String> instruments = const [],
     void Function(double fraction)? onProgress,
   }) =>
       throw UnsupportedError('Upload is not available here');
@@ -35,6 +37,7 @@ class CloudUpload {
   Future<String> submitUrl({
     required String url,
     required AudioContentType audioType,
+    List<String> instruments = const [],
   }) =>
       throw UnsupportedError('Upload is not available here');
 

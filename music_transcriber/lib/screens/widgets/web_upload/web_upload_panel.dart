@@ -9,6 +9,7 @@ import '../../../utils/web_file_picker.dart';
 import '../upload_shared/audio_type_chips.dart';
 import '../upload_shared/busy_guard.dart';
 import '../upload_shared/clip_review.dart';
+import '../upload_shared/instrument_picker.dart';
 import '../upload_shared/link_field.dart';
 import '../upload_shared/source_selector.dart';
 import '../upload_shared/submission_tracker.dart';
@@ -40,6 +41,7 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
   String? _email;
   UploadSource _source = UploadSource.file;
   AudioContentType _audioType = AudioContentType.mixed;
+  Set<String> _instruments = {};
 
   @override
   void initState() {
@@ -131,6 +133,10 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
 
   // --- Submitting ------------------------------------------------------------
 
+  /// Voice-only recordings have no instruments to look for.
+  bool get _usesInstruments => _audioType != AudioContentType.vocals;
+  List<String> get _chosenInstruments => _usesInstruments ? _instruments.toList() : const [];
+
   bool get _canSubmit {
     if (busy || _recorder.isRecording) return false;
     return _source == UploadSource.link ? _url.text.trim().isNotEmpty : _draft.hasClip && _draft.duration > 0;
@@ -149,6 +155,7 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
           audioType: _audioType,
           trimStart: trimmed ? _draft.trimStart : null,
           trimEnd: trimmed ? _draft.trimEnd : null,
+          instruments: _chosenInstruments,
           onProgress: (f) => setState(() => uploadFraction = f),
         ));
     _draft.clear(); // uploaded: release the bytes
@@ -160,7 +167,7 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
       setState(() => error = 'Paste a full link starting with http');
       return;
     }
-    await _submit(url, () => _cloud.submitUrl(url: url, audioType: _audioType));
+    await _submit(url, () => _cloud.submitUrl(url: url, audioType: _audioType, instruments: _chosenInstruments));
     _url.clear();
   }
 
@@ -195,6 +202,14 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
           enabled: !busy,
           onChanged: (type) => setState(() => _audioType = type),
         ),
+        if (_usesInstruments) ...[
+          const SizedBox(height: 8),
+          InstrumentPicker(
+            selected: _instruments,
+            enabled: !busy,
+            onChanged: (chosen) => setState(() => _instruments = chosen),
+          ),
+        ],
         const SizedBox(height: 12),
         UploadSubmit(
           source: _source,

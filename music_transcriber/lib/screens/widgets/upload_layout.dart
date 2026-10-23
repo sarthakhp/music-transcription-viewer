@@ -26,6 +26,7 @@ class UploadLayout extends StatelessWidget {
     Uint8List bytes,
     String fileName, {
     AudioContentType audioType,
+    List<String> instruments,
   })?
   onFileUpload;
   final bool isRemote;
@@ -35,6 +36,7 @@ class UploadLayout extends StatelessWidget {
     double? startTime,
     double? endTime,
     AudioContentType audioType,
+    List<String> instruments,
   })?
   onUrlSubmitted;
   final Future<void> Function()? onCancel;

@@ -62,6 +62,7 @@ class CloudUpload {
     required AudioContentType audioType,
     double? trimStart,
     double? trimEnd,
+    List<String> instruments = const [],
     void Function(double fraction)? onProgress,
   }) =>
       throw UnsupportedError('A browser has no file paths; use submitBytes');
@@ -73,6 +74,7 @@ class CloudUpload {
     required AudioContentType audioType,
     double? trimStart,
     double? trimEnd,
+    List<String> instruments = const [],
     void Function(double fraction)? onProgress,
   }) async {
     await _init();
@@ -84,17 +86,18 @@ class CloudUpload {
       if (s.totalBytes > 0) onProgress?.call(s.bytesTransferred / s.totalBytes);
     });
     await task;
-    await _writeEntry(id, fileName, audioType, trimStart: trimStart, trimEnd: trimEnd);
+    await _writeEntry(id, fileName, audioType, trimStart: trimStart, trimEnd: trimEnd, instruments: instruments);
     return id;
   }
 
   Future<String> submitUrl({
     required String url,
     required AudioContentType audioType,
+    List<String> instruments = const [],
   }) async {
     await _init();
     final id = newRequestId();
-    await _writeEntry(id, url, audioType, sourceUrl: url);
+    await _writeEntry(id, url, audioType, sourceUrl: url, instruments: instruments);
     return id;
   }
 
@@ -116,6 +119,7 @@ class CloudUpload {
     double? trimStart,
     double? trimEnd,
     String? sourceUrl,
+    List<String> instruments = const [],
   }) {
     final entry = queueEntryJson(
       id: id,
@@ -124,6 +128,7 @@ class CloudUpload {
       trimStart: trimStart,
       trimEnd: trimEnd,
       sourceUrl: sourceUrl,
+      instruments: instruments,
     );
     return FirebaseStorage.instance
         .ref(queuePath(id))

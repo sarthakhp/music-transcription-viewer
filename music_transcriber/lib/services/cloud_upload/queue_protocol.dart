@@ -23,6 +23,7 @@ String queueEntryJson({
   double? trimStart,
   double? trimEnd,
   String? sourceUrl,
+  List<String> instruments = const [],
   String? notifyTopic,
   DateTime? now,
 }) {
@@ -33,6 +34,8 @@ String queueEntryJson({
     'source_url': ?sourceUrl,
     'trim_start': ?trimStart,
     'trim_end': ?trimEnd,
+    // Left out when empty, so the worker decides on its own.
+    'instruments': ?(instruments.isEmpty ? null : instruments),
     'notify_topic': ?notifyTopic,
     'status': 'queued',
     'created_at': (now ?? DateTime.now()).millisecondsSinceEpoch / 1000,
