@@ -4,9 +4,11 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 /// Loudness outline of a 16-bit PCM WAV file: [buckets] values in 0..1, each
-/// the peak of an equal slice of the audio. Read in chunks on a background
-/// isolate, so even a long recording never sits in memory or blocks the UI.
-/// Returns null for anything that isn't 16-bit PCM WAV.
+/// the average loudness (RMS) of an equal slice of the audio, scaled so the
+/// loudest slice is 1. (Taking each slice's single loudest sample instead would
+/// make loud, mastered music look like a wall of identical bars.) Read in
+/// chunks on a background isolate, so even a long recording never sits in
+/// memory or blocks the UI. Returns null for anything that isn't 16-bit PCM WAV.
 Future<List<double>?> readWavPeaks(String path, {int buckets = 160}) =>
     Isolate.run(() => _readPeaks(path, buckets));
 
@@ -21,7 +23,8 @@ List<double>? _readPeaks(String path, int buckets) {
     if (frames == 0) return null;
 
     final framesPerBucket = math.max(1, (frames / buckets).ceil());
-    final peaks = List<double>.filled(buckets, 0);
+    final sumSquares = List<double>.filled(buckets, 0);
+    final counts = List<int>.filled(buckets, 0);
     file.setPositionSync(dataStart);
 
     var frame = 0;
@@ -33,14 +36,22 @@ List<double>? _readPeaks(String path, int buckets) {
       final samples = chunk.buffer.asByteData(chunk.offsetInBytes, chunk.length);
       for (var i = 0; i + frameBytes <= chunk.length; i += frameBytes, frame++) {
         final bucket = math.min(frame ~/ framesPerBucket, buckets - 1);
-        final value = samples.getInt16(i, Endian.little).abs() / 32768.0;
-        if (value > peaks[bucket]) peaks[bucket] = value;
+        final value = samples.getInt16(i, Endian.little) / 32768.0;
+        sumSquares[bucket] += value * value;
+        counts[bucket]++;
       }
     }
-    return peaks;
+    return _normalised([
+      for (var i = 0; i < buckets; i++) counts[i] == 0 ? 0.0 : math.sqrt(sumSquares[i] / counts[i]),
+    ]);
   } finally {
     file.closeSync();
   }
+}
+
+List<double> _normalised(List<double> levels) {
+  final loudest = levels.fold<double>(0, math.max);
+  return loudest == 0 ? levels : [for (final level in levels) level / loudest];
 }
 
 /// (data offset, data length, channel count) of a 16-bit PCM WAV, or null.

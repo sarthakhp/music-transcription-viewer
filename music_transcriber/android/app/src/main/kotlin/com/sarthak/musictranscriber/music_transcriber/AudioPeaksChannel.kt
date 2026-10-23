@@ -11,11 +11,13 @@ import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
  * Loudness outline of any audio file Android can decode (mp3, m4a, ogg, flac...),
- * for the trim view's waveform. Decoding streams through the platform codec and
- * keeps only one peak per bucket, so the audio is never held in memory.
+ * for the trim view's waveform: per bucket the average loudness (RMS), scaled so
+ * the loudest bucket is 1. Decoding streams through the platform codec and keeps
+ * only running totals per bucket, so the audio is never held in memory.
  */
 object AudioPeaksChannel {
     private const val CHANNEL = "music_transcriber/audio_peaks"
@@ -65,7 +67,7 @@ object AudioPeaksChannel {
     }
 
     private fun decode(extractor: MediaExtractor, codec: MediaCodec, durationUs: Long, buckets: Int): DoubleArray {
-        val peaks = DoubleArray(buckets)
+        val levels = Levels(buckets)
         val info = MediaCodec.BufferInfo()
         var inputDone = false
         var outputDone = false
@@ -80,12 +82,12 @@ object AudioPeaksChannel {
             val channels = max(1, format.getInteger(MediaFormat.KEY_CHANNEL_COUNT))
             val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             val samples = codec.getOutputBuffer(index)!!.order(ByteOrder.nativeOrder()).asShortBuffer()
-            addPeaks(peaks, samples, channels, sampleRate, info.presentationTimeUs, durationUs)
+            addSamples(levels, samples, channels, sampleRate, info.presentationTimeUs, durationUs)
 
             codec.releaseOutputBuffer(index, false)
             outputDone = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
         }
-        return peaks
+        return levels.normalised()
     }
 
     /** Queues the next chunk of the file into the codec; returns true once the file is exhausted. */
@@ -102,9 +104,9 @@ object AudioPeaksChannel {
         return false
     }
 
-    /** Folds one decoded buffer into [peaks], placing each frame by its time in the file. */
-    private fun addPeaks(
-        peaks: DoubleArray,
+    /** Folds one decoded buffer into [levels], placing each frame by its time in the file. */
+    private fun addSamples(
+        levels: Levels,
         samples: java.nio.ShortBuffer,
         channels: Int,
         sampleRate: Int,
@@ -114,12 +116,31 @@ object AudioPeaksChannel {
         val frames = samples.remaining() / channels
         for (frame in 0 until frames) {
             val timeUs = bufferStartUs + frame * 1_000_000L / sampleRate
-            val bucket = min(peaks.size - 1, max(0, (timeUs * peaks.size / durationUs).toInt()))
+            val bucket = (timeUs * levels.size / durationUs).toInt()
             var loudest = 0
             for (channel in 0 until channels) {
                 loudest = max(loudest, abs(samples.get(frame * channels + channel).toInt()))
             }
-            peaks[bucket] = max(peaks[bucket], loudest / 32768.0)
+            levels.add(bucket, loudest / 32768.0)
+        }
+    }
+
+    /** Running mean-square per bucket. */
+    private class Levels(val size: Int) {
+        private val sumSquares = DoubleArray(size)
+        private val counts = IntArray(size)
+
+        fun add(bucket: Int, value: Double) {
+            val i = min(size - 1, max(0, bucket))
+            sumSquares[i] += value * value
+            counts[i]++
+        }
+
+        /** RMS per bucket, scaled so the loudest bucket is 1 (all zeros stay zeros). */
+        fun normalised(): DoubleArray {
+            val rms = DoubleArray(size) { if (counts[it] == 0) 0.0 else sqrt(sumSquares[it] / counts[it]) }
+            val loudest = rms.max()
+            return if (loudest == 0.0) rms else DoubleArray(size) { rms[it] / loudest }
         }
     }
 }
