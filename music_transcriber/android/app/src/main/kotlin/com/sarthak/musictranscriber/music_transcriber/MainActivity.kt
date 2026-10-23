@@ -5,7 +5,6 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -31,6 +30,7 @@ class MainActivity : FlutterActivity() {
             }
         }
         handleShare(intent)
+        AudioPeaksChannel.register(flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music_transcriber/system_audio")
             .setMethodCallHandler { call, result ->
@@ -58,12 +58,9 @@ class MainActivity : FlutterActivity() {
     private fun handleShare(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
         // The thread reads its own copy; the original is marked consumed below.
-        Log.d("ShareDebug", "handleShare action=${intent.action} type=${intent.type}")
         val share = Intent(intent)
         Thread {
-            val result = runCatching { ShareReceiver.parse(this, share) }
-            Log.d("ShareDebug", "parsed=${result.getOrNull()} error=${result.exceptionOrNull()}")
-            val shared = result.getOrNull()
+            val shared = runCatching { ShareReceiver.parse(this, share) }.getOrNull()
             if (shared != null) {
                 Handler(Looper.getMainLooper()).post { deliverShare(shared) }
             }
@@ -73,7 +70,6 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun deliverShare(shared: Map<String, String>) {
-        Log.d("ShareDebug", "deliverShare channelReady=${shareChannel != null}")
         val channel = shareChannel
         if (channel == null) {
             pendingShare = shared
@@ -82,9 +78,9 @@ class MainActivity : FlutterActivity() {
         // If Dart isn't listening yet the call fails, so keep it for takeInitial.
         pendingShare = shared
         channel.invokeMethod("shared", shared, object : MethodChannel.Result {
-            override fun success(result: Any?) { Log.d("ShareDebug", "dart accepted"); pendingShare = null }
-            override fun error(code: String, message: String?, details: Any?) { Log.d("ShareDebug", "dart error $code $message") }
-            override fun notImplemented() { Log.d("ShareDebug", "dart not listening yet") }
+            override fun success(result: Any?) { pendingShare = null }
+            override fun error(code: String, message: String?, details: Any?) {}
+            override fun notImplemented() {}
         })
     }
 

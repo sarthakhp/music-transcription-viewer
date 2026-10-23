@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../phone_audio/selected_audio.dart';
 import 'shared_item.dart';
@@ -43,7 +42,6 @@ class ShareIntake {
   }
 
   void _deliver(Object? arguments) {
-    debugPrint('ShareDebug dart got: $arguments listener=${_controller.hasListener}');
     final item = _parse(arguments);
     if (item == null) return;
     if (_controller.hasListener) {

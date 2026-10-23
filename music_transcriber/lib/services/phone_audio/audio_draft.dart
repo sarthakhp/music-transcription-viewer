@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'clip_player.dart';
 import 'selected_audio.dart';
-import 'wav_peaks.dart';
+import 'audio_peaks.dart';
 
 /// The one clip currently being prepared for upload: the file, its length,
 /// waveform outline, trim range and a player. Replacing or clearing it deletes
@@ -35,7 +35,7 @@ class AudioDraft extends ChangeNotifier {
     notifyListeners();
 
     final duration = await player.load(audio.path);
-    final peaks = audio.isWav ? await readWavPeaks(audio.path) : null;
+    final peaks = await readAudioPeaks(audio);
     if (generation != _generation) return false; // superseded meanwhile
     if (duration == null || duration <= 0) {
       await clear();
