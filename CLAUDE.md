@@ -50,7 +50,7 @@ Every feature must work on **desktop browser**, the **macOS DMG** (pywebview/WKW
 - **Routing**: `go_router` — `/` home, `/jobs/:id` viewer; browser back/forward works
 - **Audio**: Web Audio API via `dart:js_interop` + `package:web`; SoundTouchNode AudioWorklet for pitch shifting
 - **Tanpura drone**: `TanpuraService` — loads `assets/audio/tanpura_g.mp3` (G-scale, 90s loop), loops via `AudioBufferSourceNode`, shifts pitch with `playbackRate`. Shortcut: `T`.
-- **Backend**: FastAPI at `http://localhost:47821`
+- **Backend**: FastAPI at `http://localhost:47821` (the phone and hosted site instead read Firebase Storage files; see "Android app")
 
 ## Key Files
 | File | Purpose |
@@ -156,7 +156,7 @@ Home list = local jobs ∪ cloud index (`GET /cloud/jobs`, fetched in the backgr
 ## Verifying UI changes
 - The in-app browser is a mouse-only pane; for touch, dispatch synthetic `PointerEvent`s (`pointerType:'touch'`, distinct `pointerId`s) at `flt-glass-pane`. Screenshots can lag one frame behind — take a second one before concluding.
 - Run the dev server in the background (`flutter run -d web-server --web-port=8080 ...`) with stdin from a FIFO so `r`/`R` can be sent for hot reload/restart; reload the page afterwards. The user prefers to test interactions themselves — launch/reload, then wait for feedback instead of clicking through flows.
-- Pre-existing, unrelated: `test/widget_test.dart` is the stale counter template and fails.
+- `flutter test` passes (the stale counter-template test was removed).
 - Preview the release build against a scratch backend: `MT_WEB_DIR=music_transcriber/build/web` on the backend (it serves with `no-store`). Changing only the URL hash in the browser pane does NOT reload the app, so after rebuilding do `location.reload()`. Flutter web prefs live in localStorage (`flutter.*`); `localStorage.clear()` simulates a new device.
 
 ## Loading Overlay Logic
@@ -168,6 +168,25 @@ The overlay (`LoadingOverlay`) in `home_screen.dart` is visible when:
 - `isPreparingAudio` is set true in both `_downloadAudioStems` (start) and `_loadAudio` (start); only `_loadAudio` clears it on completion
 - `_buildViewerLayout` triggers `_loadAudio` via `addPostFrameCallback` whenever `!_audioLoaded && !_isLoadingAudio && audioBytes != null`
 - Error UI: audio load failure shows a SnackBar ("Audio could not be loaded. Playback is unavailable.") — the pitch visualization remains accessible
+
+## Android app (phone)
+Built from the same Flutter code: `android/` project under `music_transcriber/`, package `com.sarthak.musictranscriber.music_transcriber`. It runs in **remote mode** (reads the Firebase library, like the hosted site) plus phone-only features.
+```bash
+IDX=<public index.json URL>   # the FIREBASE_INDEX_URL CI variable
+flutter build apk --debug --dart-define=DATA_SOURCE=remote --dart-define=FIREBASE_INDEX_URL="$IDX"
+adb -s <serial> install -r build/app/outputs/flutter-apk/app-debug.apk   # retry: wireless adb is flaky
+```
+- **`android/app/google-services.json` is gitignored** (the secret scanner flags it). Re-download from the Firebase console after a fresh clone. Sign-in is registered for the **debug** SHA-1 only; a release build needs its own SHA-1 added in Firebase.
+- **Platform split**: web-only code lives behind conditional imports. A barrel `foo.dart` does `export 'foo_native.dart' if (dart.library.js_interop) 'foo_web.dart';` (or a `_stub`). Used for: `web_file_picker`, `tanpura_service`, `count_in_service`, `audio_recorder_service`, `audio_trim_service`, `download_helper`, `audio_export_interop`, `preview_audio`, `cloud_upload`, `cache/disk_cache`. When adding web-only code, add the native twin or the Android build breaks.
+- **Phone upload** (`screens/widgets/phone_upload/`): `PhoneUploadPanel` orchestrates; `SubmissionTracker` (remembered submissions + polling), `SubmissionList`, `RecordControls`, `ClipReview` (waveform, trim handles, playhead), `AccountBar`. Clip state and cleanup live in `services/phone_audio/` (`AudioDraft` deletes the previous file whenever it is replaced or disposed; recordings go to disk, never memory).
+- **Queue protocol** (`services/cloud_upload/`): the phone uploads `uploads/<id>/<file>` and writes `queue/<id>.json` (`audio_type`, optional `trim_start/trim_end`, `source_url` for links, `notify_topic`). Workers (Mac app, Modal) claim it and report `claimed -> processing -> done|failed` plus `job_id`. Trimming happens on the worker (ffmpeg), so it works for any file type. Backend side: the backend repo's CLAUDE.md.
+- **Sign-in**: Google via the in-app account sheet; if that fails within 2s (Google not yet honouring the app's SHA-1) it falls back to Firebase's browser flow. Storage rules allow only allow-listed emails to write (`scripts/allow_uploader.py` in the backend repo).
+- **Phone audio recording** (`SystemAudioService.kt`, channel `music_transcriber/system_audio`): Android playback capture through a `mediaProjection` foreground service, mono 44.1 kHz WAV. Apps may opt out of capture; the result then has a low `peak` and the UI warns.
+- **Share to the app** (`ShareReceiver.kt` + `services/share_intake/`): audio files (copied to cache) and links in shared text land in the upload panel; a share that arrives before the panel exists waits in `ShareIntake.takePending()`.
+- **Notifications**: FCM topic subscription (`job_notifications.dart`); the worker sends when a song finishes.
+- **On-device cache** (`services/cache/`): the song list is served from the saved copy and refreshed in the background (`RemoteIndexStore`, `LibrarySync` on resume). Pitch/chord/audio files are cached by URL (immutable: a reprocessed song gets new tokens, hence new URLs); audio is capped at 500 MB, least recently used deleted first.
+- **Gotchas**: `usesCleartextTraffic` must stay on, because just_audio's in-memory sources play through a localhost HTTP proxy. The vendored `third_party/just_audio` needs its `android/` folder (it was missing). Backend timestamps are UTC without a zone marker: always parse with `parseServerTime`. `ChoiceChip` with an avatar icon needs `showCheckmark: false` or the tick overlaps the icon. The launcher can keep showing the old Flutter icon until the phone restarts.
+- **Pitch/transpose on Android** uses the player's `setPitch` (independent of speed); there is no SoundTouch worklet.
 
 ## MCP / Tooling
 - **code-review-graph binary**: installed at `~/.local/bin/code-review-graph` (v2.3.7). `.mcp.json` uses the direct path — do NOT switch back to `uvx code-review-graph` (fails due to SSL cert issue on this machine).

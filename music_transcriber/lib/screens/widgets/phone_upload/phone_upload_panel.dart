@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/audio_content_type.dart';
 import '../../../services/cloud_upload/cloud_upload.dart';
@@ -5,6 +6,8 @@ import '../../../services/phone_audio/audio_draft.dart';
 import '../../../services/phone_audio/phone_file_picker.dart';
 import '../../../services/phone_audio/phone_recording.dart';
 import '../../../services/phone_audio/system_audio_recorder.dart';
+import '../../../services/share_intake/share_intake.dart';
+import '../../../services/share_intake/shared_item.dart';
 import 'account_bar.dart';
 import 'clip_review.dart';
 import 'record_controls.dart';
@@ -28,6 +31,7 @@ class PhoneUploadPanel extends StatefulWidget {
 class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   final _cloud = CloudUpload();
   late final SubmissionTracker _tracker;
+  StreamSubscription<SharedItem>? _shareSub;
   final PhoneRecording _recording = PhoneRecording();
   final AudioDraft _draft = AudioDraft();
   final TextEditingController _url = TextEditingController();
@@ -53,11 +57,15 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     SystemAudioRecorder.isSupported().then((v) {
       if (mounted) setState(() => _phoneAudioSupported = v);
     });
+    _shareSub = ShareIntake.instance.items.listen(_useShared);
+    final waiting = ShareIntake.instance.takePending();
+    if (waiting != null) _useShared(waiting);
     _restoreSession();
   }
 
   @override
   void dispose() {
+    _shareSub?.cancel();
     _tracker.dispose();
     _recording.dispose();
     _draft.dispose();
@@ -76,6 +84,29 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
       await _tracker.restore();
     } catch (e) {
       if (mounted) setState(() => _error = 'Sign-in setup failed: $e');
+    }
+  }
+
+  // --- Shared in from another app ----------------------------------------------
+
+  /// Puts what another app shared into the right tab, ready to send. Works even
+  /// before sign-in: the choice is kept and shown once the form appears.
+  Future<void> _useShared(SharedItem item) async {
+    switch (item) {
+      case SharedLink(:final url):
+        setState(() {
+          _source = _Source.link;
+          _url.text = url;
+          _error = null;
+        });
+      case SharedAudio(:final audio):
+        setState(() {
+          _source = _Source.file;
+          _error = null;
+        });
+        if (!await _draft.replaceWith(audio) && mounted) {
+          setState(() => _error = 'That file could not be read as audio.');
+        }
     }
   }
 

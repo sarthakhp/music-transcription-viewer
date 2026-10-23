@@ -5,8 +5,11 @@ import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
 import 'providers/theme_provider.dart';
 import 'router.dart';
+import 'services/share_intake/share_intake.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  ShareIntake.instance.start();
   runApp(const MyApp());
 }
 

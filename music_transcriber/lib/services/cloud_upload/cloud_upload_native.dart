@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../models/audio_content_type.dart';
+import 'job_notifications.dart';
 import 'queue_status.dart';
 
 /// Web client id of the Firebase project (from google-services.json); the
@@ -21,6 +22,7 @@ class CloudUpload {
   static const bool isSupported = true;
 
   static bool _ready = false;
+  final JobNotifications _notifications = JobNotifications();
 
   Future<void> _init() async {
     if (_ready) return;
@@ -65,13 +67,15 @@ class CloudUpload {
   String _newRequestId() => 'r${DateTime.now().millisecondsSinceEpoch}'
       '${Random().nextInt(0xFFFF).toRadixString(16)}';
 
-  Future<void> _writeQueueEntry(String id, Map<String, Object?> fields) {
+  Future<void> _writeQueueEntry(String id, Map<String, Object?> fields) async {
+    final topic = await _notifications.topic();
     final entry = jsonEncode({
       ...fields,
+      if (topic != null) 'notify_topic': topic,
       'status': 'queued',
       'created_at': DateTime.now().millisecondsSinceEpoch / 1000,
     });
-    return FirebaseStorage.instance
+    await FirebaseStorage.instance
         .ref('queue/$id.json')
         .putString(entry, metadata: SettableMetadata(contentType: 'application/json'));
   }
