@@ -223,6 +223,7 @@ class RemoteDataSource {
       videoTitle: title,
       userDisplayName: s['display_name'] as String?,
       audioType: AudioContentType.fromApi(s['audio_type'] as String?),
+      instruments: parseInstrumentList(s['instruments']),
     );
   }
 

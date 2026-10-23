@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:music_transcriber/screens/widgets/upload_shared/submission_tracker.dart';
+import 'package:music_transcriber/services/cloud_upload/submission_tracker.dart';
 import 'package:music_transcriber/services/cloud_upload/queue_status.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

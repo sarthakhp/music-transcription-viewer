@@ -10,6 +10,12 @@ class QueueStatus {
   final String? jobId;
   final String? error;
 
+  /// The song's name once the worker knows it (a video's title, say).
+  final String? title;
+
+  /// The technical reason behind [error], for anyone who wants it.
+  final String? errorDetails;
+
   const QueueStatus({
     required this.id,
     required this.fileName,
@@ -18,6 +24,8 @@ class QueueStatus {
     this.stage,
     this.jobId,
     this.error,
+    this.title,
+    this.errorDetails,
   });
 
   /// A request we remember but have not heard about yet. It is not claimed to
@@ -27,7 +35,9 @@ class QueueStatus {
         progress = 0,
         stage = null,
         jobId = null,
-        error = null;
+        error = null,
+        title = null,
+        errorDetails = null;
 
   bool get isDone => status == 'done';
   bool get isFailed => status == 'failed';
@@ -42,6 +52,8 @@ class QueueStatus {
         stage: json['stage'] as String?,
         jobId: json['job_id'] as String?,
         error: json['error'] as String?,
+        title: json['title'] as String?,
+        errorDetails: json['error_details'] as String?,
       );
 
   /// This status with the label we showed for it, which the worker does not know.
@@ -53,5 +65,7 @@ class QueueStatus {
         stage: stage,
         jobId: jobId,
         error: error,
+        title: title,
+        errorDetails: errorDetails,
       );
 }

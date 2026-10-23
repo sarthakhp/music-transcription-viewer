@@ -101,6 +101,18 @@ class CloudUpload {
     return id;
   }
 
+  Future<String> submitReprocess({
+    required String sourceJobId,
+    required String label,
+    required AudioContentType audioType,
+    List<String> instruments = const [],
+  }) async {
+    await _init();
+    final id = newRequestId();
+    await _writeEntry(id, label, audioType, reprocessOf: sourceJobId, instruments: instruments);
+    return id;
+  }
+
   Future<QueueStatus?> status(String requestId) async {
     await _init();
     try {
@@ -119,6 +131,7 @@ class CloudUpload {
     double? trimStart,
     double? trimEnd,
     String? sourceUrl,
+    String? reprocessOf,
     List<String> instruments = const [],
   }) {
     final entry = queueEntryJson(
@@ -128,6 +141,7 @@ class CloudUpload {
       trimStart: trimStart,
       trimEnd: trimEnd,
       sourceUrl: sourceUrl,
+      reprocessOf: reprocessOf,
       instruments: instruments,
     );
     return FirebaseStorage.instance

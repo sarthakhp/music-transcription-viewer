@@ -116,6 +116,19 @@ class CloudUpload {
     return id;
   }
 
+  /// Asks for an existing song to be processed again as a new song.
+  Future<String> submitReprocess({
+    required String sourceJobId,
+    required String label,
+    required AudioContentType audioType,
+    List<String> instruments = const [],
+  }) async {
+    await _init();
+    final id = newRequestId();
+    await _writeEntry(id, label, audioType, reprocessOf: sourceJobId, instruments: instruments);
+    return id;
+  }
+
   /// Current worker-reported status, or null if the entry can't be read yet.
   Future<QueueStatus?> status(String requestId) async {
     await _init();
@@ -142,6 +155,7 @@ class CloudUpload {
     double? trimStart,
     double? trimEnd,
     String? sourceUrl,
+    String? reprocessOf,
     List<String> instruments = const [],
   }) async {
     final entry = queueEntryJson(
@@ -151,6 +165,7 @@ class CloudUpload {
       trimStart: trimStart,
       trimEnd: trimEnd,
       sourceUrl: sourceUrl,
+      reprocessOf: reprocessOf,
       instruments: instruments,
       notifyTopic: await _notifications.topic(),
     );

@@ -8,11 +8,16 @@ class SubmissionList extends StatelessWidget {
   final void Function(String jobId) onOpen;
   final void Function(String requestId) onDismiss;
 
+  /// The name of a finished song in the song list, if it is there. It follows
+  /// renames, and beats the name we remembered.
+  final String? Function(String jobId) titleForJob;
+
   const SubmissionList({
     super.key,
     required this.items,
     required this.onOpen,
     required this.onDismiss,
+    required this.titleForJob,
   });
 
   @override
@@ -29,7 +34,7 @@ class SubmissionList extends StatelessWidget {
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: _leading(s, errorColor),
-      title: Text(s.fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(displayName(s), maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(describe(s)),
       onTap: canOpen ? () => onOpen(s.jobId!) : null,
       trailing: s.isActive
@@ -48,6 +53,14 @@ class SubmissionList extends StatelessWidget {
     );
   }
 
+  /// What to call a submission: the song's name in the list, else the name the
+  /// worker reported, else what we remembered (a link is shortened to a
+  /// readable form).
+  String displayName(QueueStatus s) {
+    final fromList = s.jobId == null ? null : titleForJob(s.jobId!);
+    return fromList ?? shortenLink(s.fileName);
+  }
+
   Widget _leading(QueueStatus s, Color errorColor) {
     if (s.isDone) return const Icon(Icons.check_circle_rounded);
     if (s.isFailed) return Icon(Icons.error_rounded, color: errorColor);
@@ -56,6 +69,16 @@ class SubmissionList extends StatelessWidget {
       height: 22,
       child: CircularProgressIndicator(strokeWidth: 2.5),
     );
+  }
+
+  /// "https://www.youtube.com/watch?v=abc" -> "youtube.com/watch?v=abc"; anything
+  /// that is not a link is returned unchanged.
+  static String shortenLink(String label) {
+    final uri = Uri.tryParse(label);
+    if (uri == null || !uri.hasAuthority || !label.startsWith('http')) return label;
+    final host = uri.host.startsWith('www.') ? uri.host.substring(4) : uri.host;
+    final rest = '${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}';
+    return rest == '/' ? host : '$host$rest';
   }
 
   /// The one line of status under a song's name.

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../utils/friendly_error.dart';
 import '../../../models/audio_content_type.dart';
 import '../../../services/cloud_upload/cloud_upload.dart';
+import '../../../services/cloud_upload/upload_queue.dart';
 import '../../../services/phone_audio/audio_draft.dart';
 import '../../../services/phone_audio/phone_file_picker.dart';
 import '../../../services/phone_audio/phone_recording.dart';
@@ -17,7 +19,6 @@ import '../upload_shared/upload_submit.dart';
 import '../upload_shared/clip_review.dart';
 import '../upload_shared/source_selector.dart';
 import 'record_controls.dart';
-import '../upload_shared/submission_tracker.dart';
 
 /// Android-only card: sign in with Google, then add a song from a file, a
 /// recording (microphone or other apps' audio) or a link. It is queued for
@@ -29,10 +30,14 @@ class PhoneUploadPanel extends StatefulWidget {
   /// Opens a finished song (the same as tapping it in the song list).
   final void Function(String jobId) onOpenJob;
 
+  /// A finished song's name in the song list, if it is there.
+  final String? Function(String jobId) titleForJob;
+
   const PhoneUploadPanel({
     super.key,
     required this.onLibraryChanged,
     required this.onOpenJob,
+    required this.titleForJob,
   });
 
   @override
@@ -40,8 +45,9 @@ class PhoneUploadPanel extends StatefulWidget {
 }
 
 class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
-  final _cloud = CloudUpload();
-  late final SubmissionTracker _tracker;
+  final _cloud = UploadQueue.instance.cloud;
+  final _tracker = UploadQueue.instance.tracker;
+  StreamSubscription<void>? _finishedSub;
   StreamSubscription<SharedItem>? _shareSub;
   final PhoneRecording _recording = PhoneRecording();
   final AudioDraft _draft = AudioDraft();
@@ -58,8 +64,8 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   @override
   void initState() {
     super.initState();
-    _tracker = SubmissionTracker(_cloud.status, onJobFinished: widget.onLibraryChanged)
-      ..addListener(_rebuild);
+    _tracker.addListener(_rebuild);
+    _finishedSub = UploadQueue.instance.jobFinished.listen((_) => widget.onLibraryChanged());
     _recording.addListener(_rebuild);
     _draft.addListener(_rebuild);
     _url.addListener(_rebuild);
@@ -75,7 +81,8 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   @override
   void dispose() {
     _shareSub?.cancel();
-    _tracker.dispose();
+    _finishedSub?.cancel();
+    _tracker.removeListener(_rebuild);
     _recording.dispose();
     _draft.dispose();
     _url.dispose();
@@ -90,9 +97,9 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
     try {
       final email = await _cloud.signedInEmail();
       if (mounted) setState(() => _email = email);
-      await _tracker.restore();
+      await UploadQueue.instance.restore();
     } catch (e) {
-      if (mounted) setState(() => error = 'Sign-in setup failed: $e');
+      if (mounted) setState(() => error = explainError(e, during: 'check your sign-in').message);
     }
   }
 
@@ -121,7 +128,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
 
   // --- Account ---------------------------------------------------------------
 
-  Future<void> _signIn() => guarded('Sign-in failed', () async {
+  Future<void> _signIn() => guarded('sign in', () async {
         final email = await _cloud.signIn();
         if (mounted) setState(() => _email = email);
       });
@@ -211,7 +218,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
 
   /// Runs [send] (which returns the new request id) and starts tracking it.
   Future<void> _submit(String label, Future<String> Function() send) {
-    return guarded('Upload failed', () async {
+    return guarded('upload this song', () async {
       setState(() {
         _warning = null;
         uploadFraction = 0;
@@ -236,6 +243,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
       submissions: _tracker.items,
       onOpenJob: widget.onOpenJob,
       onDismissSubmission: _tracker.dismiss,
+      titleForJob: widget.titleForJob,
     );
   }
 

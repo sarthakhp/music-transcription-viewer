@@ -23,6 +23,7 @@ String queueEntryJson({
   double? trimStart,
   double? trimEnd,
   String? sourceUrl,
+  String? reprocessOf,
   List<String> instruments = const [],
   String? notifyTopic,
   DateTime? now,
@@ -32,6 +33,8 @@ String queueEntryJson({
     'filename': filename,
     'audio_type': audioType.apiValue,
     'source_url': ?sourceUrl,
+    // An existing song to process again; there is no upload with such a request.
+    'reprocess_of': ?reprocessOf,
     'trim_start': ?trimStart,
     'trim_end': ?trimEnd,
     // Left out when empty, so the worker decides on its own.

@@ -34,6 +34,9 @@ import '../models/job.dart';
 import 'widgets/loading_overlay.dart';
 import 'widgets/keyboard_shortcuts_dialog.dart';
 import 'widgets/upload_layout.dart';
+import 'widgets/reprocess_sheet.dart';
+import '../services/cloud_upload/upload_queue.dart';
+import '../utils/friendly_error.dart';
 import 'widgets/phone_viewer_app_bar.dart';
 import 'widgets/viewer_toolbar.dart';
 import 'widgets/count_in_control.dart';
@@ -579,6 +582,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       onJobSelected: _onJobSelected,
       onJobDeleted: _onJobDeleted,
       onJobRetry: _onJobRetry,
+      onReprocess: _onReprocess,
       onFileUpload: _uploadAudioBytes,
       onUrlSubmitted: _submitUrlForTranscription,
       onCancel: _cancelCurrentJob,

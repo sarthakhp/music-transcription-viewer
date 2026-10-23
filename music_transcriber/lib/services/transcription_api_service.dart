@@ -316,6 +316,24 @@ class TranscriptionApiService {
     );
   }
 
+  /// Process a finished song's audio again as a new song, with another song
+  /// type and instrument choice. POST /api/v1/jobs/{job_id}/reprocess
+  Future<ApiResponse<JobCreationResponse>> reprocessJob(
+    String jobId, {
+    required AudioContentType audioType,
+    List<String> instruments = const [],
+  }) async {
+    if (_remote != null) return _remoteUnsupported();
+    return ApiErrorHandler.executeApiCall(
+      () => _client.post(
+        Uri.parse(ApiConfig.getUrl('${ApiConfig.jobsEndpoint}/$jobId/reprocess')),
+        headers: {..._commonHeaders, 'Content-Type': 'application/json'},
+        body: jsonEncode({'audio_type': audioType.apiValue, 'instruments': instruments}),
+      ).timeout(ApiConfig.requestTimeout),
+      (json) => JobCreationResponse.fromJson(json),
+    );
+  }
+
   // ========== Endpoint 9: Health Check ==========
 
   /// Check API health and queue status

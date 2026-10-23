@@ -18,6 +18,7 @@ class UploadCard extends StatelessWidget {
   final List<QueueStatus> submissions;
   final void Function(String jobId) onOpenJob;
   final void Function(String requestId) onDismissSubmission;
+  final String? Function(String jobId) titleForJob;
 
   const UploadCard({
     super.key,
@@ -32,6 +33,7 @@ class UploadCard extends StatelessWidget {
     required this.submissions,
     required this.onOpenJob,
     required this.onDismissSubmission,
+    required this.titleForJob,
   });
 
   @override
@@ -64,6 +66,7 @@ class UploadCard extends StatelessWidget {
                 items: submissions,
                 onOpen: onOpenJob,
                 onDismiss: onDismissSubmission,
+                titleForJob: titleForJob,
               ),
             ],
           ],

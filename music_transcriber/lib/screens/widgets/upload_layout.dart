@@ -22,6 +22,7 @@ class UploadLayout extends StatelessWidget {
   final Future<void> Function(String) onJobSelected;
   final Future<void> Function(String) onJobDeleted;
   final Future<void> Function(String) onJobRetry;
+  final void Function(JobListItem job)? onReprocess;
   final Future<void> Function(
     Uint8List bytes,
     String fileName, {
@@ -54,6 +55,7 @@ class UploadLayout extends StatelessWidget {
     required this.onJobSelected,
     required this.onJobDeleted,
     required this.onJobRetry,
+    this.onReprocess,
     this.onFileUpload,
     this.onUrlSubmitted,
     this.onCancel,
@@ -146,6 +148,7 @@ class UploadLayout extends StatelessWidget {
                               jobs: completedJobs,
                               onJobSelected: onJobSelected,
                               onJobDeleted: isRemote ? null : onJobDeleted,
+                              onReprocess: onReprocess,
                               isLoading: isLoadingJobs,
                             ),
                           ),
@@ -189,6 +192,7 @@ class UploadLayout extends StatelessWidget {
                             onToggleShowAll: toggle,
                             onJobSelected: onJobSelected,
                             onJobDeleted: isRemote ? null : onJobDeleted,
+                            onReprocess: onReprocess,
                             isLoading: isLoadingJobs,
                           ),
                         )
@@ -199,6 +203,7 @@ class UploadLayout extends StatelessWidget {
                             jobs: completedJobs,
                             onJobSelected: onJobSelected,
                             onJobDeleted: isRemote ? null : onJobDeleted,
+                            onReprocess: onReprocess,
                             isLoading: isLoadingJobs,
                           ),
                         ),
@@ -213,6 +218,15 @@ class UploadLayout extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// A song's name in the song list, so a finished submission shows its real
+  /// title (and follows renames) instead of the link it started from.
+  String? _titleForJob(String jobId) {
+    for (final job in completedJobs) {
+      if (job.id == jobId) return job.displayName;
+    }
+    return null;
   }
 
   /// Left panel: the upload/URL controls locally, or a read-only note when
@@ -248,9 +262,17 @@ class UploadLayout extends StatelessWidget {
       children: [
         if (CloudUpload.isSupported && onLibraryChanged != null) ...[
           if (kIsWeb)
-            WebUploadPanel(onLibraryChanged: onLibraryChanged!, onOpenJob: onJobSelected)
+            WebUploadPanel(
+              onLibraryChanged: onLibraryChanged!,
+              onOpenJob: onJobSelected,
+              titleForJob: _titleForJob,
+            )
           else
-            PhoneUploadPanel(onLibraryChanged: onLibraryChanged!, onOpenJob: onJobSelected),
+            PhoneUploadPanel(
+              onLibraryChanged: onLibraryChanged!,
+              onOpenJob: onJobSelected,
+              titleForJob: _titleForJob,
+            ),
           const SizedBox(height: 20),
         ],
         Card(

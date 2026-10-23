@@ -259,6 +259,9 @@ class JobListItem {
   final String? userDisplayName;
   final AudioContentType audioType;
 
+  /// The instruments it was told to look for; empty when it decided on its own.
+  final List<String> instruments;
+
   /// Where this job's data lives. Null when cloud storage isn't in play
   /// (no cloud configured or unreachable), so no badge is shown.
   final JobStorage? storage;
@@ -283,6 +286,7 @@ class JobListItem {
     this.videoTitle,
     this.userDisplayName,
     this.audioType = AudioContentType.mixed,
+    this.instruments = const [],
     this.storage,
   });
 
@@ -310,6 +314,7 @@ class JobListItem {
         videoTitle: videoTitle,
         userDisplayName: userDisplayName,
         audioType: audioType,
+        instruments: instruments,
         storage: storage,
       );
 
@@ -338,6 +343,7 @@ class JobListItem {
       videoTitle: title,
       userDisplayName: json['display_name'] as String?,
       audioType: AudioContentType.fromApi(json['audio_type'] as String?),
+      instruments: parseInstrumentList(json['instruments']),
       storage: (json['on_device'] as bool? ?? false)
           ? JobStorage.synced
           : JobStorage.cloudOnly,
@@ -373,6 +379,7 @@ class JobListItem {
       videoTitle: json['video_title'] as String?,
       userDisplayName: json['display_name'] as String?,
       audioType: AudioContentType.fromApi(json['audio_type'] as String?),
+      instruments: parseInstrumentList(json['instruments']),
     );
   }
 
@@ -487,3 +494,8 @@ class JobListResponse {
   }
 }
 
+
+
+/// The instrument names in a JSON value (a list), or none when absent.
+List<String> parseInstrumentList(Object? value) =>
+    value is List ? [for (final name in value) if (name is String) name] : const [];

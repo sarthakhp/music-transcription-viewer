@@ -75,10 +75,16 @@ class ProcessedFramesData {
     );
   }
 
-  /// Get the maximum time in the data
+  /// The song's length as stored with the job. A Music only song has no voice
+  /// frames at all, so its length cannot come from them; every part of the
+  /// viewer that needs the song's length reads [maxTime], which uses this.
+  double declaredDuration = 0;
+
+  /// The song's length in seconds: the last voice frame, or the stored length
+  /// when that is longer (or there are no voice frames).
   double get maxTime {
-    if (processedFrames.isEmpty) return 0;
-    return processedFrames.last.time;
+    final lastFrame = processedFrames.isEmpty ? 0.0 : processedFrames.last.time;
+    return lastFrame > declaredDuration ? lastFrame : declaredDuration;
   }
 
   /// Get the duration formatted as mm:ss

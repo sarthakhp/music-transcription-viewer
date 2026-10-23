@@ -9,6 +9,9 @@ class JobListCard extends StatelessWidget {
   final Function(String jobId) onJobSelected;
   final Future<void> Function(String jobId)? onJobDeleted;
   final Future<void> Function(String jobId)? onJobRetry;
+
+  /// Offers "Process again" on each finished song.
+  final void Function(JobListItem job)? onReprocess;
   final bool isLoading;
 
   /// Header title. Defaults to the completed-jobs history title.
@@ -35,6 +38,7 @@ class JobListCard extends StatelessWidget {
     required this.onJobSelected,
     this.onJobDeleted,
     this.onJobRetry,
+    this.onReprocess,
     this.isLoading = false,
     this.title = 'Your Songs',
     this.isFailedList = false,
@@ -139,6 +143,7 @@ class JobListCard extends StatelessWidget {
               ? () => onJobDeleted!(job.id)
               : null,
           onRetry: onJobRetry != null ? () => onJobRetry!(job.id) : null,
+          onReprocess: !isFailedList && onReprocess != null ? () => onReprocess!(job) : null,
         );
       },
     );
@@ -197,6 +202,7 @@ class _JobListTile extends StatefulWidget {
   final VoidCallback onTap;
   final Future<void> Function()? onDelete;
   final Future<void> Function()? onRetry;
+  final VoidCallback? onReprocess;
   final bool isFailed;
 
   const _JobListTile({
@@ -204,6 +210,7 @@ class _JobListTile extends StatefulWidget {
     required this.onTap,
     this.onDelete,
     this.onRetry,
+    this.onReprocess,
     this.isFailed = false,
   });
 
@@ -338,6 +345,14 @@ class _JobListTileState extends State<_JobListTile> {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          if (widget.onReprocess != null)
+                            IconButton(
+                              icon: const Icon(Icons.replay_rounded, size: 20),
+                              tooltip: 'Process again',
+                              onPressed: widget.onReprocess,
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            ),
                           if (widget.onDelete != null)
                             IconButton(
                               icon: const Icon(Icons.delete_outline_rounded, size: 20),

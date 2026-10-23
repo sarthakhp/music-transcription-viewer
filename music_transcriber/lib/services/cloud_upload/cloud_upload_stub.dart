@@ -41,5 +41,13 @@ class CloudUpload {
   }) =>
       throw UnsupportedError('Upload is not available here');
 
+  Future<String> submitReprocess({
+    required String sourceJobId,
+    required String label,
+    required AudioContentType audioType,
+    List<String> instruments = const [],
+  }) =>
+      throw UnsupportedError('Upload is not available here');
+
   Future<QueueStatus?> status(String requestId) async => null;
 }

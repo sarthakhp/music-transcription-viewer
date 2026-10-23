@@ -146,6 +146,53 @@ extension _HomeScreenJobs on _HomeScreenState {
     }
   }
 
+  /// Asks how to process a finished song again, then queues it as a new song.
+  Future<void> _onReprocess(JobListItem job) async {
+    final choice = await showReprocessSheet(context, job);
+    if (choice == null || !mounted) return;
+
+    final label = '${job.displayName} (${choice.audioType.label})';
+    try {
+      if (ApiConfig.isRemote) {
+        await UploadQueue.instance.reprocess(
+          sourceJobId: job.id,
+          label: label,
+          audioType: choice.audioType,
+          instruments: choice.instruments,
+        );
+        _showReprocessMessage('Queued "$label". Follow it in the upload list.');
+        return;
+      }
+      final response = await _apiService.reprocessJob(
+        job.id,
+        audioType: choice.audioType,
+        instruments: choice.instruments,
+      );
+      if (!mounted) return;
+      if (response.isSuccess && response.data != null) {
+        _pollingService.startPolling(response.data!.jobId);
+        _showReprocessMessage('Processing "$label" as a new song.');
+      } else {
+        _showReprocessMessage(
+          "Couldn't process it again: ${response.error ?? 'the server gave no reason'}",
+          isError: true,
+        );
+      }
+    } catch (e) {
+      final friendly = explainError(e, during: 'process this song again');
+      _showReprocessMessage(friendly.message, isError: true);
+    }
+  }
+
+  void _showReprocessMessage(String text, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(text),
+      backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   /// Handle job selection — load job data and display
   Future<void> _onJobSelected(String jobId) async {
     final appState = context.read<AppState>();
@@ -175,6 +222,8 @@ extension _HomeScreenJobs on _HomeScreenState {
       final results = await _apiService.getAllProcessedData(jobId);
 
       if (results.frames.isSuccess && results.frames.data != null) {
+        // Music only songs have no voice frames, so give the viewer the stored length.
+        results.frames.data!.declaredDuration = resultsResponse.data?.duration ?? 0;
         appState.setPitchData(results.frames.data!);
       }
 

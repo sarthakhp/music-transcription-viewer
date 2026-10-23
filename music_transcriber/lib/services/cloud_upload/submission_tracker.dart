@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../services/cloud_upload/queue_status.dart';
+import 'queue_status.dart';
 
 /// The songs this device has submitted, remembered across launches.
 ///
@@ -93,7 +93,9 @@ class SubmissionTracker extends ChangeNotifier {
       if (!entry.status.isActive) continue;
       final fresh = await _fetchStatus(entry.status.id);
       if (fresh == null || _disposed) continue;
-      entry.status = fresh.withLabel(entry.status.fileName);
+      // Show the song's own name once the worker knows it (a video's title).
+      final title = fresh.title;
+      entry.status = fresh.withLabel(title != null && title.isNotEmpty ? title : entry.status.fileName);
       if (!entry.status.isActive) {
         entry.finishedAt ??= _now();
         finishedNow = finishedNow || entry.status.isDone;
