@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
-import '../../../services/phone_audio/audio_draft.dart';
+import '../../../services/clip/clip_draft.dart';
 import 'waveform_trimmer.dart';
 
 /// Review card for the current clip: waveform with trim handles, a playhead,
 /// play/pause limited to the trimmed range, and the start, length and end times.
 class ClipReview extends StatelessWidget {
-  final AudioDraft draft;
+  final ClipDraft draft;
   const ClipReview({super.key, required this.draft});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([draft, draft.player]),
+      listenable: draft,
       builder: (context, _) {
         if (draft.duration <= 0) return const _Loading();
-        final player = draft.player;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(draft.audio!.name,
+            Text(draft.name ?? '',
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
             const SizedBox(height: 8),
             WaveformTrimmer(
@@ -27,13 +26,13 @@ class ClipReview extends StatelessWidget {
               duration: draft.duration,
               trimStart: draft.trimStart,
               trimEnd: draft.trimEnd,
-              position: player.position,
-              minSelection: AudioDraft.minSelectionSeconds,
+              position: draft.position,
+              minSelection: minTrimSeconds,
               onTrimChanged: draft.setTrim,
-              onSeek: player.seek,
+              onSeek: draft.seek,
             ),
             const SizedBox(height: 4),
-            _times(theme, player.position),
+            _times(theme, draft.position),
             const SizedBox(height: 4),
             _transport(theme),
           ],
@@ -56,13 +55,12 @@ class ClipReview extends StatelessWidget {
   }
 
   Widget _transport(ThemeData theme) {
-    final player = draft.player;
     return Row(
       children: [
         IconButton.filledTonal(
-          onPressed: player.toggle,
-          icon: Icon(player.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-          tooltip: player.playing ? 'Pause' : 'Play the selection',
+          onPressed: draft.toggle,
+          icon: Icon(draft.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+          tooltip: draft.playing ? 'Pause' : 'Play the selection',
         ),
         const SizedBox(width: 8),
         Text(
@@ -74,7 +72,7 @@ class ClipReview extends StatelessWidget {
         const Spacer(),
         if (draft.isTrimmed)
           TextButton(
-            onPressed: () => draft.setTrim(0, draft.duration),
+            onPressed: draft.resetTrim,
             child: const Text('Reset'),
           ),
       ],

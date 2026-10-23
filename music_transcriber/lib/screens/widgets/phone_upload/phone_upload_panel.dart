@@ -8,13 +8,15 @@ import '../../../services/phone_audio/phone_recording.dart';
 import '../../../services/phone_audio/system_audio_recorder.dart';
 import '../../../services/share_intake/share_intake.dart';
 import '../../../services/share_intake/shared_item.dart';
-import 'account_bar.dart';
-import 'clip_review.dart';
+import '../upload_shared/audio_type_chips.dart';
+import '../upload_shared/busy_guard.dart';
+import '../upload_shared/link_field.dart';
+import '../upload_shared/upload_card.dart';
+import '../upload_shared/upload_submit.dart';
+import '../upload_shared/clip_review.dart';
+import '../upload_shared/source_selector.dart';
 import 'record_controls.dart';
-import 'submission_list.dart';
-import 'submission_tracker.dart';
-
-enum _Source { file, record, link }
+import '../upload_shared/submission_tracker.dart';
 
 /// Android-only card: sign in with Google, then add a song from a file, a
 /// recording (microphone or other apps' audio) or a link. It is queued for
@@ -28,7 +30,7 @@ class PhoneUploadPanel extends StatefulWidget {
   State<PhoneUploadPanel> createState() => _PhoneUploadPanelState();
 }
 
-class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
+class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   final _cloud = CloudUpload();
   late final SubmissionTracker _tracker;
   StreamSubscription<SharedItem>? _shareSub;
@@ -37,13 +39,10 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   final TextEditingController _url = TextEditingController();
 
   String? _email;
-  _Source _source = _Source.file;
+  UploadSource _source = UploadSource.file;
   RecordSource _recordSource = RecordSource.microphone;
   AudioContentType _audioType = AudioContentType.mixed;
   bool _phoneAudioSupported = false;
-  bool _busy = false;
-  double? _uploadFraction;
-  String? _error;
   String? _warning;
 
   @override
@@ -83,7 +82,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
       if (mounted) setState(() => _email = email);
       await _tracker.restore();
     } catch (e) {
-      if (mounted) setState(() => _error = 'Sign-in setup failed: $e');
+      if (mounted) setState(() => error = 'Sign-in setup failed: $e');
     }
   }
 
@@ -95,24 +94,24 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     switch (item) {
       case SharedLink(:final url):
         setState(() {
-          _source = _Source.link;
+          _source = UploadSource.link;
           _url.text = url;
-          _error = null;
+          error = null;
         });
       case SharedAudio(:final audio):
         setState(() {
-          _source = _Source.file;
-          _error = null;
+          _source = UploadSource.file;
+          error = null;
         });
         if (!await _draft.replaceWith(audio) && mounted) {
-          setState(() => _error = 'That file could not be read as audio.');
+          setState(() => error = 'That file could not be read as audio.');
         }
     }
   }
 
   // --- Account ---------------------------------------------------------------
 
-  Future<void> _signIn() => _guarded('Sign-in failed', () async {
+  Future<void> _signIn() => guarded('Sign-in failed', () async {
         final email = await _cloud.signIn();
         if (mounted) setState(() => _email = email);
       });
@@ -127,9 +126,9 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   Future<void> _pickFile() async {
     final picked = await pickAudioFile();
     if (picked == null || !mounted) return;
-    setState(() => _error = null);
+    setState(() => error = null);
     if (!await _draft.replaceWith(picked) && mounted) {
-      setState(() => _error = 'That file could not be read as audio.');
+      setState(() => error = 'That file could not be read as audio.');
     }
   }
 
@@ -138,12 +137,12 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     // A new take replaces the previous one: delete it before recording starts.
     await _draft.clear();
     setState(() {
-      _error = null;
+      error = null;
       _warning = null;
     });
     final started = await _recording.start(_recordSource);
     if (!started && mounted) {
-      setState(() => _error = 'Recording was not allowed. Check the permission prompt.');
+      setState(() => error = 'Recording was not allowed. Check the permission prompt.');
     }
   }
 
@@ -151,24 +150,24 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     final done = await _recording.stop();
     if (!mounted) return;
     if (done == null) {
-      setState(() => _error = 'Nothing was recorded.');
+      setState(() => error = 'Nothing was recorded.');
       return;
     }
     setState(() => _warning = done.warning);
     if (!await _draft.replaceWith(done.audio) && mounted) {
-      setState(() => _error = 'The recording could not be read.');
+      setState(() => error = 'The recording could not be read.');
     }
   }
 
   // --- Submitting ------------------------------------------------------------
 
   bool get _canSubmit {
-    if (_busy || _recording.isRecording) return false;
-    return _source == _Source.link ? _url.text.trim().isNotEmpty : _draft.hasAudio && _draft.duration > 0;
+    if (busy || _recording.isRecording) return false;
+    return _source == UploadSource.link ? _url.text.trim().isNotEmpty : _draft.hasAudio && _draft.duration > 0;
   }
 
   Future<void> _submitSelected() =>
-      _source == _Source.link ? _submitLink() : _submitFile();
+      _source == UploadSource.link ? _submitLink() : _submitFile();
 
   Future<void> _submitFile() async {
     final audio = _draft.audio;
@@ -180,7 +179,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
           audioType: _audioType,
           trimStart: trimmed ? _draft.trimStart : null,
           trimEnd: trimmed ? _draft.trimEnd : null,
-          onProgress: (f) => setState(() => _uploadFraction = f),
+          onProgress: (f) => setState(() => uploadFraction = f),
         ));
     await _draft.clear(); // uploaded: drop the local copy
   }
@@ -188,7 +187,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
   Future<void> _submitLink() async {
     final url = _url.text.trim();
     if (!url.startsWith('http') || Uri.tryParse(url)?.hasAuthority != true) {
-      setState(() => _error = 'Paste a full link starting with http');
+      setState(() => error = 'Paste a full link starting with http');
       return;
     }
     await _submit(url, () => _cloud.submitUrl(url: url, audioType: _audioType));
@@ -197,115 +196,68 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
 
   /// Runs [send] (which returns the new request id) and starts tracking it.
   Future<void> _submit(String label, Future<String> Function() send) {
-    return _guarded('Upload failed', () async {
+    return guarded('Upload failed', () async {
       setState(() {
         _warning = null;
-        _uploadFraction = 0;
+        uploadFraction = 0;
       });
       await _tracker.add(await send(), label);
-    }, onDone: () => _uploadFraction = null);
-  }
-
-  /// Shows a busy state around [action] and turns failures into [failure] text.
-  Future<void> _guarded(String failure, Future<void> Function() action,
-      {VoidCallback? onDone}) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await action();
-    } catch (e) {
-      if (mounted) setState(() => _error = '$failure: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          onDone?.call();
-        });
-      }
-    }
+    }, onDone: () => uploadFraction = null);
   }
 
   // --- UI --------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Add a song from this phone', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            if (_email == null) _signInButton() else ..._form(),
-            if (_error != null) _message(_error!, theme.colorScheme.error),
-            if (_warning != null) _message(_warning!, theme.colorScheme.tertiary),
-            if (_tracker.items.isNotEmpty) ...[
-              const Divider(height: 28),
-              SubmissionList(items: _tracker.items),
-            ],
-          ],
-        ),
-      ),
+    return UploadCard(
+      title: 'Add a song from this phone',
+      email: _email,
+      busy: busy,
+      onSignIn: _signIn,
+      onSignOut: _signOut,
+      form: _form(),
+      error: error,
+      warning: _warning,
+      submissions: _tracker.items,
     );
   }
 
-  Widget _signInButton() => FilledButton.icon(
-        onPressed: _busy ? null : _signIn,
-        icon: const Icon(Icons.login_rounded),
-        label: const Text('Sign in with Google'),
-      );
-
   List<Widget> _form() => [
-        AccountBar(email: _email!, enabled: !_busy, onSignOut: _signOut),
-        const SizedBox(height: 8),
         _sourceSelector(),
         const SizedBox(height: 12),
         _sourceBody(),
         const SizedBox(height: 12),
         _typeChips(),
         const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _canSubmit ? _submitSelected : null,
-          icon: Icon(_source == _Source.link ? Icons.link_rounded : Icons.cloud_upload_rounded),
-          label: Text(_source == _Source.link ? 'Transcribe link' : 'Upload and transcribe'),
+        UploadSubmit(
+          source: _source,
+          enabled: _canSubmit,
+          fraction: uploadFraction,
+          onPressed: _submitSelected,
         ),
-        if (_uploadFraction != null) ...[
-          const SizedBox(height: 12),
-          LinearProgressIndicator(value: _source == _Source.link ? null : _uploadFraction),
-        ],
       ];
 
-  Widget _sourceSelector() => SegmentedButton<_Source>(
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment(value: _Source.file, icon: Icon(Icons.audio_file_rounded), label: Text('File')),
-          ButtonSegment(value: _Source.record, icon: Icon(Icons.mic_rounded), label: Text('Record')),
-          ButtonSegment(value: _Source.link, icon: Icon(Icons.link_rounded), label: Text('Link')),
-        ],
-        selected: {_source},
-        onSelectionChanged:
-            (_busy || _recording.isRecording) ? null : (v) => setState(() => _source = v.first),
+  Widget _sourceSelector() => SourceSelector(
+        selected: _source,
+        enabled: !(busy || _recording.isRecording),
+        onChanged: (source) => setState(() => _source = source),
       );
 
   Widget _sourceBody() {
     switch (_source) {
-      case _Source.file:
+      case UploadSource.file:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             OutlinedButton.icon(
-              onPressed: _busy ? null : _pickFile,
+              onPressed: busy ? null : _pickFile,
               icon: const Icon(Icons.folder_open_rounded),
               label: Text(_draft.hasAudio ? 'Choose a different file' : 'Choose an audio file'),
             ),
             _review(),
           ],
         );
-      case _Source.record:
+      case UploadSource.record:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -313,7 +265,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
               recording: _recording,
               source: _recordSource,
               phoneAudioSupported: _phoneAudioSupported,
-              enabled: !_busy,
+              enabled: !busy,
               hasTake: _draft.hasAudio,
               onSourceChanged: (s) => setState(() => _recordSource = s),
               onToggle: _toggleRecording,
@@ -321,16 +273,8 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
             _review(),
           ],
         );
-      case _Source.link:
-        return TextField(
-          controller: _url,
-          enabled: !_busy,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'Link (YouTube or other)',
-            border: OutlineInputBorder(),
-          ),
-        );
+      case UploadSource.link:
+        return LinkField(controller: _url, enabled: !busy);
     }
   }
 
@@ -343,20 +287,9 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> {
     );
   }
 
-  Widget _typeChips() => Wrap(
-        spacing: 8,
-        children: [
-          for (final type in AudioContentType.values)
-            ChoiceChip(
-              label: Text(type.label),
-              selected: _audioType == type,
-              onSelected: _busy ? null : (_) => setState(() => _audioType = type),
-            ),
-        ],
-      );
-
-  Widget _message(String text, Color color) => Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Text(text, style: TextStyle(color: color)),
+  Widget _typeChips() => AudioTypeChips(
+        selected: _audioType,
+        enabled: !busy,
+        onChanged: (type) => setState(() => _audioType = type),
       );
 }

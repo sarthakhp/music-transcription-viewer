@@ -1,13 +1,16 @@
+import 'dart:typed_data';
 import '../../models/audio_content_type.dart';
 import 'queue_status.dart';
 
-/// Web has no phone-upload path (the hosted viewer stays read-only).
+/// Used where uploading isn't available (the Mac app and local browser, which
+/// talk to the local backend instead).
 class CloudUpload {
-  static const bool isSupported = false;
+  static bool get isSupported => false;
 
   Future<String?> signedInEmail() async => null;
-  Future<String> signIn() => throw UnsupportedError('Upload is Android only');
+  Future<String> signIn() => throw UnsupportedError('Upload is not available here');
   Future<void> signOut() async {}
+
   Future<String> submit({
     required String path,
     required String fileName,
@@ -16,11 +19,24 @@ class CloudUpload {
     double? trimEnd,
     void Function(double fraction)? onProgress,
   }) =>
-      throw UnsupportedError('Upload is Android only');
+      throw UnsupportedError('Upload is not available here');
+
+  Future<String> submitBytes({
+    required Uint8List bytes,
+    required String fileName,
+    required String contentType,
+    required AudioContentType audioType,
+    double? trimStart,
+    double? trimEnd,
+    void Function(double fraction)? onProgress,
+  }) =>
+      throw UnsupportedError('Upload is not available here');
+
   Future<String> submitUrl({
     required String url,
     required AudioContentType audioType,
   }) =>
-      throw UnsupportedError('Upload is Android only');
+      throw UnsupportedError('Upload is not available here');
+
   Future<QueueStatus?> status(String requestId) async => null;
 }

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../providers/app_state.dart';
 import '../../models/audio_content_type.dart';
@@ -8,6 +9,7 @@ import '../../widgets/job_list_card.dart';
 import '../practice_screen.dart';
 import '../../services/cloud_upload/cloud_upload.dart';
 import 'phone_upload/phone_upload_panel.dart';
+import 'web_upload/web_upload_panel.dart';
 import 'upload_section.dart';
 
 /// Upload layout widget with responsive design
@@ -243,7 +245,10 @@ class UploadLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (CloudUpload.isSupported && onLibraryChanged != null) ...[
-          PhoneUploadPanel(onLibraryChanged: onLibraryChanged!),
+          if (kIsWeb)
+            WebUploadPanel(onLibraryChanged: onLibraryChanged!)
+          else
+            PhoneUploadPanel(onLibraryChanged: onLibraryChanged!),
           const SizedBox(height: 20),
         ],
         Card(

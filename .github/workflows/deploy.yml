@@ -41,11 +41,16 @@ jobs:
           # Set in repo Settings → Secrets and variables → Actions → Variables.
           # The public Firebase Storage download URL of index.json.
           FIREBASE_INDEX_URL: ${{ vars.FIREBASE_INDEX_URL }}
+          # Web API key of the Firebase web app. Not a secret (it ships in the
+          # page), but restrict it to this site's address in Google Cloud. Without
+          # it the site stays read-only (no upload card).
+          FIREBASE_WEB_API_KEY: ${{ vars.FIREBASE_WEB_API_KEY }}
         run: |
           flutter build web --release \
             --base-href /music-transcription-viewer/ \
             --dart-define=DATA_SOURCE=remote \
-            --dart-define=FIREBASE_INDEX_URL="$FIREBASE_INDEX_URL"
+            --dart-define=FIREBASE_INDEX_URL="$FIREBASE_INDEX_URL" \
+            --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
