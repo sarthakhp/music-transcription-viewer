@@ -23,10 +23,13 @@ class UploadSubmit extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FilledButton.icon(
-          onPressed: enabled ? onPressed : null,
-          icon: Icon(isLink ? Icons.link_rounded : Icons.cloud_upload_rounded),
-          label: Text(isLink ? 'Transcribe link' : 'Upload and transcribe'),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: enabled ? onPressed : null,
+            icon: Icon(isLink ? Icons.link_rounded : Icons.cloud_upload_rounded),
+            label: const Text('Transcribe'),
+          ),
         ),
         if (fraction != null) ...[
           const SizedBox(height: 12),

@@ -45,8 +45,10 @@ class UploadCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
+            if (email == null) ...[
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+            ],
             if (email == null)
               FilledButton.icon(
                 onPressed: busy ? null : onSignIn,
@@ -54,8 +56,6 @@ class UploadCard extends StatelessWidget {
                 label: const Text('Sign in with Google'),
               )
             else ...[
-              AccountBar(email: email!, enabled: !busy, onSignOut: onSignOut),
-              const SizedBox(height: 8),
               ...form,
             ],
             if (error != null) _message(error!, theme.colorScheme.error),
@@ -68,6 +68,10 @@ class UploadCard extends StatelessWidget {
                 onDismiss: onDismissSubmission,
                 titleForJob: titleForJob,
               ),
+            ],
+            if (email != null) ...[
+              const SizedBox(height: 4),
+              AccountBar(email: email!, enabled: !busy, onSignOut: onSignOut),
             ],
           ],
         ),

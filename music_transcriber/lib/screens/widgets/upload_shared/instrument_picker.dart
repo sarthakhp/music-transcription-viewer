@@ -56,7 +56,7 @@ class _InstrumentPickerState extends State<InstrumentPicker> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Instruments (optional)', style: theme.textTheme.titleSmall),
+                      Text('Instruments', style: theme.textTheme.titleSmall),
                       Text(_summary(), style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),
@@ -72,7 +72,7 @@ class _InstrumentPickerState extends State<InstrumentPicker> {
   }
 
   String _summary() {
-    if (widget.selected.isEmpty) return 'Not chosen: it will work out the instruments on its own';
+    if (widget.selected.isEmpty) return 'Automatic';
     final names = [for (final o in instrumentCatalog) if (widget.selected.contains(o.id)) o.label];
     return 'Looking only for: ${names.join(', ')}';
   }

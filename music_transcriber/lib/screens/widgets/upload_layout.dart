@@ -275,6 +275,9 @@ class UploadLayout extends StatelessWidget {
             ),
           const SizedBox(height: 20),
         ],
+        // The upload card already says what this is; the intro only helps
+        // when there is no upload card (read-only site).
+        if (!(CloudUpload.isSupported && onLibraryChanged != null))
         Card(
           child: Padding(
             padding: const EdgeInsets.all(24),

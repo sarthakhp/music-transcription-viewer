@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../utils/friendly_error.dart';
 import '../../../models/audio_content_type.dart';
-import '../../../services/cloud_upload/cloud_upload.dart';
 import '../../../services/cloud_upload/upload_queue.dart';
 import '../../../services/phone_audio/audio_draft.dart';
 import '../../../services/phone_audio/phone_file_picker.dart';
@@ -18,6 +17,7 @@ import '../upload_shared/upload_card.dart';
 import '../upload_shared/upload_submit.dart';
 import '../upload_shared/clip_review.dart';
 import '../upload_shared/source_selector.dart';
+import '../upload_shared/source_tiles.dart';
 import 'record_controls.dart';
 
 /// Android-only card: sign in with Google, then add a song from a file, a
@@ -54,7 +54,8 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   final TextEditingController _url = TextEditingController();
 
   String? _email;
-  UploadSource _source = UploadSource.file;
+  /// Null while idle (just the three ways to start); set once one is chosen.
+  UploadSource? _source;
   RecordSource _recordSource = RecordSource.microphone;
   AudioContentType _audioType = AudioContentType.mixed;
   Set<String> _instruments = {};
@@ -184,6 +185,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
 
   bool get _canSubmit {
     if (busy || _recording.isRecording) return false;
+    if (_source == null) return false;
     return _source == UploadSource.link ? _url.text.trim().isNotEmpty : _draft.hasAudio && _draft.duration > 0;
   }
 
@@ -204,6 +206,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
           onProgress: (f) => setState(() => uploadFraction = f),
         ));
     await _draft.clear(); // uploaded: drop the local copy
+    _finishCompose();
   }
 
   Future<void> _submitLink() async {
@@ -214,6 +217,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
     }
     await _submit(url, () => _cloud.submitUrl(url: url, audioType: _audioType, instruments: _chosenInstruments));
     _url.clear();
+    _finishCompose();
   }
 
   /// Runs [send] (which returns the new request id) and starts tracking it.
@@ -232,7 +236,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   @override
   Widget build(BuildContext context) {
     return UploadCard(
-      title: 'Add a song from this phone',
+      title: 'Add a song',
       email: _email,
       busy: busy,
       onSignIn: _signIn,
@@ -247,37 +251,72 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
     );
   }
 
-  List<Widget> _form() => [
-        _sourceSelector(),
-        const SizedBox(height: 12),
-        _sourceBody(),
-        const SizedBox(height: 12),
-        _typeChips(),
-        if (_usesInstruments) ...[
-          const SizedBox(height: 8),
-          InstrumentPicker(
-            selected: _instruments,
-            enabled: !busy,
-            onChanged: (chosen) => setState(() => _instruments = chosen),
-          ),
-        ],
-        const SizedBox(height: 12),
-        UploadSubmit(
-          source: _source,
-          enabled: _canSubmit,
-          fraction: uploadFraction,
-          onPressed: _submitSelected,
-        ),
-      ];
-
-  Widget _sourceSelector() => SourceSelector(
-        selected: _source,
+  /// Idle: three ways to start. Once one is chosen: only that step, the song
+  /// type, and one clear button.
+  List<Widget> _form() {
+    final source = _source;
+    if (source == null) {
+      return [SourceTiles(enabled: !busy, onPick: _start)];
+    }
+    return [
+      ComposeHeader(
+        title: _sourceTitle(source),
         enabled: !(busy || _recording.isRecording),
-        onChanged: (source) => setState(() => _source = source),
-      );
+        onBack: _cancelCompose,
+      ),
+      const SizedBox(height: 8),
+      _sourceBody(source),
+      const SizedBox(height: 16),
+      _typeChips(),
+      if (_usesInstruments) ...[
+        const SizedBox(height: 8),
+        InstrumentPicker(
+          selected: _instruments,
+          enabled: !busy,
+          onChanged: (chosen) => setState(() => _instruments = chosen),
+        ),
+      ],
+      const SizedBox(height: 16),
+      UploadSubmit(
+        source: source,
+        enabled: _canSubmit,
+        fraction: uploadFraction,
+        onPressed: _submitSelected,
+      ),
+    ];
+  }
 
-  Widget _sourceBody() {
-    switch (_source) {
+  String _sourceTitle(UploadSource source) => switch (source) {
+        UploadSource.file => 'Upload a file',
+        UploadSource.record => 'Record',
+        UploadSource.link => 'Paste a link',
+      };
+
+  Future<void> _start(UploadSource source) async {
+    setState(() {
+      _source = source;
+      error = null;
+      _warning = null;
+    });
+    if (source != UploadSource.file) return;
+    await _pickFile();
+    // Backed out of the picker: nothing chosen, so go back to the start.
+    if (mounted && !_draft.hasAudio) setState(() => _source = null);
+  }
+
+  Future<void> _cancelCompose() async {
+    if (_recording.isRecording) await _recording.stop();
+    await _draft.clear();
+    _url.clear();
+    if (mounted) setState(() => _source = null);
+  }
+
+  void _finishCompose() {
+    if (mounted && error == null) setState(() => _source = null);
+  }
+
+  Widget _sourceBody(UploadSource source) {
+    switch (source) {
       case UploadSource.file:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

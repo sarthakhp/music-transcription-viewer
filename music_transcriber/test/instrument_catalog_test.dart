@@ -52,12 +52,12 @@ void main() {
 
     testWidgets('says it decides on its own when nothing is chosen', (tester) async {
       await pumpPicker(tester);
-      expect(find.textContaining('work out the instruments on its own'), findsOneWidget);
+      expect(find.text('Automatic'), findsOneWidget);
     });
 
     testWidgets('search narrows the list and ticking summarises the choice', (tester) async {
       await pumpPicker(tester);
-      await tester.tap(find.text('Instruments (optional)'));
+      await tester.tap(find.text('Instruments'));
       await tester.pump();
       await tester.enterText(find.byType(TextField), 'bansuri');
       await tester.pump();
@@ -72,12 +72,12 @@ void main() {
 
       await tester.tap(find.text('Clear all (1 chosen)'));
       await tester.pump();
-      expect(find.textContaining('work out the instruments on its own'), findsOneWidget);
+      expect(find.text('Automatic'), findsOneWidget);
     });
 
     testWidgets('a search with no match says so', (tester) async {
       await pumpPicker(tester);
-      await tester.tap(find.text('Instruments (optional)'));
+      await tester.tap(find.text('Instruments'));
       await tester.pump();
       await tester.enterText(find.byType(TextField), 'zzzz');
       await tester.pump();

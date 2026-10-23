@@ -74,10 +74,10 @@ void main() {
     ));
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Instruments (optional)'), findsOneWidget);
+    expect(find.text('Instruments'), findsOneWidget);
     await tester.tap(find.widgetWithText(ChoiceChip, 'Voice only'));
     await tester.pump();
-    expect(find.text('Instruments (optional)'), findsNothing);
+    expect(find.text('Instruments'), findsNothing);
     await tester.tap(find.text('Process again').last);
     await tester.pumpAndSettle();
     expect(picked?.audioType, AudioContentType.vocals);
