@@ -16,6 +16,8 @@ class UploadCard extends StatelessWidget {
   final String? error;
   final String? warning;
   final List<QueueStatus> submissions;
+  final void Function(String jobId) onOpenJob;
+  final void Function(String requestId) onDismissSubmission;
 
   const UploadCard({
     super.key,
@@ -28,6 +30,8 @@ class UploadCard extends StatelessWidget {
     required this.error,
     required this.warning,
     required this.submissions,
+    required this.onOpenJob,
+    required this.onDismissSubmission,
   });
 
   @override
@@ -56,7 +60,11 @@ class UploadCard extends StatelessWidget {
             if (warning != null) _message(warning!, theme.colorScheme.tertiary),
             if (submissions.isNotEmpty) ...[
               const Divider(height: 28),
-              SubmissionList(items: submissions),
+              SubmissionList(
+                items: submissions,
+                onOpen: onOpenJob,
+                onDismiss: onDismissSubmission,
+              ),
             ],
           ],
         ),

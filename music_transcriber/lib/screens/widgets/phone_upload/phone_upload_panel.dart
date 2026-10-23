@@ -25,7 +25,15 @@ import '../upload_shared/submission_tracker.dart';
 /// submission finishes so the song list can refresh.
 class PhoneUploadPanel extends StatefulWidget {
   final VoidCallback onLibraryChanged;
-  const PhoneUploadPanel({super.key, required this.onLibraryChanged});
+
+  /// Opens a finished song (the same as tapping it in the song list).
+  final void Function(String jobId) onOpenJob;
+
+  const PhoneUploadPanel({
+    super.key,
+    required this.onLibraryChanged,
+    required this.onOpenJob,
+  });
 
   @override
   State<PhoneUploadPanel> createState() => _PhoneUploadPanelState();
@@ -50,7 +58,7 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
   @override
   void initState() {
     super.initState();
-    _tracker = SubmissionTracker(_cloud, onJobFinished: widget.onLibraryChanged)
+    _tracker = SubmissionTracker(_cloud.status, onJobFinished: widget.onLibraryChanged)
       ..addListener(_rebuild);
     _recording.addListener(_rebuild);
     _draft.addListener(_rebuild);
@@ -226,6 +234,8 @@ class _PhoneUploadPanelState extends State<PhoneUploadPanel> with BusyGuard {
       error: error,
       warning: _warning,
       submissions: _tracker.items,
+      onOpenJob: widget.onOpenJob,
+      onDismissSubmission: _tracker.dismiss,
     );
   }
 

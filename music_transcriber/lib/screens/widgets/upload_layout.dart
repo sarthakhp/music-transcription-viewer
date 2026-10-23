@@ -248,9 +248,9 @@ class UploadLayout extends StatelessWidget {
       children: [
         if (CloudUpload.isSupported && onLibraryChanged != null) ...[
           if (kIsWeb)
-            WebUploadPanel(onLibraryChanged: onLibraryChanged!)
+            WebUploadPanel(onLibraryChanged: onLibraryChanged!, onOpenJob: onJobSelected)
           else
-            PhoneUploadPanel(onLibraryChanged: onLibraryChanged!),
+            PhoneUploadPanel(onLibraryChanged: onLibraryChanged!, onOpenJob: onJobSelected),
           const SizedBox(height: 20),
         ],
         Card(

@@ -23,7 +23,15 @@ import 'web_record_controls.dart';
 /// [onLibraryChanged] fires when a submission finishes so the song list refreshes.
 class WebUploadPanel extends StatefulWidget {
   final VoidCallback onLibraryChanged;
-  const WebUploadPanel({super.key, required this.onLibraryChanged});
+
+  /// Opens a finished song (the same as tapping it in the song list).
+  final void Function(String jobId) onOpenJob;
+
+  const WebUploadPanel({
+    super.key,
+    required this.onLibraryChanged,
+    required this.onOpenJob,
+  });
 
   @override
   State<WebUploadPanel> createState() => _WebUploadPanelState();
@@ -46,7 +54,7 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
   @override
   void initState() {
     super.initState();
-    _tracker = SubmissionTracker(_cloud, onJobFinished: widget.onLibraryChanged)
+    _tracker = SubmissionTracker(_cloud.status, onJobFinished: widget.onLibraryChanged)
       ..addListener(_rebuild);
     _draft.addListener(_rebuild);
     _url.addListener(_rebuild);
@@ -221,6 +229,8 @@ class _WebUploadPanelState extends State<WebUploadPanel> with BusyGuard {
       error: error,
       warning: null,
       submissions: _tracker.items,
+      onOpenJob: widget.onOpenJob,
+      onDismissSubmission: _tracker.dismiss,
     );
   }
 
