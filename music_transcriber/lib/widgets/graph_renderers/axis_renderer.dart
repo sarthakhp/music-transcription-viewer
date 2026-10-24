@@ -17,6 +17,9 @@ class AxisRenderer {
   final double maxLabelFontSize;
   final Brightness brightness;
 
+  /// Rows the song uses (already transposed). Other labels fade. Null: no fading.
+  final Set<int>? usedRows;
+
   AxisRenderer({
     required this.data,
     required this.viewStartTime,
@@ -29,6 +32,7 @@ class AxisRenderer {
     this.scaleRoot = 0,
     this.maxLabelFontSize = 14,
     this.brightness = Brightness.dark,
+    this.usedRows,
   });
 
   void drawAxes(Canvas canvas, Size size, Rect rect) {
@@ -107,15 +111,19 @@ class AxisRenderer {
         );
       }
 
+      final faded = usedRows != null && usedRows!.isNotEmpty && !usedRows!.contains(midi);
       final tp = TextPainter(
-        text: TextSpan(text: label, style: labelStyle),
+        text: TextSpan(
+          text: label,
+          style: faded ? labelStyle.copyWith(color: labelStyle.color?.withValues(alpha: 0.25)) : labelStyle,
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
 
       final labelX = rect.left - tp.width - 8;
       final labelY = y - tp.height / 2;
 
-      if (sargamEnabled) {
+      if (sargamEnabled && !faded) {
         final bg = SargamTheme.forType(getSargamNoteType(semitone)).backgroundColor;
         if (bg != null) {
           const hPad = 4.0;

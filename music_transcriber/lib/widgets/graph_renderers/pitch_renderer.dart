@@ -61,6 +61,39 @@ class PitchRenderer {
     return active;
   }
 
+  /// The next different notes the voice moves to after the playhead (looking
+  /// up to [lookAhead] seconds), soonest first, never repeating the one sounding.
+  List<int> upcomingPitches({int count = 3, double lookAhead = 6}) {
+    final frames = data.getDisplayFrames(framesPerSecond: vocalDetail);
+    if (frames.isEmpty) return const [];
+    var lo = 0, hi = frames.length - 1, first = frames.length;
+    while (lo <= hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (frames[mid].time >= currentTime) {
+        first = mid;
+        hi = mid - 1;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    int? last;
+    final out = <int>[];
+    for (int i = first; i < frames.length && frames[i].time <= currentTime + lookAhead; i++) {
+      final f = frames[i];
+      if (!f.isVoiced || f.frequency <= 0 || f.confidence < minConfidence) continue;
+      final midi = (frequencyToMidi(f.frequency, referenceFrequency: referenceFrequency) + transposeAmount).round();
+      if (last == null) {
+        last = midi; // the note sounding at the playhead is not "next"
+        continue;
+      }
+      if (midi == last) continue;
+      last = midi;
+      out.add(midi);
+      if (out.length == count) break;
+    }
+    return out;
+  }
+
   void drawPitchPoints(Canvas canvas, Rect rect) {
 
     // Find the visible frame range using binary search for better performance

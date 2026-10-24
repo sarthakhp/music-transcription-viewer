@@ -43,6 +43,7 @@ class PitchGraphPainter extends CustomPainter {
   final int vocalDetail;
   final double currentTime;
   final ActiveNotesHolder? activeNotesHolder;
+  final Set<int>? usedRows;
   final GraphInsets insets;
 
   PitchGraphPainter({
@@ -72,6 +73,7 @@ class PitchGraphPainter extends CustomPainter {
     required this.currentTime,
     this.insets = GraphInsets.regular,
     this.activeNotesHolder,
+    this.usedRows,
   }) : super(repaint: viewState);
 
   @override
@@ -111,6 +113,7 @@ class PitchGraphPainter extends CustomPainter {
       scaleRoot: scaleRoot,
       maxLabelFontSize: insets.maxLabelFontSize,
       brightness: brightness,
+      usedRows: usedRows == null ? null : {for (final m in usedRows!) m + transposeAmount},
     );
 
     final pitchRenderer = PitchRenderer(
@@ -182,6 +185,9 @@ class PitchGraphPainter extends CustomPainter {
     // The voice's current note lights its lane and label too.
     if (showVocals && activeNotesHolder != null) {
       activeNotesHolder!.notes = {...activeNotesHolder!.notes, ...pitchRenderer.activePitches()};
+      activeNotesHolder!.upcoming = pitchRenderer.upcomingPitches();
+    } else {
+      activeNotesHolder?.upcoming = [];
     }
 
     if (showVocals) {

@@ -9,6 +9,7 @@ import '../models/view_state.dart';
 import 'graph_constants.dart';
 import 'graph_renderers/cycle_renderer.dart';
 import 'graph_touch_gestures.dart';
+import 'graph_renderers/used_pitch_rows.dart';
 import 'pitch_graph_painter.dart';
 import 'playhead_painter.dart';
 import '../theme/app_palette.dart';
@@ -17,6 +18,9 @@ import '../theme/app_palette.dart';
 /// Avoids widget rebuild cycle while allowing painters to communicate
 class ActiveNotesHolder {
   Map<int, Color> notes = {};
+
+  /// The next few different notes the voice moves to, soonest first.
+  List<int> upcoming = [];
 }
 
 /// Main pitch graph widget with axes and visualization.
@@ -101,6 +105,22 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
   final ActiveNotesHolder _activeNotesHolder = ActiveNotesHolder();
 
   ViewState get _vs => widget.viewState;
+
+  // Rows (semitones) the song actually uses, so labels of unused rows can fade.
+  ProcessedFramesData? _usedFor;
+  InstrumentData? _usedForInstruments;
+  Set<int>? _usedRows;
+
+  Set<int> get _used {
+    if (_usedRows == null ||
+        !identical(_usedFor, widget.data) ||
+        !identical(_usedForInstruments, widget.instrumentData)) {
+      _usedFor = widget.data;
+      _usedForInstruments = widget.instrumentData;
+      _usedRows = usedPitchRows(widget.data, widget.instrumentData, widget.referenceFrequency);
+    }
+    return _usedRows!;
+  }
 
   // --- Cycle bar dragging ----------------------------------------------------
 
@@ -365,6 +385,7 @@ class _PitchGraphState extends State<PitchGraph> with SingleTickerProviderStateM
                     vocalDetail: widget.vocalDetail,
                     currentTime: widget.currentTime,
                     activeNotesHolder: _activeNotesHolder,
+                    usedRows: _used,
                     insets: _insets,
                   ),
                   foregroundPainter: PlayheadPainter(

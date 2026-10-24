@@ -21,6 +21,7 @@ class PlayheadRenderer {
   final bool sargamEnabled;
   final int scaleRoot;
   final Map<int, Color> activeNotePitches;
+  final List<int> upcomingPitches;
 
   PlayheadRenderer({
     required this.currentTime,
@@ -40,6 +41,7 @@ class PlayheadRenderer {
     this.sargamEnabled = false,
     this.scaleRoot = 0,
     this.activeNotePitches = const {},
+    this.upcomingPitches = const [],
   });
 
   void drawPlayhead(Canvas canvas, Rect rect) {
@@ -243,32 +245,42 @@ class PlayheadRenderer {
     });
   }
 
-  /// The note name(s) sounding now, big, beside the playhead.
+  String _name(int midi) =>
+      sargamEnabled ? midiToSargam(midi.toDouble(), scaleRoot: scaleRoot) : midiToNoteName(midi.toDouble());
+
+  /// The note sounding now, big, beside the playhead, with the next few notes
+  /// after it in smaller type (e.g. "Pa" then "Dha  Ni  Sa'").
   void drawNowChip(Canvas canvas, Rect rect) {
-    if (activeNotePitches.isEmpty) return;
+    if (activeNotePitches.isEmpty && upcomingPitches.isEmpty) return;
     if (currentTime < viewStartTime || currentTime > viewEndTime) return;
     final midis = activeNotePitches.keys.toList()..sort((a, b) => b.compareTo(a));
-    final names = [
-      for (final m in midis.take(3))
-        sargamEnabled ? midiToSargam(m.toDouble(), scaleRoot: scaleRoot) : midiToNoteName(m.toDouble()),
-    ];
-    final tp = TextPainter(
+    final now = TextPainter(
       text: TextSpan(
-        text: names.join('  '),
+        text: midis.isEmpty ? '·' : midis.take(3).map(_name).join('  '),
         style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    final next = upcomingPitches.isEmpty
+        ? null
+        : (TextPainter(
+            text: TextSpan(
+              text: 'next  ${upcomingPitches.map(_name).join('  ')}',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout());
+    final contentW = next == null ? now.width : (now.width > next.width ? now.width : next.width);
+    final w = contentW + 20;
+    final h = now.height + (next?.height ?? 0) + 12;
     final x = _timeToX(currentTime, rect);
-    final w = tp.width + 20, h = tp.height + 8;
-    // Sit right of the line, or left of it when there is no room.
     final left = x + 10 + w <= rect.right ? x + 10 : x - 10 - w;
-    final box = RRect.fromRectAndRadius(
-      Rect.fromLTWH(left, rect.top + 8, w, h),
-      const Radius.circular(10),
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(left, rect.top + 8, w, h), const Radius.circular(10)),
+      Paint()..color = playheadColor.withValues(alpha: 0.9),
     );
-    canvas.drawRRect(box, Paint()..color = playheadColor.withValues(alpha: 0.9));
-    tp.paint(canvas, Offset(left + 10, rect.top + 12));
+    now.paint(canvas, Offset(left + 10, rect.top + 12));
+    next?.paint(canvas, Offset(left + 10, rect.top + 12 + now.height));
   }
 
   /// Draw highlighted labels for active instrument notes

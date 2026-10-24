@@ -73,6 +73,7 @@ class PlayheadPainter extends CustomPainter {
       sargamEnabled: sargamEnabled,
       scaleRoot: scaleRoot,
       activeNotePitches: activeNotesHolder?.notes ?? {},
+      upcomingPitches: activeNotesHolder?.upcoming ?? const [],
     );
 
     playheadRenderer.drawActiveLanes(canvas, graphRect);
