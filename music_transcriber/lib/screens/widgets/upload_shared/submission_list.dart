@@ -93,7 +93,7 @@ class SubmissionList extends StatelessWidget {
       case 'queued':
         // Links download only on the Mac (video sites block cloud servers).
         return s.fileName.startsWith('http')
-            ? 'Waiting for your Mac. Open the Mac app to start this link'
+            ? 'Waiting for your Mac. Open the Mac app, or save the audio with another app and share the file here'
             : 'Queued. Starts as soon as a worker is free';
       default:
         return '${s.stage ?? 'Starting'} · ${s.progress}%';
