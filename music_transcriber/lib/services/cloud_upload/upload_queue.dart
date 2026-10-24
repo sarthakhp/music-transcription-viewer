@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 import '../../models/audio_content_type.dart';
 import 'cloud_upload.dart';
 import 'submission_tracker.dart';
@@ -9,6 +10,8 @@ import 'submission_tracker.dart';
 /// same list and refreshes the song list when it finishes.
 class UploadQueue {
   UploadQueue._() {
+    // Timers pause while the app is in the background: check again on return.
+    AppLifecycleListener(onResume: () => tracker.refresh());
     tracker = SubmissionTracker(cloud.status, onJobFinished: () => _finished.add(null));
   }
 

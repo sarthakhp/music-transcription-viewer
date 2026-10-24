@@ -34,6 +34,7 @@ class SubmissionTracker extends ChangeNotifier {
   final List<_Remembered> _entries = []; // newest first
   Timer? _poll;
   bool _disposed = false;
+  bool _refreshing = false;
 
   /// What the list should show, in order.
   List<QueueStatus> get items {
@@ -87,11 +88,25 @@ class SubmissionTracker extends ChangeNotifier {
   /// Fetches fresh state for every unfinished submission, then schedules the
   /// next check while any remain.
   Future<void> refresh() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      await _refreshOnce();
+    } finally {
+      _refreshing = false;
+    }
+    if (!_disposed && _entries.any((e) => e.status.isActive)) {
+      _poll?.cancel();
+      _poll = Timer(_pollEvery, refresh);
+    }
+  }
+
+  Future<void> _refreshOnce() async {
     _poll?.cancel();
     var finishedNow = false;
     for (final entry in List.of(_entries)) {
       if (!entry.status.isActive) continue;
-      final fresh = await _fetchStatus(entry.status.id);
+      final fresh = await _fetchSafely(entry.status.id);
       if (fresh == null || _disposed) continue;
       // Show the song's own name once the worker knows it (a video's title).
       final title = fresh.title;
@@ -104,8 +119,15 @@ class SubmissionTracker extends ChangeNotifier {
       notifyListeners();
     }
     if (finishedNow) onJobFinished();
-    if (!_disposed && _entries.any((e) => e.status.isActive)) {
-      _poll = Timer(_pollEvery, refresh);
+  }
+
+  /// One status read that can never stall the loop: a hung or failed network
+  /// call counts as "no answer yet" and is simply asked again next round.
+  Future<QueueStatus?> _fetchSafely(String id) async {
+    try {
+      return await _fetchStatus(id).timeout(const Duration(seconds: 12));
+    } catch (_) {
+      return null;
     }
   }
 
