@@ -175,6 +175,13 @@ class PitchGraphPainter extends CustomPainter {
       if (activeNotesHolder != null) {
         activeNotesHolder!.notes = renderer.getActiveNotesAtTime(currentTime);
       }
+    } else {
+      activeNotesHolder?.notes = {};
+    }
+
+    // The voice's current note lights its lane and label too.
+    if (showVocals && activeNotesHolder != null) {
+      activeNotesHolder!.notes = {...activeNotesHolder!.notes, ...pitchRenderer.activePitches()};
     }
 
     if (showVocals) {

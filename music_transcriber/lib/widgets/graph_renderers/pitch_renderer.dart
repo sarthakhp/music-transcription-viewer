@@ -42,6 +42,25 @@ class PitchRenderer {
     this.currentTime = 0.0,
   });
 
+  /// The semitone rows the voice is on right now (within 200 ms of the playhead),
+  /// each mapped to the highlight colour. Used to light up the matching lane and
+  /// its label, so the dot can be read without tracing across to the axis.
+  Map<int, Color> activePitches() {
+    final startIndex = _findStartIndex();
+    final endIndex = _findEndIndex();
+    if (startIndex == -1 || endIndex == -1 || startIndex > endIndex) return {};
+    final frames = data.getDisplayFrames(framesPerSecond: vocalDetail);
+    final active = <int, Color>{};
+    for (int i = startIndex; i <= endIndex; i++) {
+      final frame = frames[i];
+      if (!frame.isVoiced || frame.frequency <= 0 || frame.confidence < minConfidence) continue;
+      if ((frame.time - currentTime).abs() >= 0.2) continue;
+      final midi = frequencyToMidi(frame.frequency, referenceFrequency: referenceFrequency) + transposeAmount;
+      active[midi.round()] = primaryHighlightColor;
+    }
+    return active;
+  }
+
   void drawPitchPoints(Canvas canvas, Rect rect) {
 
     // Find the visible frame range using binary search for better performance

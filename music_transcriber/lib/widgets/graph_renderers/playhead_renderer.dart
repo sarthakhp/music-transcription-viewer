@@ -228,6 +228,49 @@ class PlayheadRenderer {
     tp.paint(canvas, Offset(labelX, labelY));
   }
 
+  /// A soft band across the whole width for every note sounding now, so the
+  /// lane joins the dot to its label on the left edge.
+  void drawActiveLanes(Canvas canvas, Rect rect) {
+    if (activeNotePitches.isEmpty || maxMidi - minMidi <= 0) return;
+    activeNotePitches.forEach((midi, color) {
+      final top = _midiToY(midi + 0.5, rect).clamp(rect.top, rect.bottom);
+      final bottom = _midiToY(midi - 0.5, rect).clamp(rect.top, rect.bottom);
+      if (top >= bottom) return;
+      canvas.drawRect(
+        Rect.fromLTRB(rect.left, top, rect.right, bottom),
+        Paint()..color = color.withValues(alpha: 0.16),
+      );
+    });
+  }
+
+  /// The note name(s) sounding now, big, beside the playhead.
+  void drawNowChip(Canvas canvas, Rect rect) {
+    if (activeNotePitches.isEmpty) return;
+    if (currentTime < viewStartTime || currentTime > viewEndTime) return;
+    final midis = activeNotePitches.keys.toList()..sort((a, b) => b.compareTo(a));
+    final names = [
+      for (final m in midis.take(3))
+        sargamEnabled ? midiToSargam(m.toDouble(), scaleRoot: scaleRoot) : midiToNoteName(m.toDouble()),
+    ];
+    final tp = TextPainter(
+      text: TextSpan(
+        text: names.join('  '),
+        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final x = _timeToX(currentTime, rect);
+    final w = tp.width + 20, h = tp.height + 8;
+    // Sit right of the line, or left of it when there is no room.
+    final left = x + 10 + w <= rect.right ? x + 10 : x - 10 - w;
+    final box = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, rect.top + 8, w, h),
+      const Radius.circular(10),
+    );
+    canvas.drawRRect(box, Paint()..color = playheadColor.withValues(alpha: 0.9));
+    tp.paint(canvas, Offset(left + 10, rect.top + 12));
+  }
+
   /// Draw highlighted labels for active instrument notes
   void drawActiveNoteLabels(Canvas canvas, Rect rect) {
     if (activeNotePitches.isEmpty) return;

@@ -75,10 +75,12 @@ class PlayheadPainter extends CustomPainter {
       activeNotePitches: activeNotesHolder?.notes ?? {},
     );
 
+    playheadRenderer.drawActiveLanes(canvas, graphRect);
     playheadRenderer.drawActiveNoteLabels(canvas, graphRect);
     playheadRenderer.drawNoteRowHighlight(canvas, graphRect);
     playheadRenderer.drawHoverIndicator(canvas, graphRect);
     playheadRenderer.drawPlayhead(canvas, graphRect);
+    playheadRenderer.drawNowChip(canvas, graphRect);
   }
 
   @override
