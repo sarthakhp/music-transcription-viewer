@@ -91,7 +91,10 @@ class SubmissionList extends StatelessWidget {
       case 'checking':
         return 'Checking…';
       case 'queued':
-        return 'Waiting for your Mac or the cloud to pick it up';
+        // Links download only on the Mac (video sites block cloud servers).
+        return s.fileName.startsWith('http')
+            ? 'Waiting for your Mac. Links are only processed there, so it needs to be on and running the app'
+            : 'Waiting for your Mac or the cloud to pick it up';
       default:
         return '${s.stage ?? 'Starting'} · ${s.progress}%';
     }
