@@ -11,6 +11,7 @@ import '../../services/cloud_upload/cloud_upload.dart';
 import 'phone_upload/phone_upload_panel.dart';
 import 'web_upload/web_upload_panel.dart';
 import 'upload_section.dart';
+import 'active_jobs_banner.dart';
 
 /// Upload layout widget with responsive design
 class UploadLayout extends StatelessWidget {
@@ -237,6 +238,10 @@ class UploadLayout extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // This window's own upload shows its own progress card instead.
+          if (!(appState.isProcessing || appState.isUploading)) ...[
+            ActiveJobsBanner(apiService: apiService),
+          ],
           UploadSection(
             appState: appState,
             apiService: apiService,
