@@ -276,11 +276,11 @@ class PlayheadRenderer {
     final x = _timeToX(currentTime, rect);
     final left = x + 10 + w <= rect.right ? x + 10 : x - 10 - w;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(left, rect.top + 8, w, h), const Radius.circular(10)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(left, rect.top + 40, w, h), const Radius.circular(10)),
       Paint()..color = playheadColor.withValues(alpha: 0.9),
     );
-    now.paint(canvas, Offset(left + 10, rect.top + 12));
-    next?.paint(canvas, Offset(left + 10, rect.top + 12 + now.height));
+    now.paint(canvas, Offset(left + 10, rect.top + 44));
+    next?.paint(canvas, Offset(left + 10, rect.top + 44 + now.height));
   }
 
   /// Draw highlighted labels for active instrument notes

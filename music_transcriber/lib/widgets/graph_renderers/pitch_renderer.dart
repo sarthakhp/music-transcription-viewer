@@ -76,14 +76,22 @@ class PitchRenderer {
         lo = mid + 1;
       }
     }
-    int? last;
+    // A note counts only once it holds for [minFrames] frames in a row, so a
+    // wobble between neighbouring semitones is not announced as new notes.
+    const minFrames = 2;
+    int? last; // the note sounding at the playhead, then each confirmed note after it
+    int? candidate;
+    var run = 0;
     final out = <int>[];
     for (int i = first; i < frames.length && frames[i].time <= currentTime + lookAhead; i++) {
       final f = frames[i];
       if (!f.isVoiced || f.frequency <= 0 || f.confidence < minConfidence) continue;
       final midi = (frequencyToMidi(f.frequency, referenceFrequency: referenceFrequency) + transposeAmount).round();
+      run = midi == candidate ? run + 1 : 1;
+      candidate = midi;
+      if (run < minFrames) continue;
       if (last == null) {
-        last = midi; // the note sounding at the playhead is not "next"
+        last = midi;
         continue;
       }
       if (midi == last) continue;
