@@ -39,7 +39,17 @@ class CachedFetcher {
 
   Future<Uint8List?> peek(String url) => _cache.read(url);
 
+  /// One automatic second try: a dropped connection on a big file is common on
+  /// phones and slow networks, and a plain retry usually succeeds.
   Future<Uint8List> _download(String url) async {
+    try {
+      return await _downloadOnce(url);
+    } catch (_) {
+      return _downloadOnce(url);
+    }
+  }
+
+  Future<Uint8List> _downloadOnce(String url) async {
     final res = await _client.get(Uri.parse(url)).timeout(timeout);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('HTTP ${res.statusCode}');

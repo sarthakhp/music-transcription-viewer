@@ -193,6 +193,24 @@ extension _HomeScreenJobs on _HomeScreenState {
     ));
   }
 
+  /// Says plainly that part of a song did not load, with a way to try again,
+  /// instead of leaving an empty graph that looks like the song has no notes.
+  void _showLoadProblem(String jobId, String what, String? reason) {
+    if (!mounted) return;
+    final text = reason != null && (reason.contains('Timeout') || reason.contains('TimeoutException'))
+        ? "Loading $what took too long. Check your connection and try again."
+        : "Couldn't load $what for this song. Check your connection and try again.";
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(text),
+        duration: const Duration(seconds: 12),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Theme.of(context).colorScheme.error,
+        action: SnackBarAction(label: 'Retry', textColor: Colors.white, onPressed: () => _onJobSelected(jobId)),
+      ));
+  }
+
   /// Handle job selection — load job data and display
   Future<void> _onJobSelected(String jobId) async {
     final appState = context.read<AppState>();
@@ -225,10 +243,14 @@ extension _HomeScreenJobs on _HomeScreenState {
         // Music only songs have no voice frames, so give the viewer the stored length.
         results.frames.data!.declaredDuration = resultsResponse.data?.duration ?? 0;
         appState.setPitchData(results.frames.data!);
+      } else {
+        _showLoadProblem(jobId, 'the notes', results.frames.error);
       }
 
       if (results.chords.isSuccess && results.chords.data != null) {
         appState.setChordData(results.chords.data!);
+      } else {
+        _showLoadProblem(jobId, 'the chords', results.chords.error);
       }
 
       await Future.wait([

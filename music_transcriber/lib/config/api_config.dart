@@ -53,7 +53,7 @@ class ApiConfig {
   
   // Timeouts
   static const Duration uploadTimeout = Duration(minutes: 5);
-  static const Duration requestTimeout = Duration(seconds: 30);
+  static const Duration requestTimeout = Duration(seconds: 60);
   static const Duration downloadTimeout = Duration(minutes: 10);
   
   // Polling configuration
